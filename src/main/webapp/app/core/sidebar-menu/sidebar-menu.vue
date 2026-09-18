@@ -14,6 +14,15 @@
         <span class="menu-tooltip">Home</span>
       </li>
 
+      <!-- My teams (signed-in users) -->
+      <li v-if="authenticated" :class="{ active: isTeamsActive }" data-cy="myTeamsMenu">
+        <router-link to="/teams" class="menu-item">
+          <font-awesome-icon class="va-icon" icon="users" />
+          <span class="nav-item">Teams</span>
+        </router-link>
+        <span class="menu-tooltip">Teams</span>
+      </li>
+
       <!-- Entity groups -->
       <template v-for="group in groups" :key="group.key">
         <li class="section" :class="{ active: !openGroups[group.key] && groupHasActive(group) }">

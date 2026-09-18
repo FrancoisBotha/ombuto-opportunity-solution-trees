@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router';
 
 import type AccountService from '@/account/account.service';
 import { useStore } from '@/store';
+import { storeToRefs } from 'pinia';
 
 export interface SidebarLink {
   path: string;
@@ -67,8 +68,10 @@ export default defineComponent({
     const hasAnyAuthorityValues: Ref<any> = ref({});
     const openAPIEnabled = computed(() => store.activeProfiles.includes('api-docs'));
     const inProduction = computed(() => store.activeProfiles.includes('prod'));
+    const { authenticated } = storeToRefs(store);
 
     const currentPath = computed(() => router.currentRoute.value.path);
+    const isTeamsActive = computed(() => currentPath.value === '/teams' || currentPath.value.startsWith('/teams/'));
 
     const isLinkActive = (link: SidebarLink) =>
       link.prefix ? currentPath.value === link.path || currentPath.value.startsWith(`${link.path}/`) : currentPath.value === link.path;
@@ -116,7 +119,9 @@ export default defineComponent({
       hasAnyAuthorityValues,
       openAPIEnabled,
       inProduction,
+      authenticated,
       currentPath,
+      isTeamsActive,
       groups: [treeGroup, discoveryGroup],
       isLinkActive,
       groupHasActive,
