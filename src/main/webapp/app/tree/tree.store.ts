@@ -1,7 +1,16 @@
 import { defineStore } from 'pinia';
 
 import type { IOpportunityTreeNode, IOutcomeTreeNode, IProductTreeNode, ITeamTree, TreeNode, TreeNodeType } from './tree.model';
-import TreeService, { type CreateChildInput, type CreateProductInput } from './tree.service';
+import TreeService, {
+  type CreateChildInput,
+  type CreateProductInput,
+  type UpdateOpportunityInput,
+  type UpdateOutcomeInput,
+  type UpdateProductInput,
+  type UpdateSolutionInput,
+} from './tree.service';
+
+export type UpdateNodePatch = UpdateProductInput | UpdateOutcomeInput | UpdateOpportunityInput | UpdateSolutionInput;
 
 export type TreeLoadError = 'forbidden' | 'not-found' | 'unknown';
 
@@ -358,6 +367,45 @@ export const useTreeStore = defineStore('tree', {
         }
       }
       return true;
+    },
+    /**
+     * Update a node via the API (PATCH), then replace it in place preserving
+     * any children the server does not return.
+     */
+    async updateNode(type: TreeNodeType, id: number, patch: UpdateNodePatch, service?: TreeService): Promise<TreeNode | null> {
+      if (!this.tree) return null;
+      const svc = service ?? new TreeService();
+      this.clearWriteError();
+      const existing = this.findNode(type, id);
+      if (!existing) return null;
+      try {
+        let updated: TreeNode | null = null;
+        if (type === 'product') {
+          const p = await svc.updateProduct(id, patch as UpdateProductInput);
+          updated = { ...(existing as IProductTreeNode), ...p, outcomes: (existing as IProductTreeNode).outcomes };
+        } else if (type === 'outcome') {
+          const o = await svc.updateOutcome(id, patch as UpdateOutcomeInput);
+          updated = { ...(existing as IOutcomeTreeNode), ...o, opportunities: (existing as IOutcomeTreeNode).opportunities };
+        } else if (type === 'opportunity') {
+          const o = await svc.updateOpportunity(id, patch as UpdateOpportunityInput);
+          updated = {
+            ...(existing as IOpportunityTreeNode),
+            ...o,
+            children: (existing as IOpportunityTreeNode).children,
+            solutions: (existing as IOpportunityTreeNode).solutions,
+          };
+        } else if (type === 'solution') {
+          const s = await svc.updateSolution(id, patch as UpdateSolutionInput);
+          updated = { ...(existing as any), ...s };
+        }
+        if (updated) {
+          this.replaceNode(type, id, updated);
+        }
+        return updated;
+      } catch (err: any) {
+        this.recordWriteError(err);
+        return null;
+      }
     },
     enclosingOutcomeId(opportunityId: number): number | null {
       if (!this.tree) return null;

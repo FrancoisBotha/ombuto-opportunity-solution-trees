@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import type { TreeNodeType } from './tree.model';
 import { validChildTypes } from './tree.model';
 import { layoutTree, type LayoutEdge, type LayoutNode } from './tree-layout';
+import TreeDetailPanel from './tree-detail-panel.vue';
 import TreeNodeCard from './tree-node-card.vue';
 import TreeService, { type CreateChildInput, type CreateProductInput } from './tree.service';
 import { useTreeStore } from './tree.store';
@@ -27,7 +28,7 @@ interface DeleteContext {
 
 export default defineComponent({
   name: 'TreeEditor',
-  components: { TreeNodeCard },
+  components: { TreeNodeCard, TreeDetailPanel },
   setup() {
     const route = useRoute();
     const treeService = inject('treeService', () => new TreeService(), true);
@@ -110,6 +111,7 @@ export default defineComponent({
     const onCanvasClick = (event: MouseEvent) => {
       if ((event.target as HTMLElement).closest('.tree-node-card')) return;
       if ((event.target as HTMLElement).closest('.tree-editor-modal')) return;
+      if ((event.target as HTMLElement).closest('.tree-detail-panel')) return;
       treeStore.clearSelection();
     };
 

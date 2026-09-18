@@ -76,64 +76,67 @@
           </div>
         </div>
 
-        <section
-          class="tree-canvas"
-          data-cy="treeEditorCanvas"
-          :class="{ 'tree-canvas--dragging': isDragging }"
-          @mousedown="onCanvasMouseDown"
-          @mousemove="onCanvasMouseMove"
-          @mouseup="onCanvasMouseUp"
-          @mouseleave="onCanvasMouseUp"
-          @wheel="onWheel"
-          @click="onCanvasClick"
-        >
-          <div
-            class="tree-canvas__viewport"
-            :style="{
-              transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
-              transformOrigin: '0 0',
-              width: canvasWidth + 'px',
-              height: canvasHeight + 'px',
-            }"
+        <div class="tree-editor-workspace">
+          <section
+            class="tree-canvas"
+            data-cy="treeEditorCanvas"
+            :class="{ 'tree-canvas--dragging': isDragging }"
+            @mousedown="onCanvasMouseDown"
+            @mousemove="onCanvasMouseMove"
+            @mouseup="onCanvasMouseUp"
+            @mouseleave="onCanvasMouseUp"
+            @wheel="onWheel"
+            @click="onCanvasClick"
           >
-            <svg
-              class="tree-canvas__edges"
-              :width="canvasWidth"
-              :height="canvasHeight"
-              :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
-              data-cy="treeEditorEdges"
+            <div
+              class="tree-canvas__viewport"
+              :style="{
+                transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+                transformOrigin: '0 0',
+                width: canvasWidth + 'px',
+                height: canvasHeight + 'px',
+              }"
             >
-              <g :transform="`translate(${canvasPadding}, ${canvasPadding})`">
-                <path
-                  v-for="edge in edges"
-                  :key="edge.fromKey + '->' + edge.toKey"
-                  class="tree-canvas__edge"
-                  :d="`M ${edge.fromX} ${edge.fromY} C ${edge.fromX} ${(edge.fromY + edge.toY) / 2}, ${edge.toX} ${(edge.fromY + edge.toY) / 2}, ${edge.toX} ${edge.toY}`"
-                  fill="none"
-                  stroke="#a991d4"
-                  stroke-width="2"
+              <svg
+                class="tree-canvas__edges"
+                :width="canvasWidth"
+                :height="canvasHeight"
+                :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
+                data-cy="treeEditorEdges"
+              >
+                <g :transform="`translate(${canvasPadding}, ${canvasPadding})`">
+                  <path
+                    v-for="edge in edges"
+                    :key="edge.fromKey + '->' + edge.toKey"
+                    class="tree-canvas__edge"
+                    :d="`M ${edge.fromX} ${edge.fromY} C ${edge.fromX} ${(edge.fromY + edge.toY) / 2}, ${edge.toX} ${(edge.fromY + edge.toY) / 2}, ${edge.toX} ${edge.toY}`"
+                    fill="none"
+                    stroke="#a991d4"
+                    stroke-width="2"
+                  />
+                </g>
+              </svg>
+              <div class="tree-canvas__nodes" :style="{ transform: `translate(${canvasPadding}px, ${canvasPadding}px)` }">
+                <TreeNodeCard
+                  v-for="n in nodes"
+                  :key="n.key"
+                  :type="n.type"
+                  :node="n.data"
+                  :selected="isSelected(n.type, n.id)"
+                  :can-edit="canEdit"
+                  :x="n.x"
+                  :y="n.y"
+                  :width="n.width"
+                  :height="n.height"
+                  @select="onNodeSelect(n.type, n.id)"
+                  @add-child="openAddChildModal($event.parentType, $event.parentId, $event.childType)"
+                  @delete="openDeleteModal($event.type, $event.id)"
                 />
-              </g>
-            </svg>
-            <div class="tree-canvas__nodes" :style="{ transform: `translate(${canvasPadding}px, ${canvasPadding}px)` }">
-              <TreeNodeCard
-                v-for="n in nodes"
-                :key="n.key"
-                :type="n.type"
-                :node="n.data"
-                :selected="isSelected(n.type, n.id)"
-                :can-edit="canEdit"
-                :x="n.x"
-                :y="n.y"
-                :width="n.width"
-                :height="n.height"
-                @select="onNodeSelect(n.type, n.id)"
-                @add-child="openAddChildModal($event.parentType, $event.parentId, $event.childType)"
-                @delete="openDeleteModal($event.type, $event.id)"
-              />
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+          <TreeDetailPanel @delete="openDeleteModal($event.type, $event.id)" />
+        </div>
       </template>
     </div>
 
@@ -264,6 +267,15 @@
 <script lang="ts" src="./tree-editor.component.ts"></script>
 
 <style scoped lang="scss">
+.tree-editor-workspace {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+.tree-editor-workspace > .tree-canvas {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .tree-canvas {
   position: relative;
   overflow: hidden;
