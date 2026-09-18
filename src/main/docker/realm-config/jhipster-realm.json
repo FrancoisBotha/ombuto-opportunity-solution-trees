@@ -1,8 +1,9 @@
 {
   "id": "jhipster",
   "realm": "jhipster",
-  "displayName": "JHipster",
-  "displayNameHtml": "<div class=\"kc-logo-text\"><span>JHipster</span></div>",
+  "displayName": "Opportunity Solution Tree",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>Opportunity Solution Tree</span></div>",
+  "loginTheme": "ost",
   "notBefore": 0,
   "defaultSignatureAlgorithm": "RS256",
   "revokeRefreshToken": false,

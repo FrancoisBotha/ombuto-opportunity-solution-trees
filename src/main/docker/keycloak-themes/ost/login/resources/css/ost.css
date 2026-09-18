@@ -1,0 +1,198 @@
+/* Colors mirror src/main/webapp/content/scss/va-variables.scss */
+:root {
+  --ost-navbar-bg: #2c3531;
+  --ost-sidebar-bg: #263029;
+  --ost-deep-bg: #161b18;
+  --ost-fg: #d1e8e2;
+  --ost-muted: #7f958c;
+  --ost-accent: #37a473;
+  --ost-accent-dark: #2c8a5f;
+  --ost-content-bg: #f7f6fa;
+
+  --keycloak-card-top-color: var(--ost-accent);
+  --pf-v5-global--primary-color--100: var(--ost-accent);
+  --pf-v5-global--primary-color--200: var(--ost-accent-dark);
+  --pf-v5-global--link--Color: var(--ost-accent-dark);
+  --pf-v5-global--link--Color--hover: var(--ost-navbar-bg);
+  --pf-v5-global--active-color--100: var(--ost-accent);
+}
+
+.login-pf body {
+  background:
+    radial-gradient(60rem 40rem at 15% 10%, rgba(55, 164, 115, 0.28), transparent 60%),
+    radial-gradient(50rem 35rem at 90% 95%, rgba(55, 164, 115, 0.16), transparent 60%),
+    linear-gradient(160deg, var(--ost-navbar-bg) 0%, var(--ost-deep-bg) 100%) fixed;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+}
+
+.pf-v5-c-login__container {
+  grid-template-columns: minmax(0, 27rem);
+  justify-content: center;
+}
+
+/* Brand: tree mark + product name instead of the Keycloak logo */
+.pf-v5-c-login__header {
+  padding-bottom: 1.5rem;
+}
+
+#kc-header-wrapper {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ost-fg) !important;
+}
+
+div.kc-logo-text {
+  background-image: url('../img/ost-mark.svg');
+  background-position: center top;
+  background-size: 56px 56px;
+  width: auto;
+  height: auto;
+  padding-top: 68px;
+}
+
+div.kc-logo-text span {
+  display: inline;
+}
+
+/* Card */
+.pf-v5-c-login__main {
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.pf-v5-c-login__main-header {
+  border-top: 0;
+  padding-top: 2.25rem;
+}
+
+div.pf-v5-c-login__main-header {
+  grid-template-columns: 100%;
+}
+
+.pf-v5-c-login__main-title,
+#kc-page-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--ost-navbar-bg);
+}
+
+.pf-v5-c-login__main-body {
+  padding-bottom: 2.25rem;
+}
+
+/* Fields */
+.pf-v5-c-form__label-text {
+  font-weight: 500;
+  color: var(--ost-navbar-bg);
+}
+
+.pf-v5-c-form-control {
+  --pf-v5-c-form-control--BorderRadius: 8px;
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: var(--ost-accent);
+  border-radius: 8px;
+  background: var(--ost-content-bg);
+}
+
+.pf-v5-c-form-control::before,
+.pf-v5-c-form-control::after {
+  border-radius: 8px;
+}
+
+.pf-v5-c-form-control:focus-within {
+  box-shadow: 0 0 0 3px rgba(55, 164, 115, 0.22);
+}
+
+.pf-v5-c-form-control > input {
+  padding-block: 0.6rem;
+}
+
+/* The green focus-within ring above replaces the default outline */
+.pf-v5-c-form-control > input:focus {
+  outline: none;
+}
+
+.pf-v5-c-form-control:focus-within::after {
+  border-color: var(--ost-accent);
+}
+
+/* Password field + show/hide button read as one control */
+.pf-v5-c-input-group .pf-v5-c-input-group__item:first-child .pf-v5-c-form-control,
+.pf-v5-c-input-group .pf-v5-c-input-group__item:first-child .pf-v5-c-form-control::before,
+.pf-v5-c-input-group .pf-v5-c-input-group__item:first-child .pf-v5-c-form-control::after {
+  border-radius: 8px 0 0 8px;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
+  --pf-v5-c-button--m-control--BackgroundColor: var(--ost-content-bg);
+  --pf-v5-c-button--m-control--Color: var(--ost-muted);
+  --pf-v5-c-button--m-control--hover--Color: var(--ost-navbar-bg);
+  border-radius: 0 8px 8px 0;
+  height: 100%;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control::after {
+  border-radius: 0 8px 8px 0;
+}
+
+.pf-v5-c-check__input {
+  accent-color: var(--ost-accent);
+}
+
+/* Buttons */
+.pf-v5-c-button {
+  --pf-v5-c-button--BorderRadius: 8px;
+  --pf-v5-c-button--after--BorderRadius: 8px;
+}
+
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--ost-accent);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--ost-accent-dark);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--ost-accent-dark);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--ost-navbar-bg);
+  padding-block: 0.7rem;
+  font-weight: 600;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.pf-v5-c-button.pf-m-primary:hover {
+  box-shadow: 0 6px 16px rgba(55, 164, 115, 0.35);
+}
+
+.pf-v5-c-button:focus-visible {
+  outline: 3px solid rgba(55, 164, 115, 0.45);
+  outline-offset: 2px;
+}
+
+/* Footer band (registration / info links) */
+.pf-v5-c-login__main-footer-band {
+  background: transparent;
+  border-top: 1px solid #e6e4ec;
+  padding-top: 1.25rem;
+  color: var(--ost-muted);
+}
+
+#kc-social-providers svg:not(.google) {
+  filter: none;
+  color: var(--ost-accent-dark);
+}
+
+@media (max-width: 480px) {
+  .pf-v5-c-login__main {
+    border-radius: 0;
+  }
+}

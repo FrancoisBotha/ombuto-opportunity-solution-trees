@@ -39,31 +39,6 @@ Browser Upgrade Prompt
 }
 
 /* ==========================================================================
-Main page styles
-========================================================================== */
-
-.hipster.img-fluid {
-  display: inline-block;
-  width: 347px;
-  height: 497px;
-  background: url('/content/images/jhipster_family_member_2.svg') no-repeat center top;
-  background-size: contain;
-}
-
-/* wait autoprefixer update to allow simple generation of high pixel density media query */
-@media only screen and (-webkit-min-device-pixel-ratio: 2),
-  only screen and (min--moz-device-pixel-ratio: 2),
-  only screen and (-o-min-device-pixel-ratio: 2/1),
-  only screen and (min-device-pixel-ratio: 2),
-  only screen and (min-resolution: 192dpi),
-  only screen and (min-resolution: 2dppx) {
-  .hipster {
-    background: url('/content/images/jhipster_family_member_2.svg') no-repeat center top;
-    background-size: contain;
-  }
-}
-
-/* ==========================================================================
 Generic styles
 ========================================================================== */
 .jh-card {
@@ -104,7 +79,16 @@ Generic styles
 }
 
 .footer {
+  margin-top: 1.5rem;
+  padding-top: 0.75rem;
   border-top: 1px solid rgba(0, 0, 0, 0.125);
+  font-size: 0.8rem;
+  color: #7f958c;
+  text-align: center;
+
+  p {
+    margin: 0;
+  }
 }
 
 .hand,
