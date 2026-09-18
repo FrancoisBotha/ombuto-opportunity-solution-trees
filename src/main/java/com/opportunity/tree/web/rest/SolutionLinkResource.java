@@ -1,6 +1,7 @@
 package com.opportunity.tree.web.rest;
 
 import com.opportunity.tree.repository.SolutionLinkRepository;
+import com.opportunity.tree.security.AuthoritiesConstants;
 import com.opportunity.tree.service.SolutionLinkService;
 import com.opportunity.tree.service.dto.SolutionLinkDTO;
 import com.opportunity.tree.web.rest.errors.BadRequestAlertException;
@@ -15,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.ResponseUtil;
@@ -24,6 +26,7 @@ import tech.jhipster.web.util.ResponseUtil;
  */
 @RestController
 @RequestMapping("/api/solution-links")
+@PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
 public class SolutionLinkResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(SolutionLinkResource.class);

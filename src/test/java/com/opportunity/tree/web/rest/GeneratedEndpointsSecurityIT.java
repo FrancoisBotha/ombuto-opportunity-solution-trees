@@ -1,0 +1,238 @@
+package com.opportunity.tree.web.rest;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opportunity.tree.IntegrationTest;
+import com.opportunity.tree.domain.Product;
+import com.opportunity.tree.domain.Team;
+import com.opportunity.tree.domain.TeamMember;
+import com.opportunity.tree.domain.enumeration.TeamRole;
+import com.opportunity.tree.repository.ProductRepository;
+import com.opportunity.tree.repository.TeamMemberRepository;
+import com.opportunity.tree.repository.TeamRepository;
+import com.opportunity.tree.service.dto.ProductDTO;
+import com.opportunity.tree.service.dto.TeamDTO;
+import com.opportunity.tree.service.dto.TeamMemberDTO;
+import com.opportunity.tree.service.dto.UserDTO;
+import jakarta.persistence.EntityManager;
+import java.time.Instant;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Verifies TEAMS-004 acceptance criterion 3: a ROLE_USER who is not a member
+ * of a team cannot list, read, create, update, patch or delete that team's
+ * Team, TeamMember or Product rows through the generated CRUD endpoints
+ * (per HTTP verb), and denials return 403/404 without revealing whether the
+ * resource exists (criterion 4).
+ *
+ * <p>The class runs each request as a ROLE_USER whose login is NOT in the
+ * TeamMember table for the pre-seeded team. Team and TeamMember endpoints are
+ * locked to ROLE_ADMIN at the controller and must therefore 403 outright.
+ * ProductResource is routed through TeamAccessService and must uniformly deny
+ * non-members (403 on writes; empty list on GET-all; 404 on GET-one — matching
+ * a non-existent id so existence cannot be probed).
+ */
+@IntegrationTest
+@AutoConfigureMockMvc
+@WithMockUser(username = "not-a-member-teams004", authorities = { "ROLE_USER" })
+class GeneratedEndpointsSecurityIT {
+
+    @Autowired
+    private ObjectMapper om;
+
+    @Autowired
+    private EntityManager em;
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
+    private TeamMemberRepository teamMemberRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    private Team otherTeam;
+    private TeamMember otherMembership;
+    private Product otherProduct;
+
+    @BeforeEach
+    void seedOtherTeam() {
+        otherTeam = new Team().name("Other Team " + System.nanoTime()).description("owned by other").createdDate(Instant.now());
+        em.persist(otherTeam);
+        // The signed-in user is NOT added as a member of otherTeam.
+        otherProduct = new Product()
+            .name("Other Product " + System.nanoTime())
+            .description("d")
+            .vision("v")
+            .archived(Boolean.FALSE)
+            .createdDate(Instant.now());
+        otherProduct.setTeam(otherTeam);
+        em.persist(otherProduct);
+        em.flush();
+    }
+
+    @AfterEach
+    void cleanup() {
+        if (otherProduct != null && otherProduct.getId() != null) {
+            productRepository.deleteById(otherProduct.getId());
+        }
+        if (otherMembership != null && otherMembership.getId() != null) {
+            teamMemberRepository.deleteById(otherMembership.getId());
+        }
+        if (otherTeam != null && otherTeam.getId() != null) {
+            teamRepository.deleteById(otherTeam.getId());
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Team — locked to ROLE_ADMIN
+    // ---------------------------------------------------------------------
+
+    @Test
+    @Transactional
+    void teamEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        TeamDTO body = new TeamDTO();
+        body.setId(otherTeam.getId());
+        body.setName("valid-name");
+        body.setCreatedDate(Instant.now());
+
+        mvc.perform(get("/api/teams")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/teams/{id}", otherTeam.getId())).andExpect(status().isForbidden());
+        mvc
+            .perform(post("/api/teams").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(body)))
+            .andExpect(status().isForbidden());
+        mvc
+            .perform(
+                put("/api/teams/{id}", otherTeam.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(body))
+            )
+            .andExpect(status().isForbidden());
+        mvc
+            .perform(
+                patch("/api/teams/{id}", otherTeam.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(body))
+            )
+            .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/teams/{id}", otherTeam.getId()).with(csrf())).andExpect(status().isForbidden());
+    }
+
+    // ---------------------------------------------------------------------
+    // TeamMember — locked to ROLE_ADMIN
+    // ---------------------------------------------------------------------
+
+    @Test
+    @Transactional
+    void teamMemberEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        TeamDTO teamRef = new TeamDTO();
+        teamRef.setId(otherTeam.getId());
+        UserDTO userRef = new UserDTO();
+        TeamMemberDTO body = new TeamMemberDTO();
+        body.setId(1L);
+        body.setRole(TeamRole.VIEWER);
+        body.setJoinedDate(Instant.now());
+        body.setTeam(teamRef);
+        body.setUser(userRef);
+
+        mvc.perform(get("/api/team-members")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/team-members/{id}", 1L)).andExpect(status().isForbidden());
+        mvc
+            .perform(post("/api/team-members").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(body)))
+            .andExpect(status().isForbidden());
+        mvc
+            .perform(
+                put("/api/team-members/{id}", 1L).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(body))
+            )
+            .andExpect(status().isForbidden());
+        mvc
+            .perform(
+                patch("/api/team-members/{id}", 1L)
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(body))
+            )
+            .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/team-members/{id}", 1L).with(csrf())).andExpect(status().isForbidden());
+    }
+
+    // ---------------------------------------------------------------------
+    // Product — routed through TeamAccessService
+    // ---------------------------------------------------------------------
+
+    @Test
+    @Transactional
+    void productEndpointsDenyNonMemberOnEveryVerb() throws Exception {
+        TeamDTO teamRef = new TeamDTO();
+        teamRef.setId(otherTeam.getId());
+        ProductDTO body = new ProductDTO();
+        body.setName("hijack");
+        body.setDescription("d");
+        body.setVision("v");
+        body.setArchived(Boolean.FALSE);
+        body.setCreatedDate(Instant.now());
+        body.setTeam(teamRef);
+
+        // GET-all: not-a-member sees an empty list — the other team's product
+        // is filtered out (findAllForCurrentUser). Cannot be listed.
+        mvc
+            .perform(get("/api/products"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == " + otherProduct.getId() + ")]").isEmpty());
+
+        // GET-one: uniform 404 whether the product exists or not (NFR-002).
+        mvc.perform(get("/api/products/{id}", otherProduct.getId())).andExpect(status().isNotFound());
+
+        // POST: creating for another team is 403.
+        mvc
+            .perform(post("/api/products").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(body)))
+            .andExpect(status().isForbidden());
+
+        // PUT: updating another team's product is 403.
+        ProductDTO update = new ProductDTO();
+        update.setId(otherProduct.getId());
+        update.setName("hijacked");
+        update.setArchived(Boolean.FALSE);
+        update.setCreatedDate(Instant.now());
+        update.setTeam(teamRef);
+        mvc
+            .perform(
+                put("/api/products/{id}", otherProduct.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(update))
+            )
+            .andExpect(status().isForbidden());
+
+        // PATCH: partial update of another team's product is 403.
+        mvc
+            .perform(
+                patch("/api/products/{id}", otherProduct.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(update))
+            )
+            .andExpect(status().isForbidden());
+
+        // DELETE: another team's product is 403.
+        mvc.perform(delete("/api/products/{id}", otherProduct.getId()).with(csrf())).andExpect(status().isForbidden());
+    }
+}

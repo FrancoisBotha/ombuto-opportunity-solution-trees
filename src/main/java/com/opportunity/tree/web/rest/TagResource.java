@@ -1,6 +1,7 @@
 package com.opportunity.tree.web.rest;
 
 import com.opportunity.tree.repository.TagRepository;
+import com.opportunity.tree.security.AuthoritiesConstants;
 import com.opportunity.tree.service.TagService;
 import com.opportunity.tree.service.dto.TagDTO;
 import com.opportunity.tree.web.rest.errors.BadRequestAlertException;
@@ -15,15 +16,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.ResponseUtil;
 
 /**
  * REST controller for managing {@link com.opportunity.tree.domain.Tag}.
+ *
+ * <p>Tag is a team-owned entity. The generated CRUD endpoints are locked down to
+ * {@code ROLE_ADMIN} (TEAMS-004, NFR-001, NFR-002). Non-admin callers reach tag
+ * data through the team-scoped tree façades in later epics.
  */
 @RestController
 @RequestMapping("/api/tags")
+@PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
 public class TagResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(TagResource.class);

@@ -49,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 @IntegrationTest
 @ExtendWith(MockitoExtension.class)
 @AutoConfigureMockMvc
-@WithMockUser
+@WithMockUser(authorities = "ROLE_ADMIN")
 class InterviewResourceIT {
 
     private static final String DEFAULT_TITLE = "AAAAAAAAAA";

@@ -1,6 +1,7 @@
 package com.opportunity.tree.web.rest;
 
 import com.opportunity.tree.repository.InterviewRepository;
+import com.opportunity.tree.security.AuthoritiesConstants;
 import com.opportunity.tree.service.InterviewQueryService;
 import com.opportunity.tree.service.InterviewService;
 import com.opportunity.tree.service.criteria.InterviewCriteria;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
@@ -31,6 +33,7 @@ import tech.jhipster.web.util.ResponseUtil;
  */
 @RestController
 @RequestMapping("/api/interviews")
+@PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
 public class InterviewResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(InterviewResource.class);

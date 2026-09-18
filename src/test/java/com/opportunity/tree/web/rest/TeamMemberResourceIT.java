@@ -47,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 @IntegrationTest
 @ExtendWith(MockitoExtension.class)
 @AutoConfigureMockMvc
-@WithMockUser
+@WithMockUser(authorities = "ROLE_ADMIN")
 class TeamMemberResourceIT {
 
     private static final TeamRole DEFAULT_ROLE = TeamRole.OWNER;
