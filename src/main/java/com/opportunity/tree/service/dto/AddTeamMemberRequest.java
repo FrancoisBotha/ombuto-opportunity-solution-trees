@@ -1,0 +1,32 @@
+package com.opportunity.tree.service.dto;
+
+import com.opportunity.tree.domain.enumeration.TeamRole;
+import jakarta.validation.constraints.NotNull;
+import java.io.Serializable;
+
+public class AddTeamMemberRequest implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @NotNull
+    private String userId;
+
+    @NotNull
+    private TeamRole role;
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public TeamRole getRole() {
+        return role;
+    }
+
+    public void setRole(TeamRole role) {
+        this.role = role;
+    }
+}

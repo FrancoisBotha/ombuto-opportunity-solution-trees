@@ -14,6 +14,8 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
+    long countByTeamId(Long teamId);
+
     default Optional<Product> findOneWithEagerRelationships(Long id) {
         return this.findOneWithToOneRelationships(id);
     }

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        TEAMS-002 — a user may belong to a given team at most once (see FR-003, FR-005). Enforcing the
+        constraint at the DB layer means duplicate adds surface as a 4xx via TeamManagementService's
+        pre-check instead of a 500 on flush.
+    -->
+    <changeSet id="20260918110000-1" author="teams-002">
+        <addUniqueConstraint
+            tableName="team_member"
+            columnNames="team_id, user_id"
+            constraintName="ux_team_member__team_user"/>
+    </changeSet>
+</databaseChangeLog>

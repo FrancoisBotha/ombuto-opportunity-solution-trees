@@ -1,6 +1,7 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.TeamMember;
+import com.opportunity.tree.domain.enumeration.TeamRole;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,16 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     List<TeamMember> findByUserIsCurrentUser();
 
     List<TeamMember> findAllByUserLogin(String login);
+
+    List<TeamMember> findAllByTeamId(Long teamId);
+
+    Optional<TeamMember> findOneByTeamIdAndUserId(Long teamId, String userId);
+
+    boolean existsByTeamIdAndUserId(Long teamId, String userId);
+
+    long countByTeamId(Long teamId);
+
+    long countByTeamIdAndRole(Long teamId, TeamRole role);
 
     default Optional<TeamMember> findOneWithEagerRelationships(Long id) {
         return this.findOneWithToOneRelationships(id);

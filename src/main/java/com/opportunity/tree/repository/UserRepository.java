@@ -24,4 +24,12 @@ public interface UserRepository extends JpaRepository<User, String> {
     Optional<User> findOneWithAuthoritiesByLogin(String login);
 
     Page<User> findAllByIdNotNullAndActivatedIsTrue(Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Query(
+        "select u from User u where u.activated = true and (" +
+            "lower(u.login) like lower(concat('%', :q, '%')) or " +
+            "lower(coalesce(u.firstName, '')) like lower(concat('%', :q, '%')) or " +
+            "lower(coalesce(u.lastName, '')) like lower(concat('%', :q, '%')))"
+    )
+    Page<User> searchByLoginOrName(@org.springframework.data.repository.query.Param("q") String q, Pageable pageable);
 }
