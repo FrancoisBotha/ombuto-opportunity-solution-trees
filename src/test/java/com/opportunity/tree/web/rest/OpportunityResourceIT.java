@@ -62,9 +62,9 @@ class OpportunityResourceIT {
     private static final OpportunityStatus DEFAULT_STATUS = OpportunityStatus.IDENTIFIED;
     private static final OpportunityStatus UPDATED_STATUS = OpportunityStatus.EXPLORING;
 
-    private static final Integer DEFAULT_VALUE = 1;
-    private static final Integer UPDATED_VALUE = 2;
-    private static final Integer SMALLER_VALUE = 1 - 1;
+    private static final Integer DEFAULT_VALUERATING = 1;
+    private static final Integer UPDATED_VALUERATING = 2;
+    private static final Integer SMALLER_VALUERATING = 1 - 1;
 
     private static final Integer DEFAULT_COMPLEXITY = 1;
     private static final Integer UPDATED_COMPLEXITY = 2;
@@ -125,7 +125,7 @@ class OpportunityResourceIT {
             .title(DEFAULT_TITLE)
             .description(DEFAULT_DESCRIPTION)
             .status(DEFAULT_STATUS)
-            .value(DEFAULT_VALUE)
+            .valuerating(DEFAULT_VALUERATING)
             .complexity(DEFAULT_COMPLEXITY)
             .sortOrder(DEFAULT_SORT_ORDER)
             .createdDate(DEFAULT_CREATED_DATE)
@@ -154,7 +154,7 @@ class OpportunityResourceIT {
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
-            .value(UPDATED_VALUE)
+            .valuerating(UPDATED_VALUERATING)
             .complexity(UPDATED_COMPLEXITY)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
@@ -275,7 +275,7 @@ class OpportunityResourceIT {
     void checkValueIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
-        opportunity.setValue(null);
+        opportunity.setValuerating(null);
 
         // Create the Opportunity, which fails.
         OpportunityDTO opportunityDTO = opportunityMapper.toDto(opportunity);
@@ -361,7 +361,7 @@ class OpportunityResourceIT {
             .andExpect(jsonPath("$.[*].title").value(hasItem(DEFAULT_TITLE)))
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
-            .andExpect(jsonPath("$.[*].value").value(hasItem(DEFAULT_VALUE)))
+            .andExpect(jsonPath("$.[*].valuerating").value(hasItem(DEFAULT_VALUERATING)))
             .andExpect(jsonPath("$.[*].complexity").value(hasItem(DEFAULT_COMPLEXITY)))
             .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
@@ -400,7 +400,7 @@ class OpportunityResourceIT {
             .andExpect(jsonPath("$.title").value(DEFAULT_TITLE))
             .andExpect(jsonPath("$.description").value(DEFAULT_DESCRIPTION))
             .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
-            .andExpect(jsonPath("$.value").value(DEFAULT_VALUE))
+            .andExpect(jsonPath("$.valuerating").value(DEFAULT_VALUERATING))
             .andExpect(jsonPath("$.complexity").value(DEFAULT_COMPLEXITY))
             .andExpect(jsonPath("$.sortOrder").value(DEFAULT_SORT_ORDER))
             .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()))
@@ -504,72 +504,81 @@ class OpportunityResourceIT {
 
     @Test
     @Transactional
-    void getAllOpportunitiesByValueIsEqualToSomething() throws Exception {
+    void getAllOpportunitiesByValueratingIsEqualToSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where value equals to
-        defaultOpportunityFiltering("value.equals=" + DEFAULT_VALUE, "value.equals=" + UPDATED_VALUE);
+        // Get all the opportunityList where valuerating equals to
+        defaultOpportunityFiltering("valuerating.equals=" + DEFAULT_VALUERATING, "valuerating.equals=" + UPDATED_VALUERATING);
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByValueIsInShouldWork() throws Exception {
+    void getAllOpportunitiesByValueratingIsInShouldWork() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where value in
-        defaultOpportunityFiltering("value.in=" + DEFAULT_VALUE + "," + UPDATED_VALUE, "value.in=" + UPDATED_VALUE);
+        // Get all the opportunityList where valuerating in
+        defaultOpportunityFiltering(
+            "valuerating.in=" + DEFAULT_VALUERATING + "," + UPDATED_VALUERATING,
+            "valuerating.in=" + UPDATED_VALUERATING
+        );
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByValueIsNullOrNotNull() throws Exception {
+    void getAllOpportunitiesByValueratingIsNullOrNotNull() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where value is not null
-        defaultOpportunityFiltering("value.specified=true", "value.specified=false");
+        // Get all the opportunityList where valuerating is not null
+        defaultOpportunityFiltering("valuerating.specified=true", "valuerating.specified=false");
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByValueIsGreaterThanOrEqualToSomething() throws Exception {
+    void getAllOpportunitiesByValueratingIsGreaterThanOrEqualToSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where value is greater than or equal to
-        defaultOpportunityFiltering("value.greaterThanOrEqual=" + DEFAULT_VALUE, "value.greaterThanOrEqual=" + (DEFAULT_VALUE + 1));
+        // Get all the opportunityList where valuerating is greater than or equal to
+        defaultOpportunityFiltering(
+            "valuerating.greaterThanOrEqual=" + DEFAULT_VALUERATING,
+            "valuerating.greaterThanOrEqual=" + (DEFAULT_VALUERATING + 1)
+        );
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByValueIsLessThanOrEqualToSomething() throws Exception {
+    void getAllOpportunitiesByValueratingIsLessThanOrEqualToSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where value is less than or equal to
-        defaultOpportunityFiltering("value.lessThanOrEqual=" + DEFAULT_VALUE, "value.lessThanOrEqual=" + SMALLER_VALUE);
+        // Get all the opportunityList where valuerating is less than or equal to
+        defaultOpportunityFiltering(
+            "valuerating.lessThanOrEqual=" + DEFAULT_VALUERATING,
+            "valuerating.lessThanOrEqual=" + SMALLER_VALUERATING
+        );
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByValueIsLessThanSomething() throws Exception {
+    void getAllOpportunitiesByValueratingIsLessThanSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where value is less than
-        defaultOpportunityFiltering("value.lessThan=" + (DEFAULT_VALUE + 1), "value.lessThan=" + DEFAULT_VALUE);
+        // Get all the opportunityList where valuerating is less than
+        defaultOpportunityFiltering("valuerating.lessThan=" + (DEFAULT_VALUERATING + 1), "valuerating.lessThan=" + DEFAULT_VALUERATING);
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByValueIsGreaterThanSomething() throws Exception {
+    void getAllOpportunitiesByValueratingIsGreaterThanSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where value is greater than
-        defaultOpportunityFiltering("value.greaterThan=" + SMALLER_VALUE, "value.greaterThan=" + DEFAULT_VALUE);
+        // Get all the opportunityList where valuerating is greater than
+        defaultOpportunityFiltering("valuerating.greaterThan=" + SMALLER_VALUERATING, "valuerating.greaterThan=" + DEFAULT_VALUERATING);
     }
 
     @Test
@@ -917,7 +926,7 @@ class OpportunityResourceIT {
             .andExpect(jsonPath("$.[*].title").value(hasItem(DEFAULT_TITLE)))
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
-            .andExpect(jsonPath("$.[*].value").value(hasItem(DEFAULT_VALUE)))
+            .andExpect(jsonPath("$.[*].valuerating").value(hasItem(DEFAULT_VALUERATING)))
             .andExpect(jsonPath("$.[*].complexity").value(hasItem(DEFAULT_COMPLEXITY)))
             .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
@@ -973,7 +982,7 @@ class OpportunityResourceIT {
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
-            .value(UPDATED_VALUE)
+            .valuerating(UPDATED_VALUERATING)
             .complexity(UPDATED_COMPLEXITY)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
@@ -1071,7 +1080,7 @@ class OpportunityResourceIT {
         partialUpdatedOpportunity.setId(opportunity.getId());
 
         partialUpdatedOpportunity
-            .value(UPDATED_VALUE)
+            .valuerating(UPDATED_VALUERATING)
             .complexity(UPDATED_COMPLEXITY)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE);
@@ -1110,7 +1119,7 @@ class OpportunityResourceIT {
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
-            .value(UPDATED_VALUE)
+            .valuerating(UPDATED_VALUERATING)
             .complexity(UPDATED_COMPLEXITY)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)

@@ -26,7 +26,7 @@
             <span>Value</span>
           </dt>
           <dd>
-            <span>{{ opportunity.value }}</span>
+            <span>{{ opportunity.valuerating }}</span>
           </dd>
           <dt>
             <span>Complexity</span>

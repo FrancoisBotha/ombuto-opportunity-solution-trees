@@ -48,7 +48,7 @@ public class OpportunityCriteria implements Serializable, Criteria {
 
     private OpportunityStatusFilter status;
 
-    private IntegerFilter value;
+    private IntegerFilter valuerating;
 
     private IntegerFilter complexity;
 
@@ -76,7 +76,7 @@ public class OpportunityCriteria implements Serializable, Criteria {
         this.id = other.optionalId().map(LongFilter::copy).orElse(null);
         this.title = other.optionalTitle().map(StringFilter::copy).orElse(null);
         this.status = other.optionalStatus().map(OpportunityStatusFilter::copy).orElse(null);
-        this.value = other.optionalValue().map(IntegerFilter::copy).orElse(null);
+        this.valuerating = other.optionalValuerating().map(IntegerFilter::copy).orElse(null);
         this.complexity = other.optionalComplexity().map(IntegerFilter::copy).orElse(null);
         this.sortOrder = other.optionalSortOrder().map(IntegerFilter::copy).orElse(null);
         this.createdDate = other.optionalCreatedDate().map(InstantFilter::copy).orElse(null);
@@ -151,23 +151,23 @@ public class OpportunityCriteria implements Serializable, Criteria {
         this.status = status;
     }
 
-    public IntegerFilter getValue() {
-        return value;
+    public IntegerFilter getValuerating() {
+        return valuerating;
     }
 
-    public Optional<IntegerFilter> optionalValue() {
-        return Optional.ofNullable(value);
+    public Optional<IntegerFilter> optionalValuerating() {
+        return Optional.ofNullable(valuerating);
     }
 
-    public IntegerFilter value() {
-        if (value == null) {
-            setValue(new IntegerFilter());
+    public IntegerFilter valuerating() {
+        if (valuerating == null) {
+            setValuerating(new IntegerFilter());
         }
-        return value;
+        return valuerating;
     }
 
-    public void setValue(IntegerFilter value) {
-        this.value = value;
+    public void setValuerating(IntegerFilter valuerating) {
+        this.valuerating = valuerating;
     }
 
     public IntegerFilter getComplexity() {
@@ -373,7 +373,7 @@ public class OpportunityCriteria implements Serializable, Criteria {
             Objects.equals(id, that.id) &&
             Objects.equals(title, that.title) &&
             Objects.equals(status, that.status) &&
-            Objects.equals(value, that.value) &&
+            Objects.equals(valuerating, that.valuerating) &&
             Objects.equals(complexity, that.complexity) &&
             Objects.equals(sortOrder, that.sortOrder) &&
             Objects.equals(createdDate, that.createdDate) &&
@@ -393,7 +393,7 @@ public class OpportunityCriteria implements Serializable, Criteria {
             id,
             title,
             status,
-            value,
+            valuerating,
             complexity,
             sortOrder,
             createdDate,
@@ -414,7 +414,7 @@ public class OpportunityCriteria implements Serializable, Criteria {
             optionalId().map(f -> "id=" + f + ", ").orElse("") +
             optionalTitle().map(f -> "title=" + f + ", ").orElse("") +
             optionalStatus().map(f -> "status=" + f + ", ").orElse("") +
-            optionalValue().map(f -> "value=" + f + ", ").orElse("") +
+            optionalValuerating().map(f -> "valuerating=" + f + ", ").orElse("") +
             optionalComplexity().map(f -> "complexity=" + f + ", ").orElse("") +
             optionalSortOrder().map(f -> "sortOrder=" + f + ", ").orElse("") +
             optionalCreatedDate().map(f -> "createdDate=" + f + ", ").orElse("") +

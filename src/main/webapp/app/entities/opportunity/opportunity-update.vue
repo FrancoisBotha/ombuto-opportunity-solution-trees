@@ -61,15 +61,15 @@
             <input
               type="number"
               class="form-control"
-              name="value"
-              id="opportunity-value"
-              data-cy="value"
-              :class="{ valid: !v$.value.$invalid, invalid: v$.value.$invalid }"
-              v-model.number="v$.value.$model"
+              name="valuerating"
+              id="opportunity-valuerating"
+              data-cy="valuerating"
+              :class="{ valid: !v$.valuerating.$invalid, invalid: v$.valuerating.$invalid }"
+              v-model.number="v$.valuerating.$model"
               required
             />
-            <div v-if="v$.value.$anyDirty && v$.value.$invalid">
-              <small class="form-text text-danger" v-for="error of v$.value.$errors" :key="error.$uid">{{ error.$message }}</small>
+            <div v-if="v$.valuerating.$anyDirty && v$.valuerating.$invalid">
+              <small class="form-text text-danger" v-for="error of v$.valuerating.$errors" :key="error.$uid">{{ error.$message }}</small>
             </div>
           </div>
           <div class="mb-3">

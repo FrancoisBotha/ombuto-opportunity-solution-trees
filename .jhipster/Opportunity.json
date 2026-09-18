@@ -24,7 +24,7 @@
       "fieldValues": "IDENTIFIED,EXPLORING,PRIORITISED,IN_PROGRESS,ADDRESSED,PARKED,DISCARDED"
     },
     {
-      "fieldName": "value",
+      "fieldName": "valuerating",
       "fieldType": "Integer",
       "fieldValidateRules": ["required", "min", "max"],
       "fieldValidateRulesMax": "5",

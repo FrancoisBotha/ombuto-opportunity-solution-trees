@@ -23,7 +23,7 @@
             <column name="status" type="varchar(255)">
                 <constraints nullable="false" />
             </column>
-            <column name="value" type="integer">
+            <column name="valuerating" type="integer">
                 <constraints nullable="false" />
             </column>
             <column name="complexity" type="integer">
@@ -98,7 +98,7 @@
             <column name="title" type="string"/>
             <column name="description" type="clob"/>
             <column name="status" type="string"/>
-            <column name="value" type="numeric"/>
+            <column name="valuerating" type="numeric"/>
             <column name="complexity" type="numeric"/>
             <column name="sort_order" type="numeric"/>
             <column name="created_date" type="date"/>

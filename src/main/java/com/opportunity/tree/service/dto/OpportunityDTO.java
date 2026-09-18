@@ -32,7 +32,7 @@ public class OpportunityDTO implements Serializable {
     @NotNull
     @Min(value = 1)
     @Max(value = 5)
-    private Integer value;
+    private Integer valuerating;
 
     @NotNull
     @Min(value = 1)
@@ -90,12 +90,12 @@ public class OpportunityDTO implements Serializable {
         this.status = status;
     }
 
-    public Integer getValue() {
-        return value;
+    public Integer getValuerating() {
+        return valuerating;
     }
 
-    public void setValue(Integer value) {
-        this.value = value;
+    public void setValuerating(Integer valuerating) {
+        this.valuerating = valuerating;
     }
 
     public Integer getComplexity() {
@@ -199,7 +199,7 @@ public class OpportunityDTO implements Serializable {
             ", title='" + getTitle() + "'" +
             ", description='" + getDescription() + "'" +
             ", status='" + getStatus() + "'" +
-            ", value=" + getValue() +
+            ", valuerating=" + getValuerating() +
             ", complexity=" + getComplexity() +
             ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +

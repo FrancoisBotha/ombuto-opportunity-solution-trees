@@ -108,7 +108,7 @@ export default defineComponent({
       status: {
         required: validations.required('This field is required.'),
       },
-      value: {
+      valuerating: {
         required: validations.required('This field is required.'),
         integer: validations.integer('This field should be a number.'),
         min: validations.minValue('This field should be at least 1.', 1),

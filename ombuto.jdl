@@ -114,7 +114,7 @@ entity Opportunity {
   title String required minlength(2) maxlength(200)
   description TextBlob
   status OpportunityStatus required
-  value Integer required min(1) max(5)
+  valuerating Integer required min(1) max(5)
   complexity Integer required min(1) max(5)
   sortOrder Integer required
   createdDate Instant required

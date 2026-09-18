@@ -50,7 +50,7 @@ public class OpportunityAsserts {
             .satisfies(a -> assertThat(a.getTitle()).as("check title").isEqualTo(expected.getTitle()))
             .satisfies(a -> assertThat(a.getDescription()).as("check description").isEqualTo(expected.getDescription()))
             .satisfies(a -> assertThat(a.getStatus()).as("check status").isEqualTo(expected.getStatus()))
-            .satisfies(a -> assertThat(a.getValue()).as("check value").isEqualTo(expected.getValue()))
+            .satisfies(a -> assertThat(a.getValuerating()).as("check valuerating").isEqualTo(expected.getValuerating()))
             .satisfies(a -> assertThat(a.getComplexity()).as("check complexity").isEqualTo(expected.getComplexity()))
             .satisfies(a -> assertThat(a.getSortOrder()).as("check sortOrder").isEqualTo(expected.getSortOrder()))
             .satisfies(a -> assertThat(a.getCreatedDate()).as("check createdDate").isEqualTo(expected.getCreatedDate()))

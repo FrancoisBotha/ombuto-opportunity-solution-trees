@@ -1,4 +1,4 @@
-id;title;description;status;value;complexity;sort_order;created_date;last_modified_date;outcome_id
+id;title;description;status;valuerating;complexity;sort_order;created_date;last_modified_date;outcome_id
 1;along quietly instead;../fake-data/blob/hipster.txt;ADDRESSED;5;2;21114;2026-09-17T21:02:33;2026-09-18T09:17:25;1
 2;or curly dispense;../fake-data/blob/hipster.txt;ADDRESSED;3;1;4900;2026-09-17T13:49:38;2026-09-17T22:12:02;2
 3;plus ha diagram;../fake-data/blob/hipster.txt;IDENTIFIED;4;2;11563;2026-09-17T17:28:31;2026-09-17T22:15:42;3
