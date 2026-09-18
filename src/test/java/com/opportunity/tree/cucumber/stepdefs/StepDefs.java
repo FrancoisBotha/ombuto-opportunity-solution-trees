@@ -1,8 +1,8 @@
 package com.opportunity.tree.cucumber.stepdefs;
 
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.ResultActions;
 
 public abstract class StepDefs {
 
-    protected WebTestClient.ResponseSpec actions;
+    protected ResultActions actions;
 }

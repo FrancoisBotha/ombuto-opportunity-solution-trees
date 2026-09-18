@@ -121,13 +121,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Opportunity', async () => {
-        const patchObject = {
-          description: 'BBBBBB',
-          status: 'BBBBBB',
-          sortOrder: 1,
-          createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
-          ...new Opportunity(),
-        };
+        const patchObject = { complexity: 1, ...new Opportunity() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };

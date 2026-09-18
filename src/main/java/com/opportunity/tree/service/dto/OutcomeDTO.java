@@ -18,7 +18,7 @@ public class OutcomeDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 200)
     private String title;
 
@@ -34,17 +34,17 @@ public class OutcomeDTO implements Serializable {
     @Size(max = 100)
     private String currentValue;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private OutcomeStatus status;
 
     private LocalDate startDate;
 
     private LocalDate targetDate;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Integer sortOrder;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant createdDate;
 
     private Instant lastModifiedDate;

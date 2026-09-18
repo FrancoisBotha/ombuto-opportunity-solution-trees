@@ -4,9 +4,10 @@ import static com.opportunity.tree.domain.ExperimentAsserts.*;
 import static com.opportunity.tree.web.rest.TestUtil.createUpdateProxyForBean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
@@ -14,15 +15,16 @@ import com.opportunity.tree.domain.Experiment;
 import com.opportunity.tree.domain.Solution;
 import com.opportunity.tree.domain.enumeration.ExperimentResult;
 import com.opportunity.tree.domain.enumeration.ExperimentStatus;
-import com.opportunity.tree.repository.EntityManager;
 import com.opportunity.tree.repository.ExperimentRepository;
 import com.opportunity.tree.service.ExperimentService;
 import com.opportunity.tree.service.dto.ExperimentDTO;
 import com.opportunity.tree.service.mapper.ExperimentMapper;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
@@ -32,18 +34,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Flux;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the {@link ExperimentResource} REST controller.
  */
 @IntegrationTest
 @ExtendWith(MockitoExtension.class)
-@AutoConfigureWebTestClient(timeout = IntegrationTest.DEFAULT_ENTITY_TIMEOUT)
+@AutoConfigureMockMvc
 @WithMockUser
 class ExperimentResourceIT {
 
@@ -102,7 +106,7 @@ class ExperimentResourceIT {
     private EntityManager em;
 
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc restExperimentMockMvc;
 
     private Experiment experiment;
 
@@ -128,7 +132,13 @@ class ExperimentResourceIT {
             .createdDate(DEFAULT_CREATED_DATE);
         // Add required entity
         Solution solution;
-        solution = em.insert(SolutionResourceIT.createEntity(em)).block();
+        if (TestUtil.findAll(em, Solution.class).isEmpty()) {
+            solution = SolutionResourceIT.createEntity(em);
+            em.persist(solution);
+            em.flush();
+        } else {
+            solution = TestUtil.findAll(em, Solution.class).get(0);
+        }
         experiment.setSolution(solution);
         return experiment;
     }
@@ -153,24 +163,15 @@ class ExperimentResourceIT {
             .createdDate(UPDATED_CREATED_DATE);
         // Add required entity
         Solution solution;
-        solution = em.insert(SolutionResourceIT.createUpdatedEntity(em)).block();
+        if (TestUtil.findAll(em, Solution.class).isEmpty()) {
+            solution = SolutionResourceIT.createUpdatedEntity(em);
+            em.persist(solution);
+            em.flush();
+        } else {
+            solution = TestUtil.findAll(em, Solution.class).get(0);
+        }
         updatedExperiment.setSolution(solution);
         return updatedExperiment;
-    }
-
-    public static void deleteEntities(EntityManager em) {
-        try {
-            em.deleteAll("rel_experiment__assumption").block();
-            em.deleteAll(Experiment.class).block();
-        } catch (Exception e) {
-            // It can fail, if other entities are still referring this - it will be removed later.
-        }
-        SolutionResourceIT.deleteEntities(em);
-    }
-
-    @BeforeEach
-    void setupCsrf() {
-        webTestClient = webTestClient.mutateWith(csrf());
     }
 
     @BeforeEach
@@ -181,28 +182,28 @@ class ExperimentResourceIT {
     @AfterEach
     void cleanup() {
         if (insertedExperiment != null) {
-            experimentRepository.delete(insertedExperiment).block();
+            experimentRepository.delete(insertedExperiment);
             insertedExperiment = null;
         }
-        deleteEntities(em);
     }
 
     @Test
+    @Transactional
     void createExperiment() throws Exception {
         long databaseSizeBeforeCreate = getRepositoryCount();
         // Create the Experiment
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
-        var returnedExperimentDTO = webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(ExperimentDTO.class)
-            .returnResult()
-            .getResponseBody();
+        var returnedExperimentDTO = om.readValue(
+            restExperimentMockMvc
+                .perform(
+                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(experimentDTO))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            ExperimentDTO.class
+        );
 
         // Validate the Experiment in the database
         assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
@@ -213,6 +214,7 @@ class ExperimentResourceIT {
     }
 
     @Test
+    @Transactional
     void createExperimentWithExistingId() throws Exception {
         // Create the Experiment with an existing ID
         experiment.setId(1L);
@@ -221,20 +223,16 @@ class ExperimentResourceIT {
         long databaseSizeBeforeCreate = getRepositoryCount();
 
         // An entity with an existing ID cannot be created, so this API call must fail
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restExperimentMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(experimentDTO)))
+            .andExpect(status().isBadRequest());
 
         // Validate the Experiment in the database
         assertSameRepositoryCount(databaseSizeBeforeCreate);
     }
 
     @Test
+    @Transactional
     void checkTitleIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -243,19 +241,15 @@ class ExperimentResourceIT {
         // Create the Experiment, which fails.
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restExperimentMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(experimentDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkStatusIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -264,19 +258,15 @@ class ExperimentResourceIT {
         // Create the Experiment, which fails.
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restExperimentMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(experimentDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkCreatedDateIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -285,136 +275,97 @@ class ExperimentResourceIT {
         // Create the Experiment, which fails.
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restExperimentMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(experimentDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
-    void getAllExperiments() {
+    @Transactional
+    void getAllExperiments() throws Exception {
         // Initialize the database
-        insertedExperiment = experimentRepository.save(experiment).block();
+        insertedExperiment = experimentRepository.saveAndFlush(experiment);
 
         // Get all the experimentList
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL + "?sort=id,desc")
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.[*].id")
-            .value(hasItem(experiment.getId().intValue()))
-            .jsonPath("$.[*].title")
-            .value(hasItem(DEFAULT_TITLE))
-            .jsonPath("$.[*].hypothesis")
-            .value(hasItem(DEFAULT_HYPOTHESIS))
-            .jsonPath("$.[*].method")
-            .value(hasItem(DEFAULT_METHOD))
-            .jsonPath("$.[*].successCriteria")
-            .value(hasItem(DEFAULT_SUCCESS_CRITERIA))
-            .jsonPath("$.[*].status")
-            .value(hasItem(DEFAULT_STATUS.toString()))
-            .jsonPath("$.[*].result")
-            .value(hasItem(DEFAULT_RESULT.toString()))
-            .jsonPath("$.[*].learnings")
-            .value(hasItem(DEFAULT_LEARNINGS))
-            .jsonPath("$.[*].startDate")
-            .value(hasItem(DEFAULT_START_DATE.toString()))
-            .jsonPath("$.[*].endDate")
-            .value(hasItem(DEFAULT_END_DATE.toString()))
-            .jsonPath("$.[*].createdDate")
-            .value(hasItem(DEFAULT_CREATED_DATE.toString()));
+        restExperimentMockMvc
+            .perform(get(ENTITY_API_URL + "?sort=id,desc"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.[*].id").value(hasItem(experiment.getId().intValue())))
+            .andExpect(jsonPath("$.[*].title").value(hasItem(DEFAULT_TITLE)))
+            .andExpect(jsonPath("$.[*].hypothesis").value(hasItem(DEFAULT_HYPOTHESIS)))
+            .andExpect(jsonPath("$.[*].method").value(hasItem(DEFAULT_METHOD)))
+            .andExpect(jsonPath("$.[*].successCriteria").value(hasItem(DEFAULT_SUCCESS_CRITERIA)))
+            .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
+            .andExpect(jsonPath("$.[*].result").value(hasItem(DEFAULT_RESULT.toString())))
+            .andExpect(jsonPath("$.[*].learnings").value(hasItem(DEFAULT_LEARNINGS)))
+            .andExpect(jsonPath("$.[*].startDate").value(hasItem(DEFAULT_START_DATE.toString())))
+            .andExpect(jsonPath("$.[*].endDate").value(hasItem(DEFAULT_END_DATE.toString())))
+            .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())));
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllExperimentsWithEagerRelationshipsIsEnabled() {
-        when(experimentServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllExperimentsWithEagerRelationshipsIsEnabled() throws Exception {
+        when(experimentServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=true").exchange().expectStatus().isOk();
+        restExperimentMockMvc.perform(get(ENTITY_API_URL + "?eagerload=true")).andExpect(status().isOk());
 
         verify(experimentServiceMock, times(1)).findAllWithEagerRelationships(any());
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllExperimentsWithEagerRelationshipsIsNotEnabled() {
-        when(experimentServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllExperimentsWithEagerRelationshipsIsNotEnabled() throws Exception {
+        when(experimentServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=false").exchange().expectStatus().isOk();
-        verify(experimentRepositoryMock, times(1)).findAllWithEagerRelationships(any());
+        restExperimentMockMvc.perform(get(ENTITY_API_URL + "?eagerload=false")).andExpect(status().isOk());
+        verify(experimentRepositoryMock, times(1)).findAll(any(Pageable.class));
     }
 
     @Test
-    void getExperiment() {
+    @Transactional
+    void getExperiment() throws Exception {
         // Initialize the database
-        insertedExperiment = experimentRepository.save(experiment).block();
+        insertedExperiment = experimentRepository.saveAndFlush(experiment);
 
         // Get the experiment
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, experiment.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.id")
-            .value(is(experiment.getId().intValue()))
-            .jsonPath("$.title")
-            .value(is(DEFAULT_TITLE))
-            .jsonPath("$.hypothesis")
-            .value(is(DEFAULT_HYPOTHESIS))
-            .jsonPath("$.method")
-            .value(is(DEFAULT_METHOD))
-            .jsonPath("$.successCriteria")
-            .value(is(DEFAULT_SUCCESS_CRITERIA))
-            .jsonPath("$.status")
-            .value(is(DEFAULT_STATUS.toString()))
-            .jsonPath("$.result")
-            .value(is(DEFAULT_RESULT.toString()))
-            .jsonPath("$.learnings")
-            .value(is(DEFAULT_LEARNINGS))
-            .jsonPath("$.startDate")
-            .value(is(DEFAULT_START_DATE.toString()))
-            .jsonPath("$.endDate")
-            .value(is(DEFAULT_END_DATE.toString()))
-            .jsonPath("$.createdDate")
-            .value(is(DEFAULT_CREATED_DATE.toString()));
+        restExperimentMockMvc
+            .perform(get(ENTITY_API_URL_ID, experiment.getId()))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.id").value(experiment.getId().intValue()))
+            .andExpect(jsonPath("$.title").value(DEFAULT_TITLE))
+            .andExpect(jsonPath("$.hypothesis").value(DEFAULT_HYPOTHESIS))
+            .andExpect(jsonPath("$.method").value(DEFAULT_METHOD))
+            .andExpect(jsonPath("$.successCriteria").value(DEFAULT_SUCCESS_CRITERIA))
+            .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
+            .andExpect(jsonPath("$.result").value(DEFAULT_RESULT.toString()))
+            .andExpect(jsonPath("$.learnings").value(DEFAULT_LEARNINGS))
+            .andExpect(jsonPath("$.startDate").value(DEFAULT_START_DATE.toString()))
+            .andExpect(jsonPath("$.endDate").value(DEFAULT_END_DATE.toString()))
+            .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()));
     }
 
     @Test
-    void getNonExistingExperiment() {
+    @Transactional
+    void getNonExistingExperiment() throws Exception {
         // Get the experiment
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, Long.MAX_VALUE)
-            .accept(MediaType.APPLICATION_PROBLEM_JSON)
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+        restExperimentMockMvc.perform(get(ENTITY_API_URL_ID, Long.MAX_VALUE)).andExpect(status().isNotFound());
     }
 
     @Test
+    @Transactional
     void putExistingExperiment() throws Exception {
         // Initialize the database
-        insertedExperiment = experimentRepository.save(experiment).block();
+        insertedExperiment = experimentRepository.saveAndFlush(experiment);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
         // Update the experiment
-        Experiment updatedExperiment = experimentRepository.findById(experiment.getId()).block();
+        Experiment updatedExperiment = experimentRepository.findById(experiment.getId()).orElseThrow();
+        // Disconnect from session so that the updates on updatedExperiment are not directly saved in db
+        em.detach(updatedExperiment);
         updatedExperiment
             .title(UPDATED_TITLE)
             .hypothesis(UPDATED_HYPOTHESIS)
@@ -428,14 +379,14 @@ class ExperimentResourceIT {
             .createdDate(UPDATED_CREATED_DATE);
         ExperimentDTO experimentDTO = experimentMapper.toDto(updatedExperiment);
 
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, experimentDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restExperimentMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, experimentDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(experimentDTO))
+            )
+            .andExpect(status().isOk());
 
         // Validate the Experiment in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -443,6 +394,7 @@ class ExperimentResourceIT {
     }
 
     @Test
+    @Transactional
     void putNonExistingExperiment() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         experiment.setId(longCount.incrementAndGet());
@@ -451,20 +403,21 @@ class ExperimentResourceIT {
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, experimentDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restExperimentMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, experimentDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(experimentDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the Experiment in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithIdMismatchExperiment() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         experiment.setId(longCount.incrementAndGet());
@@ -473,20 +426,21 @@ class ExperimentResourceIT {
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restExperimentMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(experimentDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the Experiment in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithMissingIdPathParamExperiment() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         experiment.setId(longCount.incrementAndGet());
@@ -495,23 +449,19 @@ class ExperimentResourceIT {
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restExperimentMockMvc
+            .perform(put(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(experimentDTO)))
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the Experiment in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void partialUpdateExperimentWithPatch() throws Exception {
         // Initialize the database
-        insertedExperiment = experimentRepository.save(experiment).block();
+        insertedExperiment = experimentRepository.saveAndFlush(experiment);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -521,19 +471,22 @@ class ExperimentResourceIT {
 
         partialUpdatedExperiment
             .title(UPDATED_TITLE)
+            .hypothesis(UPDATED_HYPOTHESIS)
             .successCriteria(UPDATED_SUCCESS_CRITERIA)
+            .status(UPDATED_STATUS)
             .result(UPDATED_RESULT)
-            .learnings(UPDATED_LEARNINGS)
+            .startDate(UPDATED_START_DATE)
+            .endDate(UPDATED_END_DATE)
             .createdDate(UPDATED_CREATED_DATE);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedExperiment.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedExperiment))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restExperimentMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedExperiment.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedExperiment))
+            )
+            .andExpect(status().isOk());
 
         // Validate the Experiment in the database
 
@@ -545,9 +498,10 @@ class ExperimentResourceIT {
     }
 
     @Test
+    @Transactional
     void fullUpdateExperimentWithPatch() throws Exception {
         // Initialize the database
-        insertedExperiment = experimentRepository.save(experiment).block();
+        insertedExperiment = experimentRepository.saveAndFlush(experiment);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -567,14 +521,14 @@ class ExperimentResourceIT {
             .endDate(UPDATED_END_DATE)
             .createdDate(UPDATED_CREATED_DATE);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedExperiment.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedExperiment))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restExperimentMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedExperiment.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedExperiment))
+            )
+            .andExpect(status().isOk());
 
         // Validate the Experiment in the database
 
@@ -583,6 +537,7 @@ class ExperimentResourceIT {
     }
 
     @Test
+    @Transactional
     void patchNonExistingExperiment() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         experiment.setId(longCount.incrementAndGet());
@@ -591,20 +546,21 @@ class ExperimentResourceIT {
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, experimentDTO.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restExperimentMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, experimentDTO.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(experimentDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the Experiment in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithIdMismatchExperiment() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         experiment.setId(longCount.incrementAndGet());
@@ -613,20 +569,21 @@ class ExperimentResourceIT {
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restExperimentMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(experimentDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the Experiment in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithMissingIdPathParamExperiment() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         experiment.setId(longCount.incrementAndGet());
@@ -635,41 +592,35 @@ class ExperimentResourceIT {
         ExperimentDTO experimentDTO = experimentMapper.toDto(experiment);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(experimentDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restExperimentMockMvc
+            .perform(
+                patch(ENTITY_API_URL).with(csrf()).contentType("application/merge-patch+json").content(om.writeValueAsBytes(experimentDTO))
+            )
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the Experiment in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
-    void deleteExperiment() {
+    @Transactional
+    void deleteExperiment() throws Exception {
         // Initialize the database
-        insertedExperiment = experimentRepository.save(experiment).block();
+        insertedExperiment = experimentRepository.saveAndFlush(experiment);
 
         long databaseSizeBeforeDelete = getRepositoryCount();
 
         // Delete the experiment
-        webTestClient
-            .delete()
-            .uri(ENTITY_API_URL_ID, experiment.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+        restExperimentMockMvc
+            .perform(delete(ENTITY_API_URL_ID, experiment.getId()).with(csrf()).accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isNoContent());
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
     }
 
     protected long getRepositoryCount() {
-        return experimentRepository.count().block();
+        return experimentRepository.count();
     }
 
     protected void assertIncrementedRepositoryCount(long countBefore) {
@@ -685,18 +636,14 @@ class ExperimentResourceIT {
     }
 
     protected Experiment getPersistedExperiment(Experiment experiment) {
-        return experimentRepository.findById(experiment.getId()).block();
+        return experimentRepository.findById(experiment.getId()).orElseThrow();
     }
 
     protected void assertPersistedExperimentToMatchAllProperties(Experiment expectedExperiment) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertExperimentAllPropertiesEquals(expectedExperiment, getPersistedExperiment(expectedExperiment));
-        assertExperimentUpdatableFieldsEquals(expectedExperiment, getPersistedExperiment(expectedExperiment));
+        assertExperimentAllPropertiesEquals(expectedExperiment, getPersistedExperiment(expectedExperiment));
     }
 
     protected void assertPersistedExperimentToMatchUpdatableProperties(Experiment expectedExperiment) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertExperimentAllUpdatablePropertiesEquals(expectedExperiment, getPersistedExperiment(expectedExperiment));
-        assertExperimentUpdatableFieldsEquals(expectedExperiment, getPersistedExperiment(expectedExperiment));
+        assertExperimentAllUpdatablePropertiesEquals(expectedExperiment, getPersistedExperiment(expectedExperiment));
     }
 }

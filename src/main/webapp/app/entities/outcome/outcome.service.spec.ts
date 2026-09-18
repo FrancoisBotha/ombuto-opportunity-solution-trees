@@ -154,13 +154,10 @@ describe('Service Tests', () => {
 
       it('should partial update a Outcome', async () => {
         const patchObject = {
-          title: 'BBBBBB',
-          description: 'BBBBBB',
-          targetValue: 'BBBBBB',
+          currentValue: 'BBBBBB',
+          status: 'BBBBBB',
           startDate: dayjs(currentDate).format(DATE_FORMAT),
           sortOrder: 1,
-          createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
-          lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           ...new Outcome(),
         };
         const returnedFromService = Object.assign(patchObject, elemDefault);

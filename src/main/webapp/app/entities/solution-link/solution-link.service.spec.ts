@@ -98,7 +98,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a SolutionLink', async () => {
-        const patchObject = { name: 'BBBBBB', url: 'BBBBBB', sortOrder: 1, ...new SolutionLink() };
+        const patchObject = { ...new SolutionLink() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { ...returnedFromService };

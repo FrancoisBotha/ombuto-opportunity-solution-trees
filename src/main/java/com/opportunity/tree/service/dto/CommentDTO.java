@@ -19,7 +19,7 @@ public class CommentDTO implements Serializable {
     @Lob
     private String body;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant createdDate;
 
     private Instant editedDate;

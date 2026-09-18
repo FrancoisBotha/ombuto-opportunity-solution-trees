@@ -1,9 +1,9 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.service.dto.ExperimentDTO;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Interface for managing {@link com.opportunity.tree.domain.Experiment}.
@@ -15,7 +15,7 @@ public interface ExperimentService {
      * @param experimentDTO the entity to save.
      * @return the persisted entity.
      */
-    Mono<ExperimentDTO> save(ExperimentDTO experimentDTO);
+    ExperimentDTO save(ExperimentDTO experimentDTO);
 
     /**
      * Updates a experiment.
@@ -23,7 +23,7 @@ public interface ExperimentService {
      * @param experimentDTO the entity to update.
      * @return the persisted entity.
      */
-    Mono<ExperimentDTO> update(ExperimentDTO experimentDTO);
+    ExperimentDTO update(ExperimentDTO experimentDTO);
 
     /**
      * Partially updates a experiment.
@@ -31,7 +31,7 @@ public interface ExperimentService {
      * @param experimentDTO the entity to update partially.
      * @return the persisted entity.
      */
-    Mono<ExperimentDTO> partialUpdate(ExperimentDTO experimentDTO);
+    Optional<ExperimentDTO> partialUpdate(ExperimentDTO experimentDTO);
 
     /**
      * Get all the experiments.
@@ -39,7 +39,7 @@ public interface ExperimentService {
      * @param pageable the pagination information.
      * @return the list of entities.
      */
-    Flux<ExperimentDTO> findAll(Pageable pageable);
+    Page<ExperimentDTO> findAll(Pageable pageable);
 
     /**
      * Get all the experiments with eager load of many-to-many relationships.
@@ -47,14 +47,7 @@ public interface ExperimentService {
      * @param pageable the pagination information.
      * @return the list of entities.
      */
-    Flux<ExperimentDTO> findAllWithEagerRelationships(Pageable pageable);
-
-    /**
-     * Returns the number of experiments available.
-     * @return the number of entities in the database.
-     *
-     */
-    Mono<Long> countAll();
+    Page<ExperimentDTO> findAllWithEagerRelationships(Pageable pageable);
 
     /**
      * Get the "id" experiment.
@@ -62,13 +55,12 @@ public interface ExperimentService {
      * @param id the id of the entity.
      * @return the entity.
      */
-    Mono<ExperimentDTO> findOne(Long id);
+    Optional<ExperimentDTO> findOne(Long id);
 
     /**
      * Delete the "id" experiment.
      *
      * @param id the id of the entity.
-     * @return a Mono to signal the deletion
      */
-    Mono<Void> delete(Long id);
+    void delete(Long id);
 }

@@ -2,20 +2,22 @@ package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.opportunity.tree.domain.enumeration.SolutionStatus;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * A Solution.
  */
-@Table("solution")
+@Entity
+@Table(name = "solution")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Solution implements Serializable {
 
@@ -23,53 +25,58 @@ public class Solution implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 200)
-    @Column("title")
+    @Column(name = "title", length = 200, nullable = false)
     private String title;
 
-    @Column("description")
+    @Lob
+    @Column(name = "description")
     private String description;
 
-    @NotNull(message = "must not be null")
-    @Column("status")
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     private SolutionStatus status;
 
     @Min(value = 1)
     @Max(value = 5)
-    @Column("effort")
+    @Column(name = "effort")
     private Integer effort;
 
-    @NotNull(message = "must not be null")
-    @Column("sort_order")
+    @NotNull
+    @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
-    @NotNull(message = "must not be null")
-    @Column("created_date")
+    @NotNull
+    @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
-    @Column("last_modified_date")
+    @Column(name = "last_modified_date")
     private Instant lastModifiedDate;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     @JsonIgnoreProperties(value = { "outcome", "parent", "owner", "interviews", "tags" }, allowSetters = true)
     private Opportunity opportunity;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     private User owner;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "rel_solution__tag",
+        joinColumns = @JoinColumn(name = "solution_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "team", "opportunities", "solutions" }, allowSetters = true)
     private Set<Tag> tags = new HashSet<>();
-
-    @Column("opportunity_id")
-    private Long opportunityId;
-
-    @Column("owner_id")
-    private String ownerId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -183,7 +190,6 @@ public class Solution implements Serializable {
 
     public void setOpportunity(Opportunity opportunity) {
         this.opportunity = opportunity;
-        this.opportunityId = opportunity != null ? opportunity.getId() : null;
     }
 
     public Solution opportunity(Opportunity opportunity) {
@@ -197,7 +203,6 @@ public class Solution implements Serializable {
 
     public void setOwner(User user) {
         this.owner = user;
-        this.ownerId = user != null ? user.getId() : null;
     }
 
     public Solution owner(User user) {
@@ -226,22 +231,6 @@ public class Solution implements Serializable {
     public Solution removeTag(Tag tag) {
         this.tags.remove(tag);
         return this;
-    }
-
-    public Long getOpportunityId() {
-        return this.opportunityId;
-    }
-
-    public void setOpportunityId(Long opportunity) {
-        this.opportunityId = opportunity;
-    }
-
-    public String getOwnerId() {
-        return this.ownerId;
-    }
-
-    public void setOwnerId(String user) {
-        this.ownerId = user;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

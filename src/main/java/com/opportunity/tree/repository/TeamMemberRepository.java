@@ -1,69 +1,45 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.TeamMember;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
- * Spring Data R2DBC repository for the TeamMember entity.
+ * Spring Data JPA repository for the TeamMember entity.
  */
-@SuppressWarnings("unused")
 @Repository
-public interface TeamMemberRepository extends ReactiveCrudRepository<TeamMember, Long>, TeamMemberRepositoryInternal {
-    @Override
-    Mono<TeamMember> findOneWithEagerRelationships(Long id);
+public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
+    @Query("select teamMember from TeamMember teamMember where teamMember.user.login = ?#{authentication.name}")
+    List<TeamMember> findByUserIsCurrentUser();
 
-    @Override
-    Flux<TeamMember> findAllWithEagerRelationships();
+    default Optional<TeamMember> findOneWithEagerRelationships(Long id) {
+        return this.findOneWithToOneRelationships(id);
+    }
 
-    @Override
-    Flux<TeamMember> findAllWithEagerRelationships(Pageable page);
+    default List<TeamMember> findAllWithEagerRelationships() {
+        return this.findAllWithToOneRelationships();
+    }
 
-    @Query("SELECT * FROM team_member entity WHERE entity.team_id = :id")
-    Flux<TeamMember> findByTeam(Long id);
+    default Page<TeamMember> findAllWithEagerRelationships(Pageable pageable) {
+        return this.findAllWithToOneRelationships(pageable);
+    }
 
-    @Query("SELECT * FROM team_member entity WHERE entity.team_id IS NULL")
-    Flux<TeamMember> findAllWhereTeamIsNull();
+    @Query(
+        value = "select teamMember from TeamMember teamMember left join fetch teamMember.team left join fetch teamMember.user",
+        countQuery = "select count(teamMember) from TeamMember teamMember"
+    )
+    Page<TeamMember> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("SELECT * FROM team_member entity WHERE entity.user_id = :id")
-    Flux<TeamMember> findByUser(Long id);
+    @Query("select teamMember from TeamMember teamMember left join fetch teamMember.team left join fetch teamMember.user")
+    List<TeamMember> findAllWithToOneRelationships();
 
-    @Query("SELECT * FROM team_member entity WHERE entity.user_id IS NULL")
-    Flux<TeamMember> findAllWhereUserIsNull();
-
-    @Override
-    <S extends TeamMember> Mono<S> save(S entity);
-
-    @Override
-    Flux<TeamMember> findAll();
-
-    @Override
-    Mono<TeamMember> findById(Long id);
-
-    @Override
-    Mono<Void> deleteById(Long id);
-}
-
-interface TeamMemberRepositoryInternal {
-    <S extends TeamMember> Mono<S> save(S entity);
-
-    Flux<TeamMember> findAllBy(Pageable pageable);
-
-    Flux<TeamMember> findAll();
-
-    Mono<TeamMember> findById(Long id);
-    // this is not supported at the moment because of https://github.com/jhipster/generator-jhipster/issues/18269
-    // Flux<TeamMember> findAllBy(Pageable pageable, Criteria criteria);
-
-    Mono<TeamMember> findOneWithEagerRelationships(Long id);
-
-    Flux<TeamMember> findAllWithEagerRelationships();
-
-    Flux<TeamMember> findAllWithEagerRelationships(Pageable page);
-
-    Mono<Void> deleteById(Long id);
+    @Query(
+        "select teamMember from TeamMember teamMember left join fetch teamMember.team left join fetch teamMember.user where teamMember.id =:id"
+    )
+    Optional<TeamMember> findOneWithToOneRelationships(@Param("id") Long id);
 }

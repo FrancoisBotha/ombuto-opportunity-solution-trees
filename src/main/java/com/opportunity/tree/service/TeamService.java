@@ -1,8 +1,8 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.service.dto.TeamDTO;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Service Interface for managing {@link com.opportunity.tree.domain.Team}.
@@ -14,7 +14,7 @@ public interface TeamService {
      * @param teamDTO the entity to save.
      * @return the persisted entity.
      */
-    Mono<TeamDTO> save(TeamDTO teamDTO);
+    TeamDTO save(TeamDTO teamDTO);
 
     /**
      * Updates a team.
@@ -22,7 +22,7 @@ public interface TeamService {
      * @param teamDTO the entity to update.
      * @return the persisted entity.
      */
-    Mono<TeamDTO> update(TeamDTO teamDTO);
+    TeamDTO update(TeamDTO teamDTO);
 
     /**
      * Partially updates a team.
@@ -30,21 +30,14 @@ public interface TeamService {
      * @param teamDTO the entity to update partially.
      * @return the persisted entity.
      */
-    Mono<TeamDTO> partialUpdate(TeamDTO teamDTO);
+    Optional<TeamDTO> partialUpdate(TeamDTO teamDTO);
 
     /**
      * Get all the teams.
      *
      * @return the list of entities.
      */
-    Flux<TeamDTO> findAll();
-
-    /**
-     * Returns the number of teams available.
-     * @return the number of entities in the database.
-     *
-     */
-    Mono<Long> countAll();
+    List<TeamDTO> findAll();
 
     /**
      * Get the "id" team.
@@ -52,13 +45,12 @@ public interface TeamService {
      * @param id the id of the entity.
      * @return the entity.
      */
-    Mono<TeamDTO> findOne(Long id);
+    Optional<TeamDTO> findOne(Long id);
 
     /**
      * Delete the "id" team.
      *
      * @param id the id of the entity.
-     * @return a Mono to signal the deletion
      */
-    Mono<Void> delete(Long id);
+    void delete(Long id);
 }

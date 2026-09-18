@@ -10,22 +10,19 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.ForwardedHeaderUtils;
-import reactor.core.publisher.Mono;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
-import tech.jhipster.web.util.reactive.ResponseUtil;
+import tech.jhipster.web.util.ResponseUtil;
 
 /**
  * REST controller for managing {@link com.opportunity.tree.domain.Experiment}.
@@ -38,7 +35,7 @@ public class ExperimentResource {
 
     private static final String ENTITY_NAME = "experiment";
 
-    @Value("${jhipster.clientApp.name:opportunitysolutiontree}")
+    @Value("${jhipster.clientApp.name:opportunitySolutionTree}")
     private String applicationName;
 
     private final ExperimentService experimentService;
@@ -58,22 +55,15 @@ public class ExperimentResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PostMapping("")
-    public Mono<ResponseEntity<ExperimentDTO>> createExperiment(@Valid @RequestBody ExperimentDTO experimentDTO) throws URISyntaxException {
+    public ResponseEntity<ExperimentDTO> createExperiment(@Valid @RequestBody ExperimentDTO experimentDTO) throws URISyntaxException {
         LOG.debug("REST request to save Experiment : {}", experimentDTO);
         if (experimentDTO.getId() != null) {
             throw new BadRequestAlertException("A new experiment cannot already have an ID", ENTITY_NAME, "idexists");
         }
-        return experimentService
-            .save(experimentDTO)
-            .map(result -> {
-                try {
-                    return ResponseEntity.created(new URI("/api/experiments/" + result.getId()))
-                        .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                        .body(result);
-                } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+        experimentDTO = experimentService.save(experimentDTO);
+        return ResponseEntity.created(new URI("/api/experiments/" + experimentDTO.getId()))
+            .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, experimentDTO.getId().toString()))
+            .body(experimentDTO);
     }
 
     /**
@@ -87,7 +77,7 @@ public class ExperimentResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<ExperimentDTO>> updateExperiment(
+    public ResponseEntity<ExperimentDTO> updateExperiment(
         @PathVariable(value = "id", required = false) final Long id,
         @Valid @RequestBody ExperimentDTO experimentDTO
     ) throws URISyntaxException {
@@ -99,22 +89,14 @@ public class ExperimentResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return experimentRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!experimentRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                return experimentService
-                    .update(experimentDTO)
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(result ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                            .body(result)
-                    );
-            });
+        experimentDTO = experimentService.update(experimentDTO);
+        return ResponseEntity.ok()
+            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, experimentDTO.getId().toString()))
+            .body(experimentDTO);
     }
 
     /**
@@ -129,7 +111,7 @@ public class ExperimentResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PatchMapping(value = "/{id}", consumes = { "application/json", "application/merge-patch+json" })
-    public Mono<ResponseEntity<ExperimentDTO>> partialUpdateExperiment(
+    public ResponseEntity<ExperimentDTO> partialUpdateExperiment(
         @PathVariable(value = "id", required = false) final Long id,
         @NotNull @RequestBody ExperimentDTO experimentDTO
     ) throws URISyntaxException {
@@ -141,53 +123,39 @@ public class ExperimentResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return experimentRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!experimentRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                Mono<ExperimentDTO> result = experimentService.partialUpdate(experimentDTO);
+        Optional<ExperimentDTO> result = experimentService.partialUpdate(experimentDTO);
 
-                return result
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(res ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, res.getId().toString()))
-                            .body(res)
-                    );
-            });
+        return ResponseUtil.wrapOrNotFound(
+            result,
+            HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, experimentDTO.getId().toString())
+        );
     }
 
     /**
      * {@code GET  /experiments} : get all the Experiments.
      *
      * @param pageable the pagination information.
-     * @param request a {@link ServerHttpRequest} request.
      * @param eagerload flag to eager load entities from relationships (This is applicable for many-to-many).
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of Experiments in body.
      */
-    @GetMapping(value = "", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<ResponseEntity<List<ExperimentDTO>>> getAllExperiments(
+    @GetMapping("")
+    public ResponseEntity<List<ExperimentDTO>> getAllExperiments(
         @org.springdoc.core.annotations.ParameterObject Pageable pageable,
-        ServerHttpRequest request,
         @RequestParam(name = "eagerload", required = false, defaultValue = "true") boolean eagerload
     ) {
         LOG.debug("REST request to get a page of Experiments");
-        return experimentService
-            .countAll()
-            .zipWith(experimentService.findAll(pageable).collectList())
-            .map(countWithEntities ->
-                ResponseEntity.ok()
-                    .headers(
-                        PaginationUtil.generatePaginationHttpHeaders(
-                            ForwardedHeaderUtils.adaptFromForwardedHeaders(request.getURI(), request.getHeaders()),
-                            new PageImpl<>(countWithEntities.getT2(), pageable, countWithEntities.getT1())
-                        )
-                    )
-                    .body(countWithEntities.getT2())
-            );
+        Page<ExperimentDTO> page;
+        if (eagerload) {
+            page = experimentService.findAllWithEagerRelationships(pageable);
+        } else {
+            page = experimentService.findAll(pageable);
+        }
+        HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
     }
 
     /**
@@ -197,9 +165,9 @@ public class ExperimentResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the experimentDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<ExperimentDTO>> getExperiment(@PathVariable("id") Long id) {
+    public ResponseEntity<ExperimentDTO> getExperiment(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Experiment : {}", id);
-        Mono<ExperimentDTO> experimentDTO = experimentService.findOne(id);
+        Optional<ExperimentDTO> experimentDTO = experimentService.findOne(id);
         return ResponseUtil.wrapOrNotFound(experimentDTO);
     }
 
@@ -210,16 +178,11 @@ public class ExperimentResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Void>> deleteExperiment(@PathVariable("id") Long id) {
+    public ResponseEntity<Void> deleteExperiment(@PathVariable("id") Long id) {
         LOG.debug("REST request to delete Experiment : {}", id);
-        return experimentService
-            .delete(id)
-            .then(
-                Mono.just(
-                    ResponseEntity.noContent()
-                        .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
-                        .build()
-                )
-            );
+        experimentService.delete(id);
+        return ResponseEntity.noContent()
+            .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
+            .build();
     }
 }

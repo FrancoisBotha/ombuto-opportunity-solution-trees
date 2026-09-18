@@ -138,9 +138,11 @@ describe('Service Tests', () => {
 
       it('should partial update a Experiment', async () => {
         const patchObject = {
+          title: 'BBBBBB',
           hypothesis: 'BBBBBB',
           method: 'BBBBBB',
-          status: 'BBBBBB',
+          successCriteria: 'BBBBBB',
+          result: 'BBBBBB',
           learnings: 'BBBBBB',
           startDate: dayjs(currentDate).format(DATE_FORMAT),
           endDate: dayjs(currentDate).format(DATE_FORMAT),

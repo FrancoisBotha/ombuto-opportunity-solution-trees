@@ -1,19 +1,21 @@
 package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Tag for cross-cutting labels (persona, segment, theme).
  */
-@Table("tag")
+@Entity
+@Table(name = "tag")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Tag implements Serializable {
 
@@ -21,32 +23,34 @@ public class Tag implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 1, max = 50)
-    @Column("name")
+    @Column(name = "name", length = 50, nullable = false)
     private String name;
 
     @Size(max = 7)
     @Pattern(regexp = "^#[0-9A-Fa-f]{6}$")
-    @Column("colour")
+    @Column(name = "colour", length = 7)
     private String colour;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     private Team team;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "tags")
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "outcome", "parent", "owner", "interviews", "tags" }, allowSetters = true)
     private Set<Opportunity> opportunities = new HashSet<>();
 
-    @org.springframework.data.annotation.Transient
+    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "tags")
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "opportunity", "owner", "tags" }, allowSetters = true)
     private Set<Solution> solutions = new HashSet<>();
-
-    @Column("team_id")
-    private Long teamId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -95,7 +99,6 @@ public class Tag implements Serializable {
 
     public void setTeam(Team team) {
         this.team = team;
-        this.teamId = team != null ? team.getId() : null;
     }
 
     public Tag team(Team team) {
@@ -163,14 +166,6 @@ public class Tag implements Serializable {
         this.solutions.remove(solution);
         solution.getTags().remove(this);
         return this;
-    }
-
-    public Long getTeamId() {
-        return this.teamId;
-    }
-
-    public void setTeamId(Long team) {
-        this.teamId = team;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

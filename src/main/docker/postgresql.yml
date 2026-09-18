@@ -1,12 +1,12 @@
 # This configuration is intended for development purpose, it's **your** responsibility to harden it for production
-name: opportunity-solution-tree
+name: opportunitysolutiontree
 services:
   postgresql:
     image: postgres:18.3
     # volumes:
-    #   - ~/volumes/jhipster/opportunity-solution-tree/postgresql/:/var/lib/postgresql/data/
+    #   - ~/volumes/jhipster/opportunitySolutionTree/postgresql/:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_USER=opportunity-solution-tree
+      - POSTGRES_USER=opportunitySolutionTree
       - POSTGRES_HOST_AUTH_METHOD=trust
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER}']

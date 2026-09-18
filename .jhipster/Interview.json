@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091120"
+    "changelogDate": "20260918102519"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "documentation": "Weekly customer interview or other evidence source; opportunities are mined from these.",
   "dto": "mapstruct",
   "fields": [
@@ -40,6 +40,7 @@
       "fieldValidateRules": ["required"]
     }
   ],
+  "jpaMetamodelFiltering": true,
   "name": "Interview",
   "pagination": "pagination",
   "relationships": [

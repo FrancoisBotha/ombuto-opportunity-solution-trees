@@ -1,15 +1,18 @@
 package com.opportunity.tree.service.impl;
 
+import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.service.TeamService;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.mapper.TeamMapper;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Implementation for managing {@link com.opportunity.tree.domain.Team}.
@@ -30,19 +33,23 @@ public class TeamServiceImpl implements TeamService {
     }
 
     @Override
-    public Mono<TeamDTO> save(TeamDTO teamDTO) {
+    public TeamDTO save(TeamDTO teamDTO) {
         LOG.debug("Request to save Team : {}", teamDTO);
-        return teamRepository.save(teamMapper.toEntity(teamDTO)).map(teamMapper::toDto);
+        Team team = teamMapper.toEntity(teamDTO);
+        team = teamRepository.save(team);
+        return teamMapper.toDto(team);
     }
 
     @Override
-    public Mono<TeamDTO> update(TeamDTO teamDTO) {
+    public TeamDTO update(TeamDTO teamDTO) {
         LOG.debug("Request to update Team : {}", teamDTO);
-        return teamRepository.save(teamMapper.toEntity(teamDTO)).map(teamMapper::toDto);
+        Team team = teamMapper.toEntity(teamDTO);
+        team = teamRepository.save(team);
+        return teamMapper.toDto(team);
     }
 
     @Override
-    public Mono<TeamDTO> partialUpdate(TeamDTO teamDTO) {
+    public Optional<TeamDTO> partialUpdate(TeamDTO teamDTO) {
         LOG.debug("Request to partially update Team : {}", teamDTO);
 
         return teamRepository
@@ -52,31 +59,27 @@ public class TeamServiceImpl implements TeamService {
 
                 return existingTeam;
             })
-            .flatMap(teamRepository::save)
+            .map(teamRepository::save)
             .map(teamMapper::toDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Flux<TeamDTO> findAll() {
+    public List<TeamDTO> findAll() {
         LOG.debug("Request to get all Teams");
-        return teamRepository.findAll().map(teamMapper::toDto);
-    }
-
-    public Mono<Long> countAll() {
-        return teamRepository.count();
+        return teamRepository.findAll().stream().map(teamMapper::toDto).collect(Collectors.toCollection(LinkedList::new));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Mono<TeamDTO> findOne(Long id) {
+    public Optional<TeamDTO> findOne(Long id) {
         LOG.debug("Request to get Team : {}", id);
         return teamRepository.findById(id).map(teamMapper::toDto);
     }
 
     @Override
-    public Mono<Void> delete(Long id) {
+    public void delete(Long id) {
         LOG.debug("Request to delete Team : {}", id);
-        return teamRepository.deleteById(id);
+        teamRepository.deleteById(id);
     }
 }

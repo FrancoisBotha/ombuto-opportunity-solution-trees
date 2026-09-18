@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091110"
+    "changelogDate": "20260918101519"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "dto": "mapstruct",
   "fields": [
     {

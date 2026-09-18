@@ -15,11 +15,11 @@
 
 spring:
   application:
-    name: opportunity-solution-tree
+    name: opportunitySolutionTree
   # Replace by 'prod, faker' to add the faker context and have sample data loaded in production
   liquibase:
     contexts: test
-  jackson:
+  jackson2:
     serialization:
       write-durations-as-timestamps: false
   mail:
@@ -64,7 +64,7 @@ jhipster:
   clientApp:
     name: 'opportunitySolutionTreeApp'
   mail:
-    from: opportunity-solution-tree@localhost.com
+    from: opportunitySolutionTree@localhost.com
     base-url: http://127.0.0.1:8080
   logging:
     # To test json console appender

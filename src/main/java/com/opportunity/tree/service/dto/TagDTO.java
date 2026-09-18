@@ -16,7 +16,7 @@ public class TagDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 1, max = 50)
     private String name;
 

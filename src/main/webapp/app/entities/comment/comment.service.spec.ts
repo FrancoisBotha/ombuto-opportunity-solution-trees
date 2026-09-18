@@ -116,7 +116,11 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Comment', async () => {
-        const patchObject = { createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT), ...new Comment() };
+        const patchObject = {
+          createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          editedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          ...new Comment(),
+        };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { createdDate: currentDate, editedDate: currentDate, ...returnedFromService };

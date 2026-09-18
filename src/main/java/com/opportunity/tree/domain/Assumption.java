@@ -2,20 +2,22 @@ package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.opportunity.tree.domain.enumeration.AssumptionCategory;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Something that must be true for a solution to work (assumption mapping).
  */
-@Table("assumption")
+@Entity
+@Table(name = "assumption")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Assumption implements Serializable {
 
@@ -23,47 +25,49 @@ public class Assumption implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 500)
-    @Column("statement")
+    @Column(name = "statement", length = 500, nullable = false)
     private String statement;
 
-    @NotNull(message = "must not be null")
-    @Column("category")
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false)
     private AssumptionCategory category;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Min(value = 1)
     @Max(value = 5)
-    @Column("importance")
+    @Column(name = "importance", nullable = false)
     private Integer importance;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Min(value = 1)
     @Max(value = 5)
-    @Column("evidence")
+    @Column(name = "evidence", nullable = false)
     private Integer evidence;
 
-    @Column("validated")
+    @Column(name = "validated")
     private Boolean validated;
 
-    @NotNull(message = "must not be null")
-    @Column("created_date")
+    @NotNull
+    @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     @JsonIgnoreProperties(value = { "opportunity", "owner", "tags" }, allowSetters = true)
     private Solution solution;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "assumptions")
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "solution", "assumptions" }, allowSetters = true)
     private Set<Experiment> experiments = new HashSet<>();
-
-    @Column("solution_id")
-    private Long solutionId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -164,7 +168,6 @@ public class Assumption implements Serializable {
 
     public void setSolution(Solution solution) {
         this.solution = solution;
-        this.solutionId = solution != null ? solution.getId() : null;
     }
 
     public Assumption solution(Solution solution) {
@@ -201,14 +204,6 @@ public class Assumption implements Serializable {
         this.experiments.remove(experiment);
         experiment.getAssumptions().remove(this);
         return this;
-    }
-
-    public Long getSolutionId() {
-        return this.solutionId;
-    }
-
-    public void setSolutionId(Long solution) {
-        this.solutionId = solution;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

@@ -151,3 +151,16 @@ Desktop.ini
 ######################
 coverage/
 .nyc_output/
+
+# OmbutoCode
+.ombutocode/src/node_modules/
+.ombutocode/src/release/
+.ombutocode/src/dist/
+
+######################
+# Playwright
+######################
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/

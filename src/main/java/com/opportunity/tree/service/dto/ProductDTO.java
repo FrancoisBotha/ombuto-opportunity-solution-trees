@@ -14,7 +14,7 @@ public class ProductDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 100)
     private String name;
 
@@ -24,10 +24,10 @@ public class ProductDTO implements Serializable {
     @Lob
     private String vision;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Boolean archived;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant createdDate;
 
     @NotNull

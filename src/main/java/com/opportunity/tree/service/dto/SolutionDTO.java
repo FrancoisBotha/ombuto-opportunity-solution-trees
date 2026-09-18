@@ -17,24 +17,24 @@ public class SolutionDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 200)
     private String title;
 
     @Lob
     private String description;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private SolutionStatus status;
 
     @Min(value = 1)
     @Max(value = 5)
     private Integer effort;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Integer sortOrder;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant createdDate;
 
     private Instant lastModifiedDate;

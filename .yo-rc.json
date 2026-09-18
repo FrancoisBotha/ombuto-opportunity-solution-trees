@@ -2,17 +2,15 @@
   "generator-jhipster": {
     "applicationType": "monolith",
     "authenticationType": "oauth2",
-    "baseName": "opportunity-solution-tree",
+    "baseName": "opportunitySolutionTree",
     "buildTool": "maven",
-    "cacheProvider": null,
+    "cacheProvider": "ehcache",
     "clientFramework": "vue",
-    "clientTestFrameworks": [],
     "clientTheme": "pulse",
     "clientThemeVariant": "primary",
-    "creationTimestamp": 1789721190284,
     "databaseType": "sql",
     "devDatabaseType": "h2Disk",
-    "enableHibernateCache": null,
+    "enableHibernateCache": true,
     "enableTranslation": false,
     "entities": [
       "Team",
@@ -29,19 +27,14 @@
       "Comment",
       "Tag"
     ],
-    "feignClient": null,
     "jhipsterVersion": "9.0.0",
-    "lastLiquibaseTimestamp": 1789722682000,
-    "microfrontend": null,
-    "microfrontends": [],
+    "lastLiquibaseTimestamp": 1789727239000,
     "nativeLanguage": "en",
     "packageName": "com.opportunity.tree",
     "prodDatabaseType": "postgresql",
-    "reactive": true,
-    "serverPort": null,
-    "serviceDiscoveryType": null,
-    "syncUserWithIdp": true,
+    "reactive": false,
     "testFrameworks": ["cucumber"],
+    "websocket": "spring-websocket",
     "withAdminUi": true
   }
 }

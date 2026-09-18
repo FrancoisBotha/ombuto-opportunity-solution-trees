@@ -1,16 +1,20 @@
 package com.opportunity.tree.service.impl;
 
+import com.opportunity.tree.domain.OpportunityLink;
 import com.opportunity.tree.repository.OpportunityLinkRepository;
 import com.opportunity.tree.service.OpportunityLinkService;
 import com.opportunity.tree.service.dto.OpportunityLinkDTO;
 import com.opportunity.tree.service.mapper.OpportunityLinkMapper;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Implementation for managing {@link com.opportunity.tree.domain.OpportunityLink}.
@@ -31,19 +35,23 @@ public class OpportunityLinkServiceImpl implements OpportunityLinkService {
     }
 
     @Override
-    public Mono<OpportunityLinkDTO> save(OpportunityLinkDTO opportunityLinkDTO) {
+    public OpportunityLinkDTO save(OpportunityLinkDTO opportunityLinkDTO) {
         LOG.debug("Request to save OpportunityLink : {}", opportunityLinkDTO);
-        return opportunityLinkRepository.save(opportunityLinkMapper.toEntity(opportunityLinkDTO)).map(opportunityLinkMapper::toDto);
+        OpportunityLink opportunityLink = opportunityLinkMapper.toEntity(opportunityLinkDTO);
+        opportunityLink = opportunityLinkRepository.save(opportunityLink);
+        return opportunityLinkMapper.toDto(opportunityLink);
     }
 
     @Override
-    public Mono<OpportunityLinkDTO> update(OpportunityLinkDTO opportunityLinkDTO) {
+    public OpportunityLinkDTO update(OpportunityLinkDTO opportunityLinkDTO) {
         LOG.debug("Request to update OpportunityLink : {}", opportunityLinkDTO);
-        return opportunityLinkRepository.save(opportunityLinkMapper.toEntity(opportunityLinkDTO)).map(opportunityLinkMapper::toDto);
+        OpportunityLink opportunityLink = opportunityLinkMapper.toEntity(opportunityLinkDTO);
+        opportunityLink = opportunityLinkRepository.save(opportunityLink);
+        return opportunityLinkMapper.toDto(opportunityLink);
     }
 
     @Override
-    public Mono<OpportunityLinkDTO> partialUpdate(OpportunityLinkDTO opportunityLinkDTO) {
+    public Optional<OpportunityLinkDTO> partialUpdate(OpportunityLinkDTO opportunityLinkDTO) {
         LOG.debug("Request to partially update OpportunityLink : {}", opportunityLinkDTO);
 
         return opportunityLinkRepository
@@ -53,35 +61,35 @@ public class OpportunityLinkServiceImpl implements OpportunityLinkService {
 
                 return existingOpportunityLink;
             })
-            .flatMap(opportunityLinkRepository::save)
+            .map(opportunityLinkRepository::save)
             .map(opportunityLinkMapper::toDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Flux<OpportunityLinkDTO> findAll() {
+    public List<OpportunityLinkDTO> findAll() {
         LOG.debug("Request to get all OpportunityLinks");
-        return opportunityLinkRepository.findAll().map(opportunityLinkMapper::toDto);
+        return opportunityLinkRepository
+            .findAll()
+            .stream()
+            .map(opportunityLinkMapper::toDto)
+            .collect(Collectors.toCollection(LinkedList::new));
     }
 
-    public Flux<OpportunityLinkDTO> findAllWithEagerRelationships(Pageable pageable) {
+    public Page<OpportunityLinkDTO> findAllWithEagerRelationships(Pageable pageable) {
         return opportunityLinkRepository.findAllWithEagerRelationships(pageable).map(opportunityLinkMapper::toDto);
-    }
-
-    public Mono<Long> countAll() {
-        return opportunityLinkRepository.count();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Mono<OpportunityLinkDTO> findOne(Long id) {
+    public Optional<OpportunityLinkDTO> findOne(Long id) {
         LOG.debug("Request to get OpportunityLink : {}", id);
         return opportunityLinkRepository.findOneWithEagerRelationships(id).map(opportunityLinkMapper::toDto);
     }
 
     @Override
-    public Mono<Void> delete(Long id) {
+    public void delete(Long id) {
         LOG.debug("Request to delete OpportunityLink : {}", id);
-        return opportunityLinkRepository.deleteById(id);
+        opportunityLinkRepository.deleteById(id);
     }
 }

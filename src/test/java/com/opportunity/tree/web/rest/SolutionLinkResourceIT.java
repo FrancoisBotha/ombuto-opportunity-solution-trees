@@ -4,22 +4,22 @@ import static com.opportunity.tree.domain.SolutionLinkAsserts.*;
 import static com.opportunity.tree.web.rest.TestUtil.createUpdateProxyForBean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Solution;
 import com.opportunity.tree.domain.SolutionLink;
 import com.opportunity.tree.domain.enumeration.LinkType;
-import com.opportunity.tree.repository.EntityManager;
 import com.opportunity.tree.repository.SolutionLinkRepository;
 import com.opportunity.tree.service.SolutionLinkService;
 import com.opportunity.tree.service.dto.SolutionLinkDTO;
 import com.opportunity.tree.service.mapper.SolutionLinkMapper;
-import java.time.Duration;
-import java.util.List;
+import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
@@ -29,26 +29,28 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Flux;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the {@link SolutionLinkResource} REST controller.
  */
 @IntegrationTest
 @ExtendWith(MockitoExtension.class)
-@AutoConfigureWebTestClient(timeout = IntegrationTest.DEFAULT_ENTITY_TIMEOUT)
+@AutoConfigureMockMvc
 @WithMockUser
 class SolutionLinkResourceIT {
 
     private static final String DEFAULT_NAME = "AAAAAAAAAA";
     private static final String UPDATED_NAME = "BBBBBBBBBB";
 
-    private static final String DEFAULT_URL = "https://C";
-    private static final String UPDATED_URL = "https://$]}";
+    private static final String DEFAULT_URL = "https://{J%\"|";
+    private static final String UPDATED_URL = "https://Z^";
 
     private static final LinkType DEFAULT_TYPE = LinkType.PROTOTYPE;
     private static final LinkType UPDATED_TYPE = LinkType.TICKET;
@@ -81,7 +83,7 @@ class SolutionLinkResourceIT {
     private EntityManager em;
 
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc restSolutionLinkMockMvc;
 
     private SolutionLink solutionLink;
 
@@ -97,7 +99,13 @@ class SolutionLinkResourceIT {
         SolutionLink solutionLink = new SolutionLink().name(DEFAULT_NAME).url(DEFAULT_URL).type(DEFAULT_TYPE).sortOrder(DEFAULT_SORT_ORDER);
         // Add required entity
         Solution solution;
-        solution = em.insert(SolutionResourceIT.createEntity(em)).block();
+        if (TestUtil.findAll(em, Solution.class).isEmpty()) {
+            solution = SolutionResourceIT.createEntity(em);
+            em.persist(solution);
+            em.flush();
+        } else {
+            solution = TestUtil.findAll(em, Solution.class).get(0);
+        }
         solutionLink.setSolution(solution);
         return solutionLink;
     }
@@ -116,23 +124,15 @@ class SolutionLinkResourceIT {
             .sortOrder(UPDATED_SORT_ORDER);
         // Add required entity
         Solution solution;
-        solution = em.insert(SolutionResourceIT.createUpdatedEntity(em)).block();
+        if (TestUtil.findAll(em, Solution.class).isEmpty()) {
+            solution = SolutionResourceIT.createUpdatedEntity(em);
+            em.persist(solution);
+            em.flush();
+        } else {
+            solution = TestUtil.findAll(em, Solution.class).get(0);
+        }
         updatedSolutionLink.setSolution(solution);
         return updatedSolutionLink;
-    }
-
-    public static void deleteEntities(EntityManager em) {
-        try {
-            em.deleteAll(SolutionLink.class).block();
-        } catch (Exception e) {
-            // It can fail, if other entities are still referring this - it will be removed later.
-        }
-        SolutionResourceIT.deleteEntities(em);
-    }
-
-    @BeforeEach
-    void setupCsrf() {
-        webTestClient = webTestClient.mutateWith(csrf());
     }
 
     @BeforeEach
@@ -143,28 +143,28 @@ class SolutionLinkResourceIT {
     @AfterEach
     void cleanup() {
         if (insertedSolutionLink != null) {
-            solutionLinkRepository.delete(insertedSolutionLink).block();
+            solutionLinkRepository.delete(insertedSolutionLink);
             insertedSolutionLink = null;
         }
-        deleteEntities(em);
     }
 
     @Test
+    @Transactional
     void createSolutionLink() throws Exception {
         long databaseSizeBeforeCreate = getRepositoryCount();
         // Create the SolutionLink
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
-        var returnedSolutionLinkDTO = webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(SolutionLinkDTO.class)
-            .returnResult()
-            .getResponseBody();
+        var returnedSolutionLinkDTO = om.readValue(
+            restSolutionLinkMockMvc
+                .perform(
+                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionLinkDTO))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            SolutionLinkDTO.class
+        );
 
         // Validate the SolutionLink in the database
         assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
@@ -175,6 +175,7 @@ class SolutionLinkResourceIT {
     }
 
     @Test
+    @Transactional
     void createSolutionLinkWithExistingId() throws Exception {
         // Create the SolutionLink with an existing ID
         solutionLink.setId(1L);
@@ -183,20 +184,18 @@ class SolutionLinkResourceIT {
         long databaseSizeBeforeCreate = getRepositoryCount();
 
         // An entity with an existing ID cannot be created, so this API call must fail
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the SolutionLink in the database
         assertSameRepositoryCount(databaseSizeBeforeCreate);
     }
 
     @Test
+    @Transactional
     void checkNameIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -205,19 +204,17 @@ class SolutionLinkResourceIT {
         // Create the SolutionLink, which fails.
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkUrlIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -226,19 +223,17 @@ class SolutionLinkResourceIT {
         // Create the SolutionLink, which fails.
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkTypeIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -247,19 +242,17 @@ class SolutionLinkResourceIT {
         // Create the SolutionLink, which fails.
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkSortOrderIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -268,153 +261,98 @@ class SolutionLinkResourceIT {
         // Create the SolutionLink, which fails.
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
-    void getAllSolutionLinksAsStream() {
+    @Transactional
+    void getAllSolutionLinks() throws Exception {
         // Initialize the database
-        solutionLinkRepository.save(solutionLink).block();
-
-        List<SolutionLink> solutionLinkList = webTestClient
-            .get()
-            .uri(ENTITY_API_URL)
-            .accept(MediaType.APPLICATION_NDJSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_NDJSON)
-            .returnResult(SolutionLinkDTO.class)
-            .getResponseBody()
-            .map(solutionLinkMapper::toEntity)
-            .filter(solutionLink::equals)
-            .collectList()
-            .block(Duration.ofSeconds(5));
-
-        assertThat(solutionLinkList).isNotNull();
-        assertThat(solutionLinkList).hasSize(1);
-        SolutionLink testSolutionLink = solutionLinkList.get(0);
-
-        // Test fails because reactive api returns an empty object instead of null
-        // assertSolutionLinkAllPropertiesEquals(solutionLink, testSolutionLink);
-        assertSolutionLinkUpdatableFieldsEquals(solutionLink, testSolutionLink);
-    }
-
-    @Test
-    void getAllSolutionLinks() {
-        // Initialize the database
-        insertedSolutionLink = solutionLinkRepository.save(solutionLink).block();
+        insertedSolutionLink = solutionLinkRepository.saveAndFlush(solutionLink);
 
         // Get all the solutionLinkList
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL + "?sort=id,desc")
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.[*].id")
-            .value(hasItem(solutionLink.getId().intValue()))
-            .jsonPath("$.[*].name")
-            .value(hasItem(DEFAULT_NAME))
-            .jsonPath("$.[*].url")
-            .value(hasItem(DEFAULT_URL))
-            .jsonPath("$.[*].type")
-            .value(hasItem(DEFAULT_TYPE.toString()))
-            .jsonPath("$.[*].sortOrder")
-            .value(hasItem(DEFAULT_SORT_ORDER));
+        restSolutionLinkMockMvc
+            .perform(get(ENTITY_API_URL + "?sort=id,desc"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.[*].id").value(hasItem(solutionLink.getId().intValue())))
+            .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
+            .andExpect(jsonPath("$.[*].url").value(hasItem(DEFAULT_URL)))
+            .andExpect(jsonPath("$.[*].type").value(hasItem(DEFAULT_TYPE.toString())))
+            .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)));
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllSolutionLinksWithEagerRelationshipsIsEnabled() {
-        when(solutionLinkServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllSolutionLinksWithEagerRelationshipsIsEnabled() throws Exception {
+        when(solutionLinkServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=true").exchange().expectStatus().isOk();
+        restSolutionLinkMockMvc.perform(get(ENTITY_API_URL + "?eagerload=true")).andExpect(status().isOk());
 
         verify(solutionLinkServiceMock, times(1)).findAllWithEagerRelationships(any());
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllSolutionLinksWithEagerRelationshipsIsNotEnabled() {
-        when(solutionLinkServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllSolutionLinksWithEagerRelationshipsIsNotEnabled() throws Exception {
+        when(solutionLinkServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=false").exchange().expectStatus().isOk();
-        verify(solutionLinkRepositoryMock, times(1)).findAllWithEagerRelationships(any());
+        restSolutionLinkMockMvc.perform(get(ENTITY_API_URL + "?eagerload=false")).andExpect(status().isOk());
+        verify(solutionLinkRepositoryMock, times(1)).findAll(any(Pageable.class));
     }
 
     @Test
-    void getSolutionLink() {
+    @Transactional
+    void getSolutionLink() throws Exception {
         // Initialize the database
-        insertedSolutionLink = solutionLinkRepository.save(solutionLink).block();
+        insertedSolutionLink = solutionLinkRepository.saveAndFlush(solutionLink);
 
         // Get the solutionLink
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, solutionLink.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.id")
-            .value(is(solutionLink.getId().intValue()))
-            .jsonPath("$.name")
-            .value(is(DEFAULT_NAME))
-            .jsonPath("$.url")
-            .value(is(DEFAULT_URL))
-            .jsonPath("$.type")
-            .value(is(DEFAULT_TYPE.toString()))
-            .jsonPath("$.sortOrder")
-            .value(is(DEFAULT_SORT_ORDER));
+        restSolutionLinkMockMvc
+            .perform(get(ENTITY_API_URL_ID, solutionLink.getId()))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.id").value(solutionLink.getId().intValue()))
+            .andExpect(jsonPath("$.name").value(DEFAULT_NAME))
+            .andExpect(jsonPath("$.url").value(DEFAULT_URL))
+            .andExpect(jsonPath("$.type").value(DEFAULT_TYPE.toString()))
+            .andExpect(jsonPath("$.sortOrder").value(DEFAULT_SORT_ORDER));
     }
 
     @Test
-    void getNonExistingSolutionLink() {
+    @Transactional
+    void getNonExistingSolutionLink() throws Exception {
         // Get the solutionLink
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, Long.MAX_VALUE)
-            .accept(MediaType.APPLICATION_PROBLEM_JSON)
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+        restSolutionLinkMockMvc.perform(get(ENTITY_API_URL_ID, Long.MAX_VALUE)).andExpect(status().isNotFound());
     }
 
     @Test
+    @Transactional
     void putExistingSolutionLink() throws Exception {
         // Initialize the database
-        insertedSolutionLink = solutionLinkRepository.save(solutionLink).block();
+        insertedSolutionLink = solutionLinkRepository.saveAndFlush(solutionLink);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
         // Update the solutionLink
-        SolutionLink updatedSolutionLink = solutionLinkRepository.findById(solutionLink.getId()).block();
+        SolutionLink updatedSolutionLink = solutionLinkRepository.findById(solutionLink.getId()).orElseThrow();
+        // Disconnect from session so that the updates on updatedSolutionLink are not directly saved in db
+        em.detach(updatedSolutionLink);
         updatedSolutionLink.name(UPDATED_NAME).url(UPDATED_URL).type(UPDATED_TYPE).sortOrder(UPDATED_SORT_ORDER);
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(updatedSolutionLink);
 
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, solutionLinkDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restSolutionLinkMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, solutionLinkDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isOk());
 
         // Validate the SolutionLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -422,6 +360,7 @@ class SolutionLinkResourceIT {
     }
 
     @Test
+    @Transactional
     void putNonExistingSolutionLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         solutionLink.setId(longCount.incrementAndGet());
@@ -430,20 +369,21 @@ class SolutionLinkResourceIT {
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, solutionLinkDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, solutionLinkDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the SolutionLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithIdMismatchSolutionLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         solutionLink.setId(longCount.incrementAndGet());
@@ -452,20 +392,21 @@ class SolutionLinkResourceIT {
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the SolutionLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithMissingIdPathParamSolutionLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         solutionLink.setId(longCount.incrementAndGet());
@@ -474,23 +415,21 @@ class SolutionLinkResourceIT {
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restSolutionLinkMockMvc
+            .perform(
+                put(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the SolutionLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void partialUpdateSolutionLinkWithPatch() throws Exception {
         // Initialize the database
-        insertedSolutionLink = solutionLinkRepository.save(solutionLink).block();
+        insertedSolutionLink = solutionLinkRepository.saveAndFlush(solutionLink);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -498,16 +437,16 @@ class SolutionLinkResourceIT {
         SolutionLink partialUpdatedSolutionLink = new SolutionLink();
         partialUpdatedSolutionLink.setId(solutionLink.getId());
 
-        partialUpdatedSolutionLink.name(UPDATED_NAME).url(UPDATED_URL);
+        partialUpdatedSolutionLink.name(UPDATED_NAME);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedSolutionLink.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedSolutionLink))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restSolutionLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedSolutionLink.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedSolutionLink))
+            )
+            .andExpect(status().isOk());
 
         // Validate the SolutionLink in the database
 
@@ -519,9 +458,10 @@ class SolutionLinkResourceIT {
     }
 
     @Test
+    @Transactional
     void fullUpdateSolutionLinkWithPatch() throws Exception {
         // Initialize the database
-        insertedSolutionLink = solutionLinkRepository.save(solutionLink).block();
+        insertedSolutionLink = solutionLinkRepository.saveAndFlush(solutionLink);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -531,14 +471,14 @@ class SolutionLinkResourceIT {
 
         partialUpdatedSolutionLink.name(UPDATED_NAME).url(UPDATED_URL).type(UPDATED_TYPE).sortOrder(UPDATED_SORT_ORDER);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedSolutionLink.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedSolutionLink))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restSolutionLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedSolutionLink.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedSolutionLink))
+            )
+            .andExpect(status().isOk());
 
         // Validate the SolutionLink in the database
 
@@ -547,6 +487,7 @@ class SolutionLinkResourceIT {
     }
 
     @Test
+    @Transactional
     void patchNonExistingSolutionLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         solutionLink.setId(longCount.incrementAndGet());
@@ -555,20 +496,21 @@ class SolutionLinkResourceIT {
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, solutionLinkDTO.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, solutionLinkDTO.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the SolutionLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithIdMismatchSolutionLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         solutionLink.setId(longCount.incrementAndGet());
@@ -577,20 +519,21 @@ class SolutionLinkResourceIT {
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restSolutionLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the SolutionLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithMissingIdPathParamSolutionLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         solutionLink.setId(longCount.incrementAndGet());
@@ -599,41 +542,38 @@ class SolutionLinkResourceIT {
         SolutionLinkDTO solutionLinkDTO = solutionLinkMapper.toDto(solutionLink);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(solutionLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restSolutionLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL)
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(solutionLinkDTO))
+            )
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the SolutionLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
-    void deleteSolutionLink() {
+    @Transactional
+    void deleteSolutionLink() throws Exception {
         // Initialize the database
-        insertedSolutionLink = solutionLinkRepository.save(solutionLink).block();
+        insertedSolutionLink = solutionLinkRepository.saveAndFlush(solutionLink);
 
         long databaseSizeBeforeDelete = getRepositoryCount();
 
         // Delete the solutionLink
-        webTestClient
-            .delete()
-            .uri(ENTITY_API_URL_ID, solutionLink.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+        restSolutionLinkMockMvc
+            .perform(delete(ENTITY_API_URL_ID, solutionLink.getId()).with(csrf()).accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isNoContent());
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
     }
 
     protected long getRepositoryCount() {
-        return solutionLinkRepository.count().block();
+        return solutionLinkRepository.count();
     }
 
     protected void assertIncrementedRepositoryCount(long countBefore) {
@@ -649,18 +589,14 @@ class SolutionLinkResourceIT {
     }
 
     protected SolutionLink getPersistedSolutionLink(SolutionLink solutionLink) {
-        return solutionLinkRepository.findById(solutionLink.getId()).block();
+        return solutionLinkRepository.findById(solutionLink.getId()).orElseThrow();
     }
 
     protected void assertPersistedSolutionLinkToMatchAllProperties(SolutionLink expectedSolutionLink) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertSolutionLinkAllPropertiesEquals(expectedSolutionLink, getPersistedSolutionLink(expectedSolutionLink));
-        assertSolutionLinkUpdatableFieldsEquals(expectedSolutionLink, getPersistedSolutionLink(expectedSolutionLink));
+        assertSolutionLinkAllPropertiesEquals(expectedSolutionLink, getPersistedSolutionLink(expectedSolutionLink));
     }
 
     protected void assertPersistedSolutionLinkToMatchUpdatableProperties(SolutionLink expectedSolutionLink) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertSolutionLinkAllUpdatablePropertiesEquals(expectedSolutionLink, getPersistedSolutionLink(expectedSolutionLink));
-        assertSolutionLinkUpdatableFieldsEquals(expectedSolutionLink, getPersistedSolutionLink(expectedSolutionLink));
+        assertSolutionLinkAllUpdatablePropertiesEquals(expectedSolutionLink, getPersistedSolutionLink(expectedSolutionLink));
     }
 }

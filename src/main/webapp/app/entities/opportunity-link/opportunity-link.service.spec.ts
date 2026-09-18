@@ -98,7 +98,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a OpportunityLink', async () => {
-        const patchObject = { name: 'BBBBBB', url: 'BBBBBB', ...new OpportunityLink() };
+        const patchObject = { name: 'BBBBBB', ...new OpportunityLink() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { ...returnedFromService };

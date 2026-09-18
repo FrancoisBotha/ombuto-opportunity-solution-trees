@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        Added the constraints for entity Opportunity.
+    -->
+    <changeSet id="20260918101919-2" author="jhipster">
+
+        <addForeignKeyConstraint baseColumnNames="outcome_id"
+                                 baseTableName="opportunity"
+                                 constraintName="fk_opportunity__outcome_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="outcome"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="parent_id"
+                                 baseTableName="opportunity"
+                                 constraintName="fk_opportunity__parent_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="opportunity"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="owner_id"
+                                 baseTableName="opportunity"
+                                 constraintName="fk_opportunity__owner_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="jhi_user"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="opportunity_id"
+                                 baseTableName="rel_opportunity__interview"
+                                 constraintName="fk_rel_opportunity__interview__opportunity_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="opportunity"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="interview_id"
+                                 baseTableName="rel_opportunity__interview"
+                                 constraintName="fk_rel_opportunity__interview__interview_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="interview"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="opportunity_id"
+                                 baseTableName="rel_opportunity__tag"
+                                 constraintName="fk_rel_opportunity__tag__opportunity_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="opportunity"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="tag_id"
+                                 baseTableName="rel_opportunity__tag"
+                                 constraintName="fk_rel_opportunity__tag__tag_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="tag"
+                                 />
+    </changeSet>
+</databaseChangeLog>

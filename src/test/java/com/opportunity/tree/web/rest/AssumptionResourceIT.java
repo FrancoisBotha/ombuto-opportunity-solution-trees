@@ -4,9 +4,10 @@ import static com.opportunity.tree.domain.AssumptionAsserts.*;
 import static com.opportunity.tree.web.rest.TestUtil.createUpdateProxyForBean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
@@ -14,14 +15,13 @@ import com.opportunity.tree.domain.Assumption;
 import com.opportunity.tree.domain.Solution;
 import com.opportunity.tree.domain.enumeration.AssumptionCategory;
 import com.opportunity.tree.repository.AssumptionRepository;
-import com.opportunity.tree.repository.EntityManager;
 import com.opportunity.tree.service.AssumptionService;
 import com.opportunity.tree.service.dto.AssumptionDTO;
 import com.opportunity.tree.service.mapper.AssumptionMapper;
-import java.time.Duration;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
@@ -31,18 +31,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Flux;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the {@link AssumptionResource} REST controller.
  */
 @IntegrationTest
 @ExtendWith(MockitoExtension.class)
-@AutoConfigureWebTestClient(timeout = IntegrationTest.DEFAULT_ENTITY_TIMEOUT)
+@AutoConfigureMockMvc
 @WithMockUser
 class AssumptionResourceIT {
 
@@ -89,7 +91,7 @@ class AssumptionResourceIT {
     private EntityManager em;
 
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc restAssumptionMockMvc;
 
     private Assumption assumption;
 
@@ -111,7 +113,13 @@ class AssumptionResourceIT {
             .createdDate(DEFAULT_CREATED_DATE);
         // Add required entity
         Solution solution;
-        solution = em.insert(SolutionResourceIT.createEntity(em)).block();
+        if (TestUtil.findAll(em, Solution.class).isEmpty()) {
+            solution = SolutionResourceIT.createEntity(em);
+            em.persist(solution);
+            em.flush();
+        } else {
+            solution = TestUtil.findAll(em, Solution.class).get(0);
+        }
         assumption.setSolution(solution);
         return assumption;
     }
@@ -132,23 +140,15 @@ class AssumptionResourceIT {
             .createdDate(UPDATED_CREATED_DATE);
         // Add required entity
         Solution solution;
-        solution = em.insert(SolutionResourceIT.createUpdatedEntity(em)).block();
+        if (TestUtil.findAll(em, Solution.class).isEmpty()) {
+            solution = SolutionResourceIT.createUpdatedEntity(em);
+            em.persist(solution);
+            em.flush();
+        } else {
+            solution = TestUtil.findAll(em, Solution.class).get(0);
+        }
         updatedAssumption.setSolution(solution);
         return updatedAssumption;
-    }
-
-    public static void deleteEntities(EntityManager em) {
-        try {
-            em.deleteAll(Assumption.class).block();
-        } catch (Exception e) {
-            // It can fail, if other entities are still referring this - it will be removed later.
-        }
-        SolutionResourceIT.deleteEntities(em);
-    }
-
-    @BeforeEach
-    void setupCsrf() {
-        webTestClient = webTestClient.mutateWith(csrf());
     }
 
     @BeforeEach
@@ -159,28 +159,28 @@ class AssumptionResourceIT {
     @AfterEach
     void cleanup() {
         if (insertedAssumption != null) {
-            assumptionRepository.delete(insertedAssumption).block();
+            assumptionRepository.delete(insertedAssumption);
             insertedAssumption = null;
         }
-        deleteEntities(em);
     }
 
     @Test
+    @Transactional
     void createAssumption() throws Exception {
         long databaseSizeBeforeCreate = getRepositoryCount();
         // Create the Assumption
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
-        var returnedAssumptionDTO = webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(AssumptionDTO.class)
-            .returnResult()
-            .getResponseBody();
+        var returnedAssumptionDTO = om.readValue(
+            restAssumptionMockMvc
+                .perform(
+                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(assumptionDTO))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            AssumptionDTO.class
+        );
 
         // Validate the Assumption in the database
         assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
@@ -191,6 +191,7 @@ class AssumptionResourceIT {
     }
 
     @Test
+    @Transactional
     void createAssumptionWithExistingId() throws Exception {
         // Create the Assumption with an existing ID
         assumption.setId(1L);
@@ -199,20 +200,16 @@ class AssumptionResourceIT {
         long databaseSizeBeforeCreate = getRepositoryCount();
 
         // An entity with an existing ID cannot be created, so this API call must fail
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(assumptionDTO)))
+            .andExpect(status().isBadRequest());
 
         // Validate the Assumption in the database
         assertSameRepositoryCount(databaseSizeBeforeCreate);
     }
 
     @Test
+    @Transactional
     void checkStatementIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -221,19 +218,15 @@ class AssumptionResourceIT {
         // Create the Assumption, which fails.
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(assumptionDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkCategoryIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -242,19 +235,15 @@ class AssumptionResourceIT {
         // Create the Assumption, which fails.
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(assumptionDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkImportanceIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -263,19 +252,15 @@ class AssumptionResourceIT {
         // Create the Assumption, which fails.
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(assumptionDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkEvidenceIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -284,19 +269,15 @@ class AssumptionResourceIT {
         // Create the Assumption, which fails.
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(assumptionDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkCreatedDateIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -305,150 +286,89 @@ class AssumptionResourceIT {
         // Create the Assumption, which fails.
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(assumptionDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
-    void getAllAssumptionsAsStream() {
+    @Transactional
+    void getAllAssumptions() throws Exception {
         // Initialize the database
-        assumptionRepository.save(assumption).block();
-
-        List<Assumption> assumptionList = webTestClient
-            .get()
-            .uri(ENTITY_API_URL)
-            .accept(MediaType.APPLICATION_NDJSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_NDJSON)
-            .returnResult(AssumptionDTO.class)
-            .getResponseBody()
-            .map(assumptionMapper::toEntity)
-            .filter(assumption::equals)
-            .collectList()
-            .block(Duration.ofSeconds(5));
-
-        assertThat(assumptionList).isNotNull();
-        assertThat(assumptionList).hasSize(1);
-        Assumption testAssumption = assumptionList.get(0);
-
-        // Test fails because reactive api returns an empty object instead of null
-        // assertAssumptionAllPropertiesEquals(assumption, testAssumption);
-        assertAssumptionUpdatableFieldsEquals(assumption, testAssumption);
-    }
-
-    @Test
-    void getAllAssumptions() {
-        // Initialize the database
-        insertedAssumption = assumptionRepository.save(assumption).block();
+        insertedAssumption = assumptionRepository.saveAndFlush(assumption);
 
         // Get all the assumptionList
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL + "?sort=id,desc")
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.[*].id")
-            .value(hasItem(assumption.getId().intValue()))
-            .jsonPath("$.[*].statement")
-            .value(hasItem(DEFAULT_STATEMENT))
-            .jsonPath("$.[*].category")
-            .value(hasItem(DEFAULT_CATEGORY.toString()))
-            .jsonPath("$.[*].importance")
-            .value(hasItem(DEFAULT_IMPORTANCE))
-            .jsonPath("$.[*].evidence")
-            .value(hasItem(DEFAULT_EVIDENCE))
-            .jsonPath("$.[*].validated")
-            .value(hasItem(DEFAULT_VALIDATED))
-            .jsonPath("$.[*].createdDate")
-            .value(hasItem(DEFAULT_CREATED_DATE.toString()));
+        restAssumptionMockMvc
+            .perform(get(ENTITY_API_URL + "?sort=id,desc"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.[*].id").value(hasItem(assumption.getId().intValue())))
+            .andExpect(jsonPath("$.[*].statement").value(hasItem(DEFAULT_STATEMENT)))
+            .andExpect(jsonPath("$.[*].category").value(hasItem(DEFAULT_CATEGORY.toString())))
+            .andExpect(jsonPath("$.[*].importance").value(hasItem(DEFAULT_IMPORTANCE)))
+            .andExpect(jsonPath("$.[*].evidence").value(hasItem(DEFAULT_EVIDENCE)))
+            .andExpect(jsonPath("$.[*].validated").value(hasItem(DEFAULT_VALIDATED)))
+            .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())));
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllAssumptionsWithEagerRelationshipsIsEnabled() {
-        when(assumptionServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllAssumptionsWithEagerRelationshipsIsEnabled() throws Exception {
+        when(assumptionServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=true").exchange().expectStatus().isOk();
+        restAssumptionMockMvc.perform(get(ENTITY_API_URL + "?eagerload=true")).andExpect(status().isOk());
 
         verify(assumptionServiceMock, times(1)).findAllWithEagerRelationships(any());
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllAssumptionsWithEagerRelationshipsIsNotEnabled() {
-        when(assumptionServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllAssumptionsWithEagerRelationshipsIsNotEnabled() throws Exception {
+        when(assumptionServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=false").exchange().expectStatus().isOk();
-        verify(assumptionRepositoryMock, times(1)).findAllWithEagerRelationships(any());
+        restAssumptionMockMvc.perform(get(ENTITY_API_URL + "?eagerload=false")).andExpect(status().isOk());
+        verify(assumptionRepositoryMock, times(1)).findAll(any(Pageable.class));
     }
 
     @Test
-    void getAssumption() {
+    @Transactional
+    void getAssumption() throws Exception {
         // Initialize the database
-        insertedAssumption = assumptionRepository.save(assumption).block();
+        insertedAssumption = assumptionRepository.saveAndFlush(assumption);
 
         // Get the assumption
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, assumption.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.id")
-            .value(is(assumption.getId().intValue()))
-            .jsonPath("$.statement")
-            .value(is(DEFAULT_STATEMENT))
-            .jsonPath("$.category")
-            .value(is(DEFAULT_CATEGORY.toString()))
-            .jsonPath("$.importance")
-            .value(is(DEFAULT_IMPORTANCE))
-            .jsonPath("$.evidence")
-            .value(is(DEFAULT_EVIDENCE))
-            .jsonPath("$.validated")
-            .value(is(DEFAULT_VALIDATED))
-            .jsonPath("$.createdDate")
-            .value(is(DEFAULT_CREATED_DATE.toString()));
+        restAssumptionMockMvc
+            .perform(get(ENTITY_API_URL_ID, assumption.getId()))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.id").value(assumption.getId().intValue()))
+            .andExpect(jsonPath("$.statement").value(DEFAULT_STATEMENT))
+            .andExpect(jsonPath("$.category").value(DEFAULT_CATEGORY.toString()))
+            .andExpect(jsonPath("$.importance").value(DEFAULT_IMPORTANCE))
+            .andExpect(jsonPath("$.evidence").value(DEFAULT_EVIDENCE))
+            .andExpect(jsonPath("$.validated").value(DEFAULT_VALIDATED))
+            .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()));
     }
 
     @Test
-    void getNonExistingAssumption() {
+    @Transactional
+    void getNonExistingAssumption() throws Exception {
         // Get the assumption
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, Long.MAX_VALUE)
-            .accept(MediaType.APPLICATION_PROBLEM_JSON)
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+        restAssumptionMockMvc.perform(get(ENTITY_API_URL_ID, Long.MAX_VALUE)).andExpect(status().isNotFound());
     }
 
     @Test
+    @Transactional
     void putExistingAssumption() throws Exception {
         // Initialize the database
-        insertedAssumption = assumptionRepository.save(assumption).block();
+        insertedAssumption = assumptionRepository.saveAndFlush(assumption);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
         // Update the assumption
-        Assumption updatedAssumption = assumptionRepository.findById(assumption.getId()).block();
+        Assumption updatedAssumption = assumptionRepository.findById(assumption.getId()).orElseThrow();
+        // Disconnect from session so that the updates on updatedAssumption are not directly saved in db
+        em.detach(updatedAssumption);
         updatedAssumption
             .statement(UPDATED_STATEMENT)
             .category(UPDATED_CATEGORY)
@@ -458,14 +378,14 @@ class AssumptionResourceIT {
             .createdDate(UPDATED_CREATED_DATE);
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(updatedAssumption);
 
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, assumptionDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restAssumptionMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, assumptionDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(assumptionDTO))
+            )
+            .andExpect(status().isOk());
 
         // Validate the Assumption in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -473,6 +393,7 @@ class AssumptionResourceIT {
     }
 
     @Test
+    @Transactional
     void putNonExistingAssumption() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         assumption.setId(longCount.incrementAndGet());
@@ -481,20 +402,21 @@ class AssumptionResourceIT {
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, assumptionDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, assumptionDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(assumptionDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the Assumption in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithIdMismatchAssumption() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         assumption.setId(longCount.incrementAndGet());
@@ -503,20 +425,21 @@ class AssumptionResourceIT {
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(assumptionDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the Assumption in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithMissingIdPathParamAssumption() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         assumption.setId(longCount.incrementAndGet());
@@ -525,23 +448,19 @@ class AssumptionResourceIT {
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restAssumptionMockMvc
+            .perform(put(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(assumptionDTO)))
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the Assumption in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void partialUpdateAssumptionWithPatch() throws Exception {
         // Initialize the database
-        insertedAssumption = assumptionRepository.save(assumption).block();
+        insertedAssumption = assumptionRepository.saveAndFlush(assumption);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -549,16 +468,20 @@ class AssumptionResourceIT {
         Assumption partialUpdatedAssumption = new Assumption();
         partialUpdatedAssumption.setId(assumption.getId());
 
-        partialUpdatedAssumption.statement(UPDATED_STATEMENT).validated(UPDATED_VALIDATED);
+        partialUpdatedAssumption
+            .category(UPDATED_CATEGORY)
+            .evidence(UPDATED_EVIDENCE)
+            .validated(UPDATED_VALIDATED)
+            .createdDate(UPDATED_CREATED_DATE);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedAssumption.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedAssumption))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restAssumptionMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedAssumption.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedAssumption))
+            )
+            .andExpect(status().isOk());
 
         // Validate the Assumption in the database
 
@@ -570,9 +493,10 @@ class AssumptionResourceIT {
     }
 
     @Test
+    @Transactional
     void fullUpdateAssumptionWithPatch() throws Exception {
         // Initialize the database
-        insertedAssumption = assumptionRepository.save(assumption).block();
+        insertedAssumption = assumptionRepository.saveAndFlush(assumption);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -588,14 +512,14 @@ class AssumptionResourceIT {
             .validated(UPDATED_VALIDATED)
             .createdDate(UPDATED_CREATED_DATE);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedAssumption.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedAssumption))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restAssumptionMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedAssumption.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedAssumption))
+            )
+            .andExpect(status().isOk());
 
         // Validate the Assumption in the database
 
@@ -604,6 +528,7 @@ class AssumptionResourceIT {
     }
 
     @Test
+    @Transactional
     void patchNonExistingAssumption() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         assumption.setId(longCount.incrementAndGet());
@@ -612,20 +537,21 @@ class AssumptionResourceIT {
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, assumptionDTO.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, assumptionDTO.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(assumptionDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the Assumption in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithIdMismatchAssumption() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         assumption.setId(longCount.incrementAndGet());
@@ -634,20 +560,21 @@ class AssumptionResourceIT {
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restAssumptionMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(assumptionDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the Assumption in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithMissingIdPathParamAssumption() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         assumption.setId(longCount.incrementAndGet());
@@ -656,41 +583,35 @@ class AssumptionResourceIT {
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(assumptionDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restAssumptionMockMvc
+            .perform(
+                patch(ENTITY_API_URL).with(csrf()).contentType("application/merge-patch+json").content(om.writeValueAsBytes(assumptionDTO))
+            )
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the Assumption in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
-    void deleteAssumption() {
+    @Transactional
+    void deleteAssumption() throws Exception {
         // Initialize the database
-        insertedAssumption = assumptionRepository.save(assumption).block();
+        insertedAssumption = assumptionRepository.saveAndFlush(assumption);
 
         long databaseSizeBeforeDelete = getRepositoryCount();
 
         // Delete the assumption
-        webTestClient
-            .delete()
-            .uri(ENTITY_API_URL_ID, assumption.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+        restAssumptionMockMvc
+            .perform(delete(ENTITY_API_URL_ID, assumption.getId()).with(csrf()).accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isNoContent());
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
     }
 
     protected long getRepositoryCount() {
-        return assumptionRepository.count().block();
+        return assumptionRepository.count();
     }
 
     protected void assertIncrementedRepositoryCount(long countBefore) {
@@ -706,18 +627,14 @@ class AssumptionResourceIT {
     }
 
     protected Assumption getPersistedAssumption(Assumption assumption) {
-        return assumptionRepository.findById(assumption.getId()).block();
+        return assumptionRepository.findById(assumption.getId()).orElseThrow();
     }
 
     protected void assertPersistedAssumptionToMatchAllProperties(Assumption expectedAssumption) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertAssumptionAllPropertiesEquals(expectedAssumption, getPersistedAssumption(expectedAssumption));
-        assertAssumptionUpdatableFieldsEquals(expectedAssumption, getPersistedAssumption(expectedAssumption));
+        assertAssumptionAllPropertiesEquals(expectedAssumption, getPersistedAssumption(expectedAssumption));
     }
 
     protected void assertPersistedAssumptionToMatchUpdatableProperties(Assumption expectedAssumption) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertAssumptionAllUpdatablePropertiesEquals(expectedAssumption, getPersistedAssumption(expectedAssumption));
-        assertAssumptionUpdatableFieldsEquals(expectedAssumption, getPersistedAssumption(expectedAssumption));
+        assertAssumptionAllUpdatablePropertiesEquals(expectedAssumption, getPersistedAssumption(expectedAssumption));
     }
 }

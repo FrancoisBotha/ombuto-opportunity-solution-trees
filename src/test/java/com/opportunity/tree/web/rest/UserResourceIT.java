@@ -1,17 +1,16 @@
 package com.opportunity.tree.web.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
-import com.opportunity.tree.config.Constants;
 import com.opportunity.tree.domain.User;
-import com.opportunity.tree.repository.AuthorityRepository;
-import com.opportunity.tree.repository.EntityManager;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.security.AuthoritiesConstants;
 import com.opportunity.tree.service.mapper.UserMapper;
+import jakarta.persistence.EntityManager;
 import java.util.*;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -19,14 +18,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Integration tests for the {@link UserResource} REST controller.
  */
-@AutoConfigureWebTestClient(timeout = IntegrationTest.DEFAULT_TIMEOUT)
+@AutoConfigureMockMvc
 @WithMockUser(authorities = AuthoritiesConstants.ADMIN)
 @IntegrationTest
 class UserResourceIT {
@@ -52,23 +53,18 @@ class UserResourceIT {
     private UserRepository userRepository;
 
     @Autowired
-    private AuthorityRepository authorityRepository;
-
-    @Autowired
     private UserMapper userMapper;
 
     @Autowired
     private EntityManager em;
 
     @Autowired
-    private WebTestClient webTestClient;
+    private CacheManager cacheManager;
+
+    @Autowired
+    private MockMvc restUserMockMvc;
 
     private User user;
-
-    @BeforeEach
-    void setupCsrf() {
-        webTestClient = webTestClient.mutateWith(csrf());
-    }
 
     /**
      * Create a User.
@@ -86,14 +82,8 @@ class UserResourceIT {
         persistUser.setLastName(DEFAULT_LASTNAME);
         persistUser.setImageUrl(DEFAULT_IMAGEURL);
         persistUser.setLangKey(DEFAULT_LANGKEY);
-        persistUser.setCreatedBy(Constants.SYSTEM);
         return persistUser;
     }
-
-    /**
-     * Delete all the users from the database.
-     */
-    public static void deleteEntities(EntityManager em) {}
 
     /**
      * Setups the database with one user.
@@ -112,8 +102,13 @@ class UserResourceIT {
 
     @AfterEach
     void cleanupAndCheck() {
-        userRepository.deleteAllUserAuthorities().block();
-        userRepository.deleteAll().block();
+        userRepository.deleteAll();
+        cacheManager
+            .getCacheNames()
+            .stream()
+            .map(cacheName -> this.cacheManager.getCache(cacheName))
+            .filter(Objects::nonNull)
+            .forEach(Cache::invalidate);
     }
 
     @Test
@@ -131,6 +126,6 @@ class UserResourceIT {
     }
 
     private void assertPersistedUsers(Consumer<List<User>> userAssertion) {
-        userAssertion.accept(userRepository.findAll().collectList().block());
+        userAssertion.accept(userRepository.findAll());
     }
 }

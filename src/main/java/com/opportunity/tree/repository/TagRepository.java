@@ -1,63 +1,37 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.Tag;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
- * Spring Data R2DBC repository for the Tag entity.
+ * Spring Data JPA repository for the Tag entity.
  */
-@SuppressWarnings("unused")
 @Repository
-public interface TagRepository extends ReactiveCrudRepository<Tag, Long>, TagRepositoryInternal {
-    @Override
-    Mono<Tag> findOneWithEagerRelationships(Long id);
+public interface TagRepository extends JpaRepository<Tag, Long> {
+    default Optional<Tag> findOneWithEagerRelationships(Long id) {
+        return this.findOneWithToOneRelationships(id);
+    }
 
-    @Override
-    Flux<Tag> findAllWithEagerRelationships();
+    default List<Tag> findAllWithEagerRelationships() {
+        return this.findAllWithToOneRelationships();
+    }
 
-    @Override
-    Flux<Tag> findAllWithEagerRelationships(Pageable page);
+    default Page<Tag> findAllWithEagerRelationships(Pageable pageable) {
+        return this.findAllWithToOneRelationships(pageable);
+    }
 
-    @Query("SELECT * FROM tag entity WHERE entity.team_id = :id")
-    Flux<Tag> findByTeam(Long id);
+    @Query(value = "select tag from Tag tag left join fetch tag.team", countQuery = "select count(tag) from Tag tag")
+    Page<Tag> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("SELECT * FROM tag entity WHERE entity.team_id IS NULL")
-    Flux<Tag> findAllWhereTeamIsNull();
+    @Query("select tag from Tag tag left join fetch tag.team")
+    List<Tag> findAllWithToOneRelationships();
 
-    @Override
-    <S extends Tag> Mono<S> save(S entity);
-
-    @Override
-    Flux<Tag> findAll();
-
-    @Override
-    Mono<Tag> findById(Long id);
-
-    @Override
-    Mono<Void> deleteById(Long id);
-}
-
-interface TagRepositoryInternal {
-    <S extends Tag> Mono<S> save(S entity);
-
-    Flux<Tag> findAllBy(Pageable pageable);
-
-    Flux<Tag> findAll();
-
-    Mono<Tag> findById(Long id);
-    // this is not supported at the moment because of https://github.com/jhipster/generator-jhipster/issues/18269
-    // Flux<Tag> findAllBy(Pageable pageable, Criteria criteria);
-
-    Mono<Tag> findOneWithEagerRelationships(Long id);
-
-    Flux<Tag> findAllWithEagerRelationships();
-
-    Flux<Tag> findAllWithEagerRelationships(Pageable page);
-
-    Mono<Void> deleteById(Long id);
+    @Query("select tag from Tag tag left join fetch tag.team where tag.id =:id")
+    Optional<Tag> findOneWithToOneRelationships(@Param("id") Long id);
 }

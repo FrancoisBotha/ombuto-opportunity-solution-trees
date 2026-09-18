@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091121"
+    "changelogDate": "20260918102619"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "documentation": "Threaded comment on any tree node. Exactly one of the node relationships is set.",
   "dto": "mapstruct",
   "fields": [

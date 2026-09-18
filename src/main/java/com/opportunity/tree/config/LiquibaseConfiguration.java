@@ -1,22 +1,22 @@
 package com.opportunity.tree.config;
 
-import java.util.Optional;
 import java.util.concurrent.Executor;
 import javax.sql.DataSource;
 import liquibase.integration.spring.SpringLiquibase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.liquibase.LiquibaseProperties;
-import org.springframework.boot.autoconfigure.r2dbc.R2dbcProperties;
-import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties;
+import org.springframework.boot.liquibase.autoconfigure.LiquibaseDataSource;
+import org.springframework.boot.liquibase.autoconfigure.LiquibaseProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import tech.jhipster.config.JHipsterConstants;
-import tech.jhipster.config.liquibase.AsyncSpringLiquibase;
+import tech.jhipster.config.liquibase.SpringLiquibaseUtil;
 
 @Configuration
 public class LiquibaseConfiguration {
@@ -33,10 +33,29 @@ public class LiquibaseConfiguration {
     public SpringLiquibase liquibase(
         @Qualifier("taskExecutor") Executor executor,
         LiquibaseProperties liquibaseProperties,
-        R2dbcProperties dataSourceProperties
+        @LiquibaseDataSource ObjectProvider<DataSource> liquibaseDataSource,
+        ObjectProvider<DataSource> dataSource,
+        ApplicationProperties applicationProperties,
+        DataSourceProperties dataSourceProperties
     ) {
-        SpringLiquibase liquibase = new AsyncSpringLiquibase(executor, env);
-        liquibase.setDataSource(createLiquibaseDataSource(liquibaseProperties, dataSourceProperties));
+        SpringLiquibase liquibase;
+        if (Boolean.TRUE.equals(applicationProperties.getLiquibase().getAsyncStart())) {
+            liquibase = SpringLiquibaseUtil.createAsyncSpringLiquibase(
+                this.env,
+                executor,
+                liquibaseDataSource.getIfAvailable(),
+                liquibaseProperties,
+                dataSource.getIfUnique(),
+                dataSourceProperties
+            );
+        } else {
+            liquibase = SpringLiquibaseUtil.createSpringLiquibase(
+                liquibaseDataSource.getIfAvailable(),
+                liquibaseProperties,
+                dataSource.getIfUnique(),
+                dataSourceProperties
+            );
+        }
         liquibase.setChangeLog("classpath:config/liquibase/master.xml");
         if (!CollectionUtils.isEmpty(liquibaseProperties.getContexts())) {
             liquibase.setContexts(StringUtils.collectionToCommaDelimitedString(liquibaseProperties.getContexts()));
@@ -60,12 +79,5 @@ public class LiquibaseConfiguration {
             LOG.debug("Configuring Liquibase");
         }
         return liquibase;
-    }
-
-    private static DataSource createLiquibaseDataSource(LiquibaseProperties liquibaseProperties, R2dbcProperties dataSourceProperties) {
-        String user = Optional.ofNullable(liquibaseProperties.getUser()).orElse(dataSourceProperties.getUsername());
-        String password = Optional.ofNullable(liquibaseProperties.getPassword()).orElse(dataSourceProperties.getPassword());
-
-        return DataSourceBuilder.create().url(liquibaseProperties.getUrl()).username(user).password(password).build();
     }
 }

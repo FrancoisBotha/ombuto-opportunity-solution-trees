@@ -53,10 +53,11 @@ let config = defineConfig({
     host: true,
     port: 9000,
     proxy: Object.fromEntries(
-      ['/api', '/management', '/v3/api-docs', '/h2-console', '/oauth2', '/login'].map(res => [
+      ['/api', '/management', '/v3/api-docs', '/h2-console', '/oauth2', '/login', '/websocket'].map(res => [
         res,
         {
           target: 'http://localhost:8080',
+          ws: res === '/websocket',
         },
       ]),
     ),

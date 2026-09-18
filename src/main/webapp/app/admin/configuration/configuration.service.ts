@@ -50,6 +50,6 @@ export default class ConfigurationService {
       }
     }
     // by default, use the default ApplicationContext Id
-    return res.contexts['opportunity-solution-tree'].beans;
+    return res.contexts.opportunitySolutionTree.beans;
   }
 }

@@ -1,4 +1,4 @@
-# opportunity-solution-tree
+# opportunitySolutionTree
 
 This application was generated using JHipster 9.0.0, you can find documentation and help at [https://www.jhipster.tech/documentation-archive/v9.0.0](https://www.jhipster.tech/documentation-archive/v9.0.0).
 
@@ -217,7 +217,7 @@ For further instructions on how to develop with JHipster, have a look at [Using 
 
 ### Packaging as jar
 
-To build the final jar and optimize the opportunity-solution-tree application for production, run:
+To build the final jar and optimize the opportunitySolutionTree application for production, run:
 
 ```bash
 ./mvnw -Pprod clean verify

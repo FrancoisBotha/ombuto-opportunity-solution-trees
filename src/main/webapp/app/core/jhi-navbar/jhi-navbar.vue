@@ -2,7 +2,7 @@
   <b-navbar data-cy="navbar" toggleable="md" variant="dark" data-bs-theme="dark">
     <b-navbar-brand class="logo" b-link to="/">
       <span class="logo-img"></span>
-      <span class="navbar-title">Opportunity-solution-tree</span> <span class="navbar-version">{{ version }}</span>
+      <span class="navbar-title">OpportunitySolutionTree</span> <span class="navbar-version">{{ version }}</span>
     </b-navbar-brand>
     <b-navbar-toggle
       right
@@ -57,6 +57,10 @@
               <span class="no-bold">Administration</span>
             </span>
           </template>
+          <b-dropdown-item to="/admin/tracker" active-class="active">
+            <font-awesome-icon icon="eye" />
+            <span>User tracker</span>
+          </b-dropdown-item>
           <b-dropdown-item to="/admin/metrics" active-class="active">
             <font-awesome-icon icon="tachometer-alt" />
             <span>Metrics</span>
@@ -77,7 +81,7 @@
             <font-awesome-icon icon="book" />
             <span>API</span>
           </b-dropdown-item>
-          <b-dropdown-item v-if="!inProduction" href="http://localhost:8092/" target="_tab">
+          <b-dropdown-item v-if="!inProduction" href="./h2-console/" target="_tab">
             <font-awesome-icon icon="database" />
             <span>Database</span>
           </b-dropdown-item>

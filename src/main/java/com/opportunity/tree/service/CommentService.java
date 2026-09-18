@@ -1,9 +1,9 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.service.dto.CommentDTO;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Interface for managing {@link com.opportunity.tree.domain.Comment}.
@@ -15,7 +15,7 @@ public interface CommentService {
      * @param commentDTO the entity to save.
      * @return the persisted entity.
      */
-    Mono<CommentDTO> save(CommentDTO commentDTO);
+    CommentDTO save(CommentDTO commentDTO);
 
     /**
      * Updates a comment.
@@ -23,7 +23,7 @@ public interface CommentService {
      * @param commentDTO the entity to update.
      * @return the persisted entity.
      */
-    Mono<CommentDTO> update(CommentDTO commentDTO);
+    CommentDTO update(CommentDTO commentDTO);
 
     /**
      * Partially updates a comment.
@@ -31,7 +31,7 @@ public interface CommentService {
      * @param commentDTO the entity to update partially.
      * @return the persisted entity.
      */
-    Mono<CommentDTO> partialUpdate(CommentDTO commentDTO);
+    Optional<CommentDTO> partialUpdate(CommentDTO commentDTO);
 
     /**
      * Get all the comments.
@@ -39,7 +39,7 @@ public interface CommentService {
      * @param pageable the pagination information.
      * @return the list of entities.
      */
-    Flux<CommentDTO> findAll(Pageable pageable);
+    Page<CommentDTO> findAll(Pageable pageable);
 
     /**
      * Get all the comments with eager load of many-to-many relationships.
@@ -47,14 +47,7 @@ public interface CommentService {
      * @param pageable the pagination information.
      * @return the list of entities.
      */
-    Flux<CommentDTO> findAllWithEagerRelationships(Pageable pageable);
-
-    /**
-     * Returns the number of comments available.
-     * @return the number of entities in the database.
-     *
-     */
-    Mono<Long> countAll();
+    Page<CommentDTO> findAllWithEagerRelationships(Pageable pageable);
 
     /**
      * Get the "id" comment.
@@ -62,13 +55,12 @@ public interface CommentService {
      * @param id the id of the entity.
      * @return the entity.
      */
-    Mono<CommentDTO> findOne(Long id);
+    Optional<CommentDTO> findOne(Long id);
 
     /**
      * Delete the "id" comment.
      *
      * @param id the id of the entity.
-     * @return a Mono to signal the deletion
      */
-    Mono<Void> delete(Long id);
+    void delete(Long id);
 }

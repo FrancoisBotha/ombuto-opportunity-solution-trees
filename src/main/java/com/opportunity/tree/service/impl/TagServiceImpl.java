@@ -1,16 +1,20 @@
 package com.opportunity.tree.service.impl;
 
+import com.opportunity.tree.domain.Tag;
 import com.opportunity.tree.repository.TagRepository;
 import com.opportunity.tree.service.TagService;
 import com.opportunity.tree.service.dto.TagDTO;
 import com.opportunity.tree.service.mapper.TagMapper;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Implementation for managing {@link com.opportunity.tree.domain.Tag}.
@@ -31,19 +35,23 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
-    public Mono<TagDTO> save(TagDTO tagDTO) {
+    public TagDTO save(TagDTO tagDTO) {
         LOG.debug("Request to save Tag : {}", tagDTO);
-        return tagRepository.save(tagMapper.toEntity(tagDTO)).map(tagMapper::toDto);
+        Tag tag = tagMapper.toEntity(tagDTO);
+        tag = tagRepository.save(tag);
+        return tagMapper.toDto(tag);
     }
 
     @Override
-    public Mono<TagDTO> update(TagDTO tagDTO) {
+    public TagDTO update(TagDTO tagDTO) {
         LOG.debug("Request to update Tag : {}", tagDTO);
-        return tagRepository.save(tagMapper.toEntity(tagDTO)).map(tagMapper::toDto);
+        Tag tag = tagMapper.toEntity(tagDTO);
+        tag = tagRepository.save(tag);
+        return tagMapper.toDto(tag);
     }
 
     @Override
-    public Mono<TagDTO> partialUpdate(TagDTO tagDTO) {
+    public Optional<TagDTO> partialUpdate(TagDTO tagDTO) {
         LOG.debug("Request to partially update Tag : {}", tagDTO);
 
         return tagRepository
@@ -53,35 +61,31 @@ public class TagServiceImpl implements TagService {
 
                 return existingTag;
             })
-            .flatMap(tagRepository::save)
+            .map(tagRepository::save)
             .map(tagMapper::toDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Flux<TagDTO> findAll() {
+    public List<TagDTO> findAll() {
         LOG.debug("Request to get all Tags");
-        return tagRepository.findAll().map(tagMapper::toDto);
+        return tagRepository.findAll().stream().map(tagMapper::toDto).collect(Collectors.toCollection(LinkedList::new));
     }
 
-    public Flux<TagDTO> findAllWithEagerRelationships(Pageable pageable) {
+    public Page<TagDTO> findAllWithEagerRelationships(Pageable pageable) {
         return tagRepository.findAllWithEagerRelationships(pageable).map(tagMapper::toDto);
-    }
-
-    public Mono<Long> countAll() {
-        return tagRepository.count();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Mono<TagDTO> findOne(Long id) {
+    public Optional<TagDTO> findOne(Long id) {
         LOG.debug("Request to get Tag : {}", id);
         return tagRepository.findOneWithEagerRelationships(id).map(tagMapper::toDto);
     }
 
     @Override
-    public Mono<Void> delete(Long id) {
+    public void delete(Long id) {
         LOG.debug("Request to delete Tag : {}", id);
-        return tagRepository.deleteById(id);
+        tagRepository.deleteById(id);
     }
 }

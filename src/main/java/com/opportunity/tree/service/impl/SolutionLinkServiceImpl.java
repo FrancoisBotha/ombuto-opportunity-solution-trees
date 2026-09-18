@@ -1,16 +1,20 @@
 package com.opportunity.tree.service.impl;
 
+import com.opportunity.tree.domain.SolutionLink;
 import com.opportunity.tree.repository.SolutionLinkRepository;
 import com.opportunity.tree.service.SolutionLinkService;
 import com.opportunity.tree.service.dto.SolutionLinkDTO;
 import com.opportunity.tree.service.mapper.SolutionLinkMapper;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Implementation for managing {@link com.opportunity.tree.domain.SolutionLink}.
@@ -31,19 +35,23 @@ public class SolutionLinkServiceImpl implements SolutionLinkService {
     }
 
     @Override
-    public Mono<SolutionLinkDTO> save(SolutionLinkDTO solutionLinkDTO) {
+    public SolutionLinkDTO save(SolutionLinkDTO solutionLinkDTO) {
         LOG.debug("Request to save SolutionLink : {}", solutionLinkDTO);
-        return solutionLinkRepository.save(solutionLinkMapper.toEntity(solutionLinkDTO)).map(solutionLinkMapper::toDto);
+        SolutionLink solutionLink = solutionLinkMapper.toEntity(solutionLinkDTO);
+        solutionLink = solutionLinkRepository.save(solutionLink);
+        return solutionLinkMapper.toDto(solutionLink);
     }
 
     @Override
-    public Mono<SolutionLinkDTO> update(SolutionLinkDTO solutionLinkDTO) {
+    public SolutionLinkDTO update(SolutionLinkDTO solutionLinkDTO) {
         LOG.debug("Request to update SolutionLink : {}", solutionLinkDTO);
-        return solutionLinkRepository.save(solutionLinkMapper.toEntity(solutionLinkDTO)).map(solutionLinkMapper::toDto);
+        SolutionLink solutionLink = solutionLinkMapper.toEntity(solutionLinkDTO);
+        solutionLink = solutionLinkRepository.save(solutionLink);
+        return solutionLinkMapper.toDto(solutionLink);
     }
 
     @Override
-    public Mono<SolutionLinkDTO> partialUpdate(SolutionLinkDTO solutionLinkDTO) {
+    public Optional<SolutionLinkDTO> partialUpdate(SolutionLinkDTO solutionLinkDTO) {
         LOG.debug("Request to partially update SolutionLink : {}", solutionLinkDTO);
 
         return solutionLinkRepository
@@ -53,35 +61,31 @@ public class SolutionLinkServiceImpl implements SolutionLinkService {
 
                 return existingSolutionLink;
             })
-            .flatMap(solutionLinkRepository::save)
+            .map(solutionLinkRepository::save)
             .map(solutionLinkMapper::toDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Flux<SolutionLinkDTO> findAll() {
+    public List<SolutionLinkDTO> findAll() {
         LOG.debug("Request to get all SolutionLinks");
-        return solutionLinkRepository.findAll().map(solutionLinkMapper::toDto);
+        return solutionLinkRepository.findAll().stream().map(solutionLinkMapper::toDto).collect(Collectors.toCollection(LinkedList::new));
     }
 
-    public Flux<SolutionLinkDTO> findAllWithEagerRelationships(Pageable pageable) {
+    public Page<SolutionLinkDTO> findAllWithEagerRelationships(Pageable pageable) {
         return solutionLinkRepository.findAllWithEagerRelationships(pageable).map(solutionLinkMapper::toDto);
-    }
-
-    public Mono<Long> countAll() {
-        return solutionLinkRepository.count();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Mono<SolutionLinkDTO> findOne(Long id) {
+    public Optional<SolutionLinkDTO> findOne(Long id) {
         LOG.debug("Request to get SolutionLink : {}", id);
         return solutionLinkRepository.findOneWithEagerRelationships(id).map(solutionLinkMapper::toDto);
     }
 
     @Override
-    public Mono<Void> delete(Long id) {
+    public void delete(Long id) {
         LOG.debug("Request to delete SolutionLink : {}", id);
-        return solutionLinkRepository.deleteById(id);
+        solutionLinkRepository.deleteById(id);
     }
 }

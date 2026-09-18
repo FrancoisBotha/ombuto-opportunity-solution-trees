@@ -1,18 +1,20 @@
 package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Threaded comment on any tree node. Exactly one of the node relationships is set.
  */
-@Table("comment")
+@Entity
+@Table(name = "comment")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Comment implements Serializable {
 
@@ -20,52 +22,41 @@ public class Comment implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @Column("body")
+    @Lob
+    @Column(name = "body", nullable = false)
     private String body;
 
-    @NotNull(message = "must not be null")
-    @Column("created_date")
+    @NotNull
+    @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
-    @Column("edited_date")
+    @Column(name = "edited_date")
     private Instant editedDate;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     private User author;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "author", "parent", "outcome", "opportunity", "solution" }, allowSetters = true)
     private Comment parent;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "product", "owner" }, allowSetters = true)
     private Outcome outcome;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "outcome", "parent", "owner", "interviews", "tags" }, allowSetters = true)
     private Opportunity opportunity;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "opportunity", "owner", "tags" }, allowSetters = true)
     private Solution solution;
-
-    @Column("author_id")
-    private String authorId;
-
-    @Column("parent_id")
-    private Long parentId;
-
-    @Column("outcome_id")
-    private Long outcomeId;
-
-    @Column("opportunity_id")
-    private Long opportunityId;
-
-    @Column("solution_id")
-    private Long solutionId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -127,7 +118,6 @@ public class Comment implements Serializable {
 
     public void setAuthor(User user) {
         this.author = user;
-        this.authorId = user != null ? user.getId() : null;
     }
 
     public Comment author(User user) {
@@ -141,7 +131,6 @@ public class Comment implements Serializable {
 
     public void setParent(Comment comment) {
         this.parent = comment;
-        this.parentId = comment != null ? comment.getId() : null;
     }
 
     public Comment parent(Comment comment) {
@@ -155,7 +144,6 @@ public class Comment implements Serializable {
 
     public void setOutcome(Outcome outcome) {
         this.outcome = outcome;
-        this.outcomeId = outcome != null ? outcome.getId() : null;
     }
 
     public Comment outcome(Outcome outcome) {
@@ -169,7 +157,6 @@ public class Comment implements Serializable {
 
     public void setOpportunity(Opportunity opportunity) {
         this.opportunity = opportunity;
-        this.opportunityId = opportunity != null ? opportunity.getId() : null;
     }
 
     public Comment opportunity(Opportunity opportunity) {
@@ -183,52 +170,11 @@ public class Comment implements Serializable {
 
     public void setSolution(Solution solution) {
         this.solution = solution;
-        this.solutionId = solution != null ? solution.getId() : null;
     }
 
     public Comment solution(Solution solution) {
         this.setSolution(solution);
         return this;
-    }
-
-    public String getAuthorId() {
-        return this.authorId;
-    }
-
-    public void setAuthorId(String user) {
-        this.authorId = user;
-    }
-
-    public Long getParentId() {
-        return this.parentId;
-    }
-
-    public void setParentId(Long comment) {
-        this.parentId = comment;
-    }
-
-    public Long getOutcomeId() {
-        return this.outcomeId;
-    }
-
-    public void setOutcomeId(Long outcome) {
-        this.outcomeId = outcome;
-    }
-
-    public Long getOpportunityId() {
-        return this.opportunityId;
-    }
-
-    public void setOpportunityId(Long opportunity) {
-        this.opportunityId = opportunity;
-    }
-
-    public Long getSolutionId() {
-        return this.solutionId;
-    }
-
-    public void setSolutionId(Long solution) {
-        this.solutionId = solution;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

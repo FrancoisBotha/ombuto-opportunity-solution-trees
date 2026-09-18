@@ -1,69 +1,43 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.Outcome;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
- * Spring Data R2DBC repository for the Outcome entity.
+ * Spring Data JPA repository for the Outcome entity.
  */
-@SuppressWarnings("unused")
 @Repository
-public interface OutcomeRepository extends ReactiveCrudRepository<Outcome, Long>, OutcomeRepositoryInternal {
-    @Override
-    Mono<Outcome> findOneWithEagerRelationships(Long id);
+public interface OutcomeRepository extends JpaRepository<Outcome, Long>, JpaSpecificationExecutor<Outcome> {
+    @Query("select outcome from Outcome outcome where outcome.owner.login = ?#{authentication.name}")
+    List<Outcome> findByOwnerIsCurrentUser();
 
-    @Override
-    Flux<Outcome> findAllWithEagerRelationships();
+    default Optional<Outcome> findOneWithEagerRelationships(Long id) {
+        return this.findOneWithToOneRelationships(id);
+    }
 
-    @Override
-    Flux<Outcome> findAllWithEagerRelationships(Pageable page);
+    default List<Outcome> findAllWithEagerRelationships() {
+        return this.findAllWithToOneRelationships();
+    }
 
-    @Query("SELECT * FROM outcome entity WHERE entity.product_id = :id")
-    Flux<Outcome> findByProduct(Long id);
+    default Page<Outcome> findAllWithEagerRelationships(Pageable pageable) {
+        return this.findAllWithToOneRelationships(pageable);
+    }
 
-    @Query("SELECT * FROM outcome entity WHERE entity.product_id IS NULL")
-    Flux<Outcome> findAllWhereProductIsNull();
+    @Query(
+        value = "select outcome from Outcome outcome left join fetch outcome.product left join fetch outcome.owner",
+        countQuery = "select count(outcome) from Outcome outcome"
+    )
+    Page<Outcome> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("SELECT * FROM outcome entity WHERE entity.owner_id = :id")
-    Flux<Outcome> findByOwner(Long id);
+    @Query("select outcome from Outcome outcome left join fetch outcome.product left join fetch outcome.owner")
+    List<Outcome> findAllWithToOneRelationships();
 
-    @Query("SELECT * FROM outcome entity WHERE entity.owner_id IS NULL")
-    Flux<Outcome> findAllWhereOwnerIsNull();
-
-    @Override
-    <S extends Outcome> Mono<S> save(S entity);
-
-    @Override
-    Flux<Outcome> findAll();
-
-    @Override
-    Mono<Outcome> findById(Long id);
-
-    @Override
-    Mono<Void> deleteById(Long id);
-}
-
-interface OutcomeRepositoryInternal {
-    <S extends Outcome> Mono<S> save(S entity);
-
-    Flux<Outcome> findAllBy(Pageable pageable);
-
-    Flux<Outcome> findAll();
-
-    Mono<Outcome> findById(Long id);
-    // this is not supported at the moment because of https://github.com/jhipster/generator-jhipster/issues/18269
-    // Flux<Outcome> findAllBy(Pageable pageable, Criteria criteria);
-
-    Mono<Outcome> findOneWithEagerRelationships(Long id);
-
-    Flux<Outcome> findAllWithEagerRelationships();
-
-    Flux<Outcome> findAllWithEagerRelationships(Pageable page);
-
-    Mono<Void> deleteById(Long id);
+    @Query("select outcome from Outcome outcome left join fetch outcome.product left join fetch outcome.owner where outcome.id =:id")
+    Optional<Outcome> findOneWithToOneRelationships(@Param("id") Long id);
 }

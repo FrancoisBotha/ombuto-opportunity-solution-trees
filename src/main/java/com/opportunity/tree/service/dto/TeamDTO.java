@@ -14,14 +14,14 @@ public class TeamDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 100)
     private String name;
 
     @Lob
     private String description;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant createdDate;
 
     public Long getId() {

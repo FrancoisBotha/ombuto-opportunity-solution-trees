@@ -1,17 +1,19 @@
 package com.opportunity.tree.domain;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * A Team.
  */
-@Table("team")
+@Entity
+@Table(name = "team")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Team implements Serializable {
 
@@ -19,19 +21,22 @@ public class Team implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 100)
-    @Column("name")
+    @Column(name = "name", length = 100, nullable = false)
     private String name;
 
-    @Column("description")
+    @Lob
+    @Column(name = "description")
     private String description;
 
-    @NotNull(message = "must not be null")
-    @Column("created_date")
+    @NotNull
+    @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here

@@ -1,7 +1,9 @@
 package com.opportunity.tree.web.rest;
 
 import com.opportunity.tree.repository.OpportunityRepository;
+import com.opportunity.tree.service.OpportunityQueryService;
 import com.opportunity.tree.service.OpportunityService;
+import com.opportunity.tree.service.criteria.OpportunityCriteria;
 import com.opportunity.tree.service.dto.OpportunityDTO;
 import com.opportunity.tree.web.rest.errors.BadRequestAlertException;
 import jakarta.validation.Valid;
@@ -10,22 +12,19 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.ForwardedHeaderUtils;
-import reactor.core.publisher.Mono;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
-import tech.jhipster.web.util.reactive.ResponseUtil;
+import tech.jhipster.web.util.ResponseUtil;
 
 /**
  * REST controller for managing {@link com.opportunity.tree.domain.Opportunity}.
@@ -38,16 +37,23 @@ public class OpportunityResource {
 
     private static final String ENTITY_NAME = "opportunity";
 
-    @Value("${jhipster.clientApp.name:opportunitysolutiontree}")
+    @Value("${jhipster.clientApp.name:opportunitySolutionTree}")
     private String applicationName;
 
     private final OpportunityService opportunityService;
 
     private final OpportunityRepository opportunityRepository;
 
-    public OpportunityResource(OpportunityService opportunityService, OpportunityRepository opportunityRepository) {
+    private final OpportunityQueryService opportunityQueryService;
+
+    public OpportunityResource(
+        OpportunityService opportunityService,
+        OpportunityRepository opportunityRepository,
+        OpportunityQueryService opportunityQueryService
+    ) {
         this.opportunityService = opportunityService;
         this.opportunityRepository = opportunityRepository;
+        this.opportunityQueryService = opportunityQueryService;
     }
 
     /**
@@ -58,23 +64,15 @@ public class OpportunityResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PostMapping("")
-    public Mono<ResponseEntity<OpportunityDTO>> createOpportunity(@Valid @RequestBody OpportunityDTO opportunityDTO)
-        throws URISyntaxException {
+    public ResponseEntity<OpportunityDTO> createOpportunity(@Valid @RequestBody OpportunityDTO opportunityDTO) throws URISyntaxException {
         LOG.debug("REST request to save Opportunity : {}", opportunityDTO);
         if (opportunityDTO.getId() != null) {
             throw new BadRequestAlertException("A new opportunity cannot already have an ID", ENTITY_NAME, "idexists");
         }
-        return opportunityService
-            .save(opportunityDTO)
-            .map(result -> {
-                try {
-                    return ResponseEntity.created(new URI("/api/opportunities/" + result.getId()))
-                        .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                        .body(result);
-                } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+        opportunityDTO = opportunityService.save(opportunityDTO);
+        return ResponseEntity.created(new URI("/api/opportunities/" + opportunityDTO.getId()))
+            .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, opportunityDTO.getId().toString()))
+            .body(opportunityDTO);
     }
 
     /**
@@ -88,7 +86,7 @@ public class OpportunityResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<OpportunityDTO>> updateOpportunity(
+    public ResponseEntity<OpportunityDTO> updateOpportunity(
         @PathVariable(value = "id", required = false) final Long id,
         @Valid @RequestBody OpportunityDTO opportunityDTO
     ) throws URISyntaxException {
@@ -100,22 +98,14 @@ public class OpportunityResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return opportunityRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!opportunityRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                return opportunityService
-                    .update(opportunityDTO)
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(result ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                            .body(result)
-                    );
-            });
+        opportunityDTO = opportunityService.update(opportunityDTO);
+        return ResponseEntity.ok()
+            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, opportunityDTO.getId().toString()))
+            .body(opportunityDTO);
     }
 
     /**
@@ -130,7 +120,7 @@ public class OpportunityResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PatchMapping(value = "/{id}", consumes = { "application/json", "application/merge-patch+json" })
-    public Mono<ResponseEntity<OpportunityDTO>> partialUpdateOpportunity(
+    public ResponseEntity<OpportunityDTO> partialUpdateOpportunity(
         @PathVariable(value = "id", required = false) final Long id,
         @NotNull @RequestBody OpportunityDTO opportunityDTO
     ) throws URISyntaxException {
@@ -142,53 +132,47 @@ public class OpportunityResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return opportunityRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!opportunityRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                Mono<OpportunityDTO> result = opportunityService.partialUpdate(opportunityDTO);
+        Optional<OpportunityDTO> result = opportunityService.partialUpdate(opportunityDTO);
 
-                return result
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(res ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, res.getId().toString()))
-                            .body(res)
-                    );
-            });
+        return ResponseUtil.wrapOrNotFound(
+            result,
+            HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, opportunityDTO.getId().toString())
+        );
     }
 
     /**
      * {@code GET  /opportunities} : get all the Opportunities.
      *
      * @param pageable the pagination information.
-     * @param request a {@link ServerHttpRequest} request.
-     * @param eagerload flag to eager load entities from relationships (This is applicable for many-to-many).
+     * @param criteria the criteria which the requested entities should match.
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of Opportunities in body.
      */
-    @GetMapping(value = "", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<ResponseEntity<List<OpportunityDTO>>> getAllOpportunities(
-        @org.springdoc.core.annotations.ParameterObject Pageable pageable,
-        ServerHttpRequest request,
-        @RequestParam(name = "eagerload", required = false, defaultValue = "true") boolean eagerload
+    @GetMapping("")
+    public ResponseEntity<List<OpportunityDTO>> getAllOpportunities(
+        OpportunityCriteria criteria,
+        @org.springdoc.core.annotations.ParameterObject Pageable pageable
     ) {
-        LOG.debug("REST request to get a page of Opportunities");
-        return opportunityService
-            .countAll()
-            .zipWith(opportunityService.findAll(pageable).collectList())
-            .map(countWithEntities ->
-                ResponseEntity.ok()
-                    .headers(
-                        PaginationUtil.generatePaginationHttpHeaders(
-                            ForwardedHeaderUtils.adaptFromForwardedHeaders(request.getURI(), request.getHeaders()),
-                            new PageImpl<>(countWithEntities.getT2(), pageable, countWithEntities.getT1())
-                        )
-                    )
-                    .body(countWithEntities.getT2())
-            );
+        LOG.debug("REST request to get Opportunities by criteria: {}", criteria);
+
+        Page<OpportunityDTO> page = opportunityQueryService.findByCriteria(criteria, pageable);
+        HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
+    }
+
+    /**
+     * {@code GET  /opportunities/count} : count all the opportunities.
+     *
+     * @param criteria the criteria which the requested entities should match.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the count in body.
+     */
+    @GetMapping("/count")
+    public ResponseEntity<Long> countOpportunities(OpportunityCriteria criteria) {
+        LOG.debug("REST request to count Opportunities by criteria: {}", criteria);
+        return ResponseEntity.ok().body(opportunityQueryService.countByCriteria(criteria));
     }
 
     /**
@@ -198,9 +182,9 @@ public class OpportunityResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the opportunityDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<OpportunityDTO>> getOpportunity(@PathVariable("id") Long id) {
+    public ResponseEntity<OpportunityDTO> getOpportunity(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Opportunity : {}", id);
-        Mono<OpportunityDTO> opportunityDTO = opportunityService.findOne(id);
+        Optional<OpportunityDTO> opportunityDTO = opportunityService.findOne(id);
         return ResponseUtil.wrapOrNotFound(opportunityDTO);
     }
 
@@ -211,16 +195,11 @@ public class OpportunityResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Void>> deleteOpportunity(@PathVariable("id") Long id) {
+    public ResponseEntity<Void> deleteOpportunity(@PathVariable("id") Long id) {
         LOG.debug("REST request to delete Opportunity : {}", id);
-        return opportunityService
-            .delete(id)
-            .then(
-                Mono.just(
-                    ResponseEntity.noContent()
-                        .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
-                        .build()
-                )
-            );
+        opportunityService.delete(id);
+        return ResponseEntity.noContent()
+            .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
+            .build();
     }
 }

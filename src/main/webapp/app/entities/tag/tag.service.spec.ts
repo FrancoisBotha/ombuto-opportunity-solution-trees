@@ -98,7 +98,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Tag', async () => {
-        const patchObject = { ...new Tag() };
+        const patchObject = { colour: 'BBBBBB', ...new Tag() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { ...returnedFromService };

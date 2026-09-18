@@ -18,26 +18,26 @@ public class AssumptionDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 500)
     private String statement;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private AssumptionCategory category;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Min(value = 1)
     @Max(value = 5)
     private Integer importance;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Min(value = 1)
     @Max(value = 5)
     private Integer evidence;
 
     private Boolean validated;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant createdDate;
 
     @NotNull

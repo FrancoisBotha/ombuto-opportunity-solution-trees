@@ -2,19 +2,21 @@ package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.opportunity.tree.domain.enumeration.OutcomeStatus;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDate;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Desired outcome at the top of the tree, e.g. \"Increase weekly active users\".
  */
-@Table("outcome")
+@Entity
+@Table(name = "outcome")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Outcome implements Serializable {
 
@@ -22,62 +24,61 @@ public class Outcome implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 200)
-    @Column("title")
+    @Column(name = "title", length = 200, nullable = false)
     private String title;
 
-    @Column("description")
+    @Lob
+    @Column(name = "description")
     private String description;
 
     @Size(max = 200)
-    @Column("metric")
+    @Column(name = "metric", length = 200)
     private String metric;
 
     @Size(max = 100)
-    @Column("target_value")
+    @Column(name = "target_value", length = 100)
     private String targetValue;
 
     @Size(max = 100)
-    @Column("current_value")
+    @Column(name = "current_value", length = 100)
     private String currentValue;
 
-    @NotNull(message = "must not be null")
-    @Column("status")
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     private OutcomeStatus status;
 
-    @Column("start_date")
+    @Column(name = "start_date")
     private LocalDate startDate;
 
-    @Column("target_date")
+    @Column(name = "target_date")
     private LocalDate targetDate;
 
-    @NotNull(message = "must not be null")
-    @Column("sort_order")
+    @NotNull
+    @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
-    @NotNull(message = "must not be null")
-    @Column("created_date")
+    @NotNull
+    @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
-    @Column("last_modified_date")
+    @Column(name = "last_modified_date")
     private Instant lastModifiedDate;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     @JsonIgnoreProperties(value = { "team" }, allowSetters = true)
     private Product product;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     private User owner;
-
-    @Column("product_id")
-    private Long productId;
-
-    @Column("owner_id")
-    private String ownerId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -243,7 +244,6 @@ public class Outcome implements Serializable {
 
     public void setProduct(Product product) {
         this.product = product;
-        this.productId = product != null ? product.getId() : null;
     }
 
     public Outcome product(Product product) {
@@ -257,28 +257,11 @@ public class Outcome implements Serializable {
 
     public void setOwner(User user) {
         this.owner = user;
-        this.ownerId = user != null ? user.getId() : null;
     }
 
     public Outcome owner(User user) {
         this.setOwner(user);
         return this;
-    }
-
-    public Long getProductId() {
-        return this.productId;
-    }
-
-    public void setProductId(Long product) {
-        this.productId = product;
-    }
-
-    public String getOwnerId() {
-        return this.ownerId;
-    }
-
-    public void setOwnerId(String user) {
-        this.ownerId = user;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

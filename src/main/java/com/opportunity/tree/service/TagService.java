@@ -1,9 +1,10 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.service.dto.TagDTO;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Interface for managing {@link com.opportunity.tree.domain.Tag}.
@@ -15,7 +16,7 @@ public interface TagService {
      * @param tagDTO the entity to save.
      * @return the persisted entity.
      */
-    Mono<TagDTO> save(TagDTO tagDTO);
+    TagDTO save(TagDTO tagDTO);
 
     /**
      * Updates a tag.
@@ -23,7 +24,7 @@ public interface TagService {
      * @param tagDTO the entity to update.
      * @return the persisted entity.
      */
-    Mono<TagDTO> update(TagDTO tagDTO);
+    TagDTO update(TagDTO tagDTO);
 
     /**
      * Partially updates a tag.
@@ -31,14 +32,14 @@ public interface TagService {
      * @param tagDTO the entity to update partially.
      * @return the persisted entity.
      */
-    Mono<TagDTO> partialUpdate(TagDTO tagDTO);
+    Optional<TagDTO> partialUpdate(TagDTO tagDTO);
 
     /**
      * Get all the tags.
      *
      * @return the list of entities.
      */
-    Flux<TagDTO> findAll();
+    List<TagDTO> findAll();
 
     /**
      * Get all the tags with eager load of many-to-many relationships.
@@ -46,14 +47,7 @@ public interface TagService {
      * @param pageable the pagination information.
      * @return the list of entities.
      */
-    Flux<TagDTO> findAllWithEagerRelationships(Pageable pageable);
-
-    /**
-     * Returns the number of tags available.
-     * @return the number of entities in the database.
-     *
-     */
-    Mono<Long> countAll();
+    Page<TagDTO> findAllWithEagerRelationships(Pageable pageable);
 
     /**
      * Get the "id" tag.
@@ -61,13 +55,12 @@ public interface TagService {
      * @param id the id of the entity.
      * @return the entity.
      */
-    Mono<TagDTO> findOne(Long id);
+    Optional<TagDTO> findOne(Long id);
 
     /**
      * Delete the "id" tag.
      *
      * @param id the id of the entity.
-     * @return a Mono to signal the deletion
      */
-    Mono<Void> delete(Long id);
+    void delete(Long id);
 }

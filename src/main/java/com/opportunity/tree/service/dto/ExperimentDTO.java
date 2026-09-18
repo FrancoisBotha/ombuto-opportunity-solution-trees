@@ -21,7 +21,7 @@ public class ExperimentDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 200)
     private String title;
 
@@ -34,7 +34,7 @@ public class ExperimentDTO implements Serializable {
     @Lob
     private String successCriteria;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private ExperimentStatus status;
 
     private ExperimentResult result;
@@ -46,7 +46,7 @@ public class ExperimentDTO implements Serializable {
 
     private LocalDate endDate;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant createdDate;
 
     @NotNull

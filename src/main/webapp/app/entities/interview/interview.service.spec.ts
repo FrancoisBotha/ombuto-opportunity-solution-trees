@@ -119,11 +119,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Interview', async () => {
-        const patchObject = {
-          interviewDate: dayjs(currentDate).format(DATE_FORMAT),
-          createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
-          ...new Interview(),
-        };
+        const patchObject = { title: 'BBBBBB', participant: 'BBBBBB', notes: 'BBBBBB', recordingUrl: 'BBBBBB', ...new Interview() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { interviewDate: currentDate, createdDate: currentDate, ...returnedFromService };

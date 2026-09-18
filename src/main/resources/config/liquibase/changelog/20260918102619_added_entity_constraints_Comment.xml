@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        Added the constraints for entity Comment.
+    -->
+    <changeSet id="20260918102619-2" author="jhipster">
+
+        <addForeignKeyConstraint baseColumnNames="author_id"
+                                 baseTableName="comment"
+                                 constraintName="fk_comment__author_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="jhi_user"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="parent_id"
+                                 baseTableName="comment"
+                                 constraintName="fk_comment__parent_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="comment"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="outcome_id"
+                                 baseTableName="comment"
+                                 constraintName="fk_comment__outcome_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="outcome"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="opportunity_id"
+                                 baseTableName="comment"
+                                 constraintName="fk_comment__opportunity_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="opportunity"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="solution_id"
+                                 baseTableName="comment"
+                                 constraintName="fk_comment__solution_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="solution"
+                                 />
+    </changeSet>
+</databaseChangeLog>

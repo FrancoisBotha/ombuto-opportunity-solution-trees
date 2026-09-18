@@ -9,9 +9,25 @@
 # ===================================================================
 
 spring:
-  r2dbc:
-    url: r2dbc:h2:file:///./target/h2db/testdb/opportunity-solution-tree;DB_CLOSE_DELAY=-1
-    username: opportunity-solution-tree
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    url: jdbc:h2:file:./target/h2db/testdb/opportunitysolutiontree;DB_CLOSE_DELAY=-1
+    username: opportunitySolutionTree
     password:
-  liquibase:
-    url: jdbc:h2:file:./target/h2db/testdb/opportunity-solution-tree;DB_CLOSE_DELAY=-1
+    hikari:
+      auto-commit: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate.id.new_generator_mappings: true
+      hibernate.connection.provider_disables_autocommit: true
+      hibernate.cache.use_second_level_cache: false
+      hibernate.cache.use_query_cache: false
+      hibernate.generate_statistics: false
+      hibernate.hbm2ddl.auto: none #TODO: temp relief for integration tests, revisit required
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP
+      hibernate.jdbc.time_zone: UTC
+      hibernate.timezone.default_storage: NORMALIZE
+      hibernate.query.fail_on_pagination_over_collection_fetch: true

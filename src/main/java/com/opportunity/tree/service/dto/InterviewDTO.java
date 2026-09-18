@@ -19,14 +19,14 @@ public class InterviewDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 200)
     private String title;
 
     @Size(max = 200)
     private String participant;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private LocalDate interviewDate;
 
     @Lob
@@ -35,7 +35,7 @@ public class InterviewDTO implements Serializable {
     @Size(max = 2000)
     private String recordingUrl;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant createdDate;
 
     @NotNull

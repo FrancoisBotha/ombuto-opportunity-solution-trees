@@ -16,10 +16,10 @@ public class TeamMemberDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private TeamRole role;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Instant joinedDate;
 
     @NotNull

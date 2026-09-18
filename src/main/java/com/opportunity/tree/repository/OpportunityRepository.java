@@ -1,87 +1,52 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.Opportunity;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
- * Spring Data R2DBC repository for the Opportunity entity.
+ * Spring Data JPA repository for the Opportunity entity.
+ *
+ * When extending this class, extend OpportunityRepositoryWithBagRelationships too.
+ * For more information refer to https://github.com/jhipster/generator-jhipster/issues/17990.
  */
-@SuppressWarnings("unused")
 @Repository
-public interface OpportunityRepository extends ReactiveCrudRepository<Opportunity, Long>, OpportunityRepositoryInternal {
-    Flux<Opportunity> findAllBy(Pageable pageable);
+public interface OpportunityRepository
+    extends OpportunityRepositoryWithBagRelationships, JpaRepository<Opportunity, Long>, JpaSpecificationExecutor<Opportunity>
+{
+    @Query("select opportunity from Opportunity opportunity where opportunity.owner.login = ?#{authentication.name}")
+    List<Opportunity> findByOwnerIsCurrentUser();
 
-    @Override
-    Mono<Opportunity> findOneWithEagerRelationships(Long id);
+    default Optional<Opportunity> findOneWithEagerRelationships(Long id) {
+        return this.fetchBagRelationships(this.findOneWithToOneRelationships(id));
+    }
 
-    @Override
-    Flux<Opportunity> findAllWithEagerRelationships();
+    default List<Opportunity> findAllWithEagerRelationships() {
+        return this.fetchBagRelationships(this.findAllWithToOneRelationships());
+    }
 
-    @Override
-    Flux<Opportunity> findAllWithEagerRelationships(Pageable page);
-
-    @Query("SELECT * FROM opportunity entity WHERE entity.outcome_id = :id")
-    Flux<Opportunity> findByOutcome(Long id);
-
-    @Query("SELECT * FROM opportunity entity WHERE entity.outcome_id IS NULL")
-    Flux<Opportunity> findAllWhereOutcomeIsNull();
-
-    @Query("SELECT * FROM opportunity entity WHERE entity.parent_id = :id")
-    Flux<Opportunity> findByParent(Long id);
-
-    @Query("SELECT * FROM opportunity entity WHERE entity.parent_id IS NULL")
-    Flux<Opportunity> findAllWhereParentIsNull();
-
-    @Query("SELECT * FROM opportunity entity WHERE entity.owner_id = :id")
-    Flux<Opportunity> findByOwner(Long id);
-
-    @Query("SELECT * FROM opportunity entity WHERE entity.owner_id IS NULL")
-    Flux<Opportunity> findAllWhereOwnerIsNull();
+    default Page<Opportunity> findAllWithEagerRelationships(Pageable pageable) {
+        return this.fetchBagRelationships(this.findAllWithToOneRelationships(pageable));
+    }
 
     @Query(
-        "SELECT entity.* FROM opportunity entity JOIN rel_opportunity__interview joinTable ON entity.id = joinTable.interview_id WHERE joinTable.interview_id = :id"
+        value = "select opportunity from Opportunity opportunity left join fetch opportunity.outcome left join fetch opportunity.parent left join fetch opportunity.owner",
+        countQuery = "select count(opportunity) from Opportunity opportunity"
     )
-    Flux<Opportunity> findByInterview(Long id);
+    Page<Opportunity> findAllWithToOneRelationships(Pageable pageable);
 
     @Query(
-        "SELECT entity.* FROM opportunity entity JOIN rel_opportunity__tag joinTable ON entity.id = joinTable.tag_id WHERE joinTable.tag_id = :id"
+        "select opportunity from Opportunity opportunity left join fetch opportunity.outcome left join fetch opportunity.parent left join fetch opportunity.owner"
     )
-    Flux<Opportunity> findByTag(Long id);
+    List<Opportunity> findAllWithToOneRelationships();
 
-    @Override
-    <S extends Opportunity> Mono<S> save(S entity);
-
-    @Override
-    Flux<Opportunity> findAll();
-
-    @Override
-    Mono<Opportunity> findById(Long id);
-
-    @Override
-    Mono<Void> deleteById(Long id);
-}
-
-interface OpportunityRepositoryInternal {
-    <S extends Opportunity> Mono<S> save(S entity);
-
-    Flux<Opportunity> findAllBy(Pageable pageable);
-
-    Flux<Opportunity> findAll();
-
-    Mono<Opportunity> findById(Long id);
-    // this is not supported at the moment because of https://github.com/jhipster/generator-jhipster/issues/18269
-    // Flux<Opportunity> findAllBy(Pageable pageable, Criteria criteria);
-
-    Mono<Opportunity> findOneWithEagerRelationships(Long id);
-
-    Flux<Opportunity> findAllWithEagerRelationships();
-
-    Flux<Opportunity> findAllWithEagerRelationships(Pageable page);
-
-    Mono<Void> deleteById(Long id);
+    @Query(
+        "select opportunity from Opportunity opportunity left join fetch opportunity.outcome left join fetch opportunity.parent left join fetch opportunity.owner where opportunity.id =:id"
+    )
+    Optional<Opportunity> findOneWithToOneRelationships(@Param("id") Long id);
 }

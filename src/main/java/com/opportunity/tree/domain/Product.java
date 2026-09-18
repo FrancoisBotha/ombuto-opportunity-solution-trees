@@ -1,17 +1,19 @@
 package com.opportunity.tree.domain;
 
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * A Product.
  */
-@Table("product")
+@Entity
+@Table(name = "product")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Product implements Serializable {
 
@@ -19,33 +21,35 @@ public class Product implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 100)
-    @Column("name")
+    @Column(name = "name", length = 100, nullable = false)
     private String name;
 
-    @Column("description")
+    @Lob
+    @Column(name = "description")
     private String description;
 
-    @Column("vision")
+    @Lob
+    @Column(name = "vision")
     private String vision;
 
-    @NotNull(message = "must not be null")
-    @Column("archived")
+    @NotNull
+    @Column(name = "archived", nullable = false)
     private Boolean archived;
 
-    @NotNull(message = "must not be null")
-    @Column("created_date")
+    @NotNull
+    @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     private Team team;
-
-    @Column("team_id")
-    private Long teamId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -133,20 +137,11 @@ public class Product implements Serializable {
 
     public void setTeam(Team team) {
         this.team = team;
-        this.teamId = team != null ? team.getId() : null;
     }
 
     public Product team(Team team) {
         this.setTeam(team);
         return this;
-    }
-
-    public Long getTeamId() {
-        return this.teamId;
-    }
-
-    public void setTeamId(Long team) {
-        this.teamId = team;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

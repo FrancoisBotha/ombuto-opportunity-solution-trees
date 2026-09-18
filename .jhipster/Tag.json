@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091122"
+    "changelogDate": "20260918102719"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "documentation": "Tag for cross-cutting labels (persona, segment, theme).",
   "dto": "mapstruct",
   "fields": [

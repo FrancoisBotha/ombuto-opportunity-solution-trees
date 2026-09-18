@@ -12,7 +12,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.11</version>
+        <version>4.0.3</version>
         <relativePath/>
         <!-- lookup parent from repository -->
     </parent>
@@ -37,18 +37,15 @@
         <run.addResources>false</run.addResources>
         <spring-boot.version>${project.parent.version}</spring-boot.version>
         <archunit-junit5.version>1.4.1</archunit-junit5.version>
-        <blockhound-junit-platform.version>1.0.16.RELEASE</blockhound-junit-platform.version>
         <checkstyle.version>13.3.0</checkstyle.version>
         <checksum-maven-plugin.version>1.11</checksum-maven-plugin.version>
-        <commons-beanutils.version>1.11.0</commons-beanutils.version>
         <cucumber-bom.version>7.34.3</cucumber-bom.version>
         <frontend-maven-plugin.version>2.0.0</frontend-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
-        <jhipster-framework.version>8.12.0</jhipster-framework.version>
+        <jhipster-framework.version>9.0.0</jhipster-framework.version>
         <jib-maven-plugin.architecture>amd64</jib-maven-plugin.architecture>
         <jib-maven-plugin.image>eclipse-temurin:21-jre-noble</jib-maven-plugin.image>
         <jib-maven-plugin.version>3.5.1</jib-maven-plugin.version>
-        <junit-jupiter.version>5.13.3</junit-jupiter.version>
         <lifecycle-mapping.version>1.0.0</lifecycle-mapping.version>
         <liquibase-plugin.driver/>
         <liquibase-plugin.hibernate-dialect/>
@@ -58,7 +55,6 @@
         <mapstruct.version>1.6.3</mapstruct.version>
         <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
-        <micrometer-context-propagation.version>1.2.1</micrometer-context-propagation.version>
         <modernizer-maven-plugin.version>3.2.0</modernizer-maven-plugin.version>
         <nohttp-checkstyle.version>0.0.11</nohttp-checkstyle.version>
         <profile.api-docs/>
@@ -71,7 +67,7 @@
         <sonar-maven-plugin.version>5.5.0.6356</sonar-maven-plugin.version>
         <spotless-maven-plugin.version>3.3.0</spotless-maven-plugin.version>
         <spring.profiles.active>dev</spring.profiles.active>
-        <springdoc-openapi-starter-webflux-api.version>2.8.15</springdoc-openapi-starter-webflux-api.version>
+        <springdoc-openapi-starter-webmvc-api.version>3.0.2</springdoc-openapi-starter-webmvc-api.version>
     </properties>
 
     <dependencyManagement>
@@ -99,7 +95,11 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-loader-tools</artifactId>
+            <artifactId>spring-boot-h2console</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -111,11 +111,28 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-r2dbc</artifactId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-liquibase</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -128,6 +145,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -148,7 +178,16 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -157,13 +196,21 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-data</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-messaging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webflux-api</artifactId>
-            <version>${springdoc-openapi-starter-webflux-api.version}</version>
+            <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+            <version>${springdoc-openapi-starter-webmvc-api.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
@@ -172,10 +219,6 @@
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.module</groupId>
-            <artifactId>jackson-module-jaxb-annotations</artifactId>
         </dependency>
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
@@ -210,17 +253,6 @@
             <artifactId>HikariCP</artifactId>
         </dependency>
         <dependency>
-            <groupId>commons-beanutils</groupId>
-            <artifactId>commons-beanutils</artifactId>
-            <version>${commons-beanutils.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>commons-logging</groupId>
-                    <artifactId>commons-logging</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-java</artifactId>
             <scope>test</scope>
@@ -237,41 +269,42 @@
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
-            <artifactId>context-propagation</artifactId>
-            <version>${micrometer-context-propagation.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus-simpleclient</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-resolver-dns-native-macos</artifactId>
-            <classifier>osx-aarch_64</classifier>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.projectreactor.tools</groupId>
-            <artifactId>blockhound-junit-platform</artifactId>
-            <version>${blockhound-junit-platform.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.persistence</groupId>
-            <artifactId>jakarta.persistence-api</artifactId>
+            <groupId>javax.cache</groupId>
+            <artifactId>cache-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.ehcache</groupId>
+            <artifactId>ehcache</artifactId>
+            <classifier>jakarta</classifier>
+        </dependency>
+        <dependency>
             <groupId>org.glassfish.jaxb</groupId>
             <artifactId>jaxb-runtime</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-jcache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-processor</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.validator</groupId>
+            <artifactId>hibernate-validator</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.platform</groupId>
@@ -289,23 +322,27 @@
             <version>${mapstruct.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.springframework.data</groupId>
-            <artifactId>spring-data-commons</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>jdbc</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-jdbc</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-hibernate7</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson.module</groupId>
+            <artifactId>jackson-module-jaxb-annotations</artifactId>
         </dependency>
     </dependencies>
 
@@ -443,6 +480,10 @@
                                 <version>${mapstruct.version}</version>
                             </path>
                             <path>
+                                <groupId>org.hibernate.orm</groupId>
+                                <artifactId>hibernate-processor</artifactId>
+                            </path>
+                            <path>
                                 <groupId>org.glassfish.jaxb</groupId>
                                 <artifactId>jaxb-runtime</artifactId>
                             </path>
@@ -492,7 +533,6 @@
                         <!-- Due to spring-boot repackage, without adding this property test classes are not found
                              See https://github.com/spring-projects/spring-boot/issues/6254 -->
                         <!-- Force alphabetical order to have a reproducible build -->
-                        <!-- Fix tests at java 13+ https://github.com/reactor/BlockHound/issues/33 -->
                         <classesDirectory>${project.build.outputDirectory}</classesDirectory>
                         <runOrder>alphabetical</runOrder>
                         <includes>
@@ -502,7 +542,7 @@
                         <excludes>
                             <exclude>**/*CucumberIT*</exclude>
                         </excludes>
-                        <argLine>@{argLine} -XX:+AllowRedefinitionToAddDeleteMethods -Dspring.profiles.active=${profile.test}</argLine>
+                        <argLine>@{argLine} -Dspring.profiles.active=${profile.test}</argLine>
                     </configuration>
                     <executions>
                         <execution>
@@ -535,13 +575,11 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <configuration>
                         <!-- Force alphabetical order to have a reproducible build -->
-                        <!-- Fix tests at java 13+ https://github.com/reactor/BlockHound/issues/33 -->
                         <runOrder>alphabetical</runOrder>
                         <excludes>
                             <exclude>**/*IT*</exclude>
                             <exclude>**/*IntTest*</exclude>
                         </excludes>
-                        <argLine>@{argLine} -XX:+AllowRedefinitionToAddDeleteMethods</argLine>
                         <systemPropertyVariables>
                             <java.util.logging.config.file>src/test/resources/logback.xml</java.util.logging.config.file>
                         </systemPropertyVariables>
@@ -642,7 +680,7 @@
                             </platforms>
                         </from>
                         <to>
-                            <image>opportunity-solution-tree:latest</image>
+                            <image>opportunitysolutiontree:latest</image>
                         </to>
                         <container>
                             <entrypoint>
@@ -791,6 +829,7 @@
                         <defaultSchemaName/>
                         <username>${liquibase-plugin.username}</username>
                         <password>${liquibase-plugin.password}</password>
+                        <referenceUrl>hibernate:spring:com.opportunity.tree.domain?dialect=${liquibase-plugin.hibernate-dialect}&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy</referenceUrl>
                         <verbose>true</verbose>
                         <contexts>!test</contexts>
                         <diffExcludeObjects>oauth_access_token, oauth_approvals, oauth_client_details, oauth_client_token, oauth_code, oauth_refresh_token</diffExcludeObjects>
@@ -859,8 +898,8 @@
                 <liquibase-plugin.driver>org.h2.Driver</liquibase-plugin.driver>
                 <liquibase-plugin.hibernate-dialect>org.hibernate.dialect.H2Dialect</liquibase-plugin.hibernate-dialect>
                 <liquibase-plugin.password/>
-                <liquibase-plugin.url>jdbc:h2:file:${project.build.directory}/h2db/db/opportunity-solution-tree</liquibase-plugin.url>
-                <liquibase-plugin.username>opportunity-solution-tree</liquibase-plugin.username>
+                <liquibase-plugin.url>jdbc:h2:file:${project.build.directory}/h2db/db/opportunitySolutionTree</liquibase-plugin.url>
+                <liquibase-plugin.username>opportunitySolutionTree</liquibase-plugin.username>
                 <profile.test>test,testdev</profile.test>
                 <spring.profiles.active>dev${profile.tls}${profile.no-liquibase}</spring.profiles.active>
             </properties>
@@ -875,12 +914,8 @@
                     <artifactId>h2</artifactId>
                 </dependency>
                 <dependency>
-                    <groupId>io.r2dbc</groupId>
-                    <artifactId>r2dbc-h2</artifactId>
-                </dependency>
-                <dependency>
                     <groupId>org.testcontainers</groupId>
-                    <artifactId>postgresql</artifactId>
+                    <artifactId>testcontainers-postgresql</artifactId>
                     <scope>provided</scope>
                 </dependency>
             </dependencies>
@@ -978,6 +1013,10 @@
             <id>IDE</id>
             <dependencies>
                 <dependency>
+                    <groupId>org.hibernate.orm</groupId>
+                    <artifactId>hibernate-processor</artifactId>
+                </dependency>
+                <dependency>
                     <groupId>org.mapstruct</groupId>
                     <artifactId>mapstruct-processor</artifactId>
                     <version>${mapstruct.version}</version>
@@ -997,8 +1036,8 @@
                 <liquibase-plugin.driver>org.postgresql.Driver</liquibase-plugin.driver>
                 <liquibase-plugin.hibernate-dialect>org.hibernate.dialect.PostgreSQLDialect</liquibase-plugin.hibernate-dialect>
                 <liquibase-plugin.password/>
-                <liquibase-plugin.url>jdbc:postgresql://localhost:5432/opportunity-solution-tree</liquibase-plugin.url>
-                <liquibase-plugin.username>opportunity-solution-tree</liquibase-plugin.username>
+                <liquibase-plugin.url>jdbc:postgresql://localhost:5432/opportunitySolutionTree</liquibase-plugin.url>
+                <liquibase-plugin.username>opportunitySolutionTree</liquibase-plugin.username>
                 <profile.test>test,testprod</profile.test>
                 <spring.profiles.active>prod${profile.api-docs}${profile.tls}${profile.e2e}${profile.no-liquibase}</spring.profiles.active>
             </properties>
@@ -1008,12 +1047,8 @@
                     <artifactId>postgresql</artifactId>
                 </dependency>
                 <dependency>
-                    <groupId>org.postgresql</groupId>
-                    <artifactId>r2dbc-postgresql</artifactId>
-                </dependency>
-                <dependency>
                     <groupId>org.testcontainers</groupId>
-                    <artifactId>postgresql</artifactId>
+                    <artifactId>testcontainers-postgresql</artifactId>
                     <scope>test</scope>
                 </dependency>
             </dependencies>

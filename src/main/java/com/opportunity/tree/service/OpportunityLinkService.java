@@ -1,9 +1,10 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.service.dto.OpportunityLinkDTO;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Interface for managing {@link com.opportunity.tree.domain.OpportunityLink}.
@@ -15,7 +16,7 @@ public interface OpportunityLinkService {
      * @param opportunityLinkDTO the entity to save.
      * @return the persisted entity.
      */
-    Mono<OpportunityLinkDTO> save(OpportunityLinkDTO opportunityLinkDTO);
+    OpportunityLinkDTO save(OpportunityLinkDTO opportunityLinkDTO);
 
     /**
      * Updates a opportunityLink.
@@ -23,7 +24,7 @@ public interface OpportunityLinkService {
      * @param opportunityLinkDTO the entity to update.
      * @return the persisted entity.
      */
-    Mono<OpportunityLinkDTO> update(OpportunityLinkDTO opportunityLinkDTO);
+    OpportunityLinkDTO update(OpportunityLinkDTO opportunityLinkDTO);
 
     /**
      * Partially updates a opportunityLink.
@@ -31,14 +32,14 @@ public interface OpportunityLinkService {
      * @param opportunityLinkDTO the entity to update partially.
      * @return the persisted entity.
      */
-    Mono<OpportunityLinkDTO> partialUpdate(OpportunityLinkDTO opportunityLinkDTO);
+    Optional<OpportunityLinkDTO> partialUpdate(OpportunityLinkDTO opportunityLinkDTO);
 
     /**
      * Get all the opportunityLinks.
      *
      * @return the list of entities.
      */
-    Flux<OpportunityLinkDTO> findAll();
+    List<OpportunityLinkDTO> findAll();
 
     /**
      * Get all the opportunityLinks with eager load of many-to-many relationships.
@@ -46,14 +47,7 @@ public interface OpportunityLinkService {
      * @param pageable the pagination information.
      * @return the list of entities.
      */
-    Flux<OpportunityLinkDTO> findAllWithEagerRelationships(Pageable pageable);
-
-    /**
-     * Returns the number of opportunityLinks available.
-     * @return the number of entities in the database.
-     *
-     */
-    Mono<Long> countAll();
+    Page<OpportunityLinkDTO> findAllWithEagerRelationships(Pageable pageable);
 
     /**
      * Get the "id" opportunityLink.
@@ -61,13 +55,12 @@ public interface OpportunityLinkService {
      * @param id the id of the entity.
      * @return the entity.
      */
-    Mono<OpportunityLinkDTO> findOne(Long id);
+    Optional<OpportunityLinkDTO> findOne(Long id);
 
     /**
      * Delete the "id" opportunityLink.
      *
      * @param id the id of the entity.
-     * @return a Mono to signal the deletion
      */
-    Mono<Void> delete(Long id);
+    void delete(Long id);
 }

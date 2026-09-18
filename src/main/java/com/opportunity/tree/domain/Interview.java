@@ -1,6 +1,7 @@
 package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
@@ -8,14 +9,15 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Weekly customer interview or other evidence source; opportunities are mined from these.
  */
-@Table("interview")
+@Entity
+@Table(name = "interview")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Interview implements Serializable {
 
@@ -23,49 +25,48 @@ public class Interview implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 200)
-    @Column("title")
+    @Column(name = "title", length = 200, nullable = false)
     private String title;
 
     @Size(max = 200)
-    @Column("participant")
+    @Column(name = "participant", length = 200)
     private String participant;
 
-    @NotNull(message = "must not be null")
-    @Column("interview_date")
+    @NotNull
+    @Column(name = "interview_date", nullable = false)
     private LocalDate interviewDate;
 
-    @Column("notes")
+    @Lob
+    @Column(name = "notes")
     private String notes;
 
     @Size(max = 2000)
-    @Column("recording_url")
+    @Column(name = "recording_url", length = 2000)
     private String recordingUrl;
 
-    @NotNull(message = "must not be null")
-    @Column("created_date")
+    @NotNull
+    @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     @JsonIgnoreProperties(value = { "team" }, allowSetters = true)
     private Product product;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     private User interviewer;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "interviews")
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "outcome", "parent", "owner", "interviews", "tags" }, allowSetters = true)
     private Set<Opportunity> opportunities = new HashSet<>();
-
-    @Column("product_id")
-    private Long productId;
-
-    @Column("interviewer_id")
-    private String interviewerId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -166,7 +167,6 @@ public class Interview implements Serializable {
 
     public void setProduct(Product product) {
         this.product = product;
-        this.productId = product != null ? product.getId() : null;
     }
 
     public Interview product(Product product) {
@@ -180,7 +180,6 @@ public class Interview implements Serializable {
 
     public void setInterviewer(User user) {
         this.interviewer = user;
-        this.interviewerId = user != null ? user.getId() : null;
     }
 
     public Interview interviewer(User user) {
@@ -217,22 +216,6 @@ public class Interview implements Serializable {
         this.opportunities.remove(opportunity);
         opportunity.getInterviews().remove(this);
         return this;
-    }
-
-    public Long getProductId() {
-        return this.productId;
-    }
-
-    public void setProductId(Long product) {
-        this.productId = product;
-    }
-
-    public String getInterviewerId() {
-        return this.interviewerId;
-    }
-
-    public void setInterviewerId(String user) {
-        this.interviewerId = user;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

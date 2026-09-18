@@ -14,6 +14,7 @@ export default mergeConfig(
     },
     test: {
       globals: true,
+      exclude: ['**/node_modules/**', 'src/test/javascript/**'],
       environment: 'happy-dom', // happy-dom provides a better performance but doesn't have a default url.
       setupFiles: [fileURLToPath(new URL('./src/main/webapp/app/test-setup.ts', import.meta.url))],
       reporters: ['default', 'vitest-sonar-reporter'],

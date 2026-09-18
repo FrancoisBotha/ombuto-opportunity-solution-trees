@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091117"
+    "changelogDate": "20260918102219"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "documentation": "Named external URL attached to a solution (prototype, ticket, design).",
   "dto": "mapstruct",
   "fields": [

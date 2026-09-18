@@ -15,19 +15,19 @@ public class OpportunityLinkDTO implements Serializable {
 
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 1, max = 100)
     private String name;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(max = 2000)
     @Pattern(regexp = "^https?:\\/\\/.+")
     private String url;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private LinkType type;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     private Integer sortOrder;
 
     @NotNull

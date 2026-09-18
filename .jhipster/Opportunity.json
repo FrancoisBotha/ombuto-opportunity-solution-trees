@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091114"
+    "changelogDate": "20260918101919"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "documentation": "Customer need, pain point or desire. Nested via parent to form sub-opportunities.",
   "dto": "mapstruct",
   "fields": [
@@ -52,6 +52,7 @@
       "fieldType": "Instant"
     }
   ],
+  "jpaMetamodelFiltering": true,
   "name": "Opportunity",
   "pagination": "pagination",
   "relationships": [

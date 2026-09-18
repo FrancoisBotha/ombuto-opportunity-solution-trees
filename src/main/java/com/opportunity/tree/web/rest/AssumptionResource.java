@@ -10,18 +10,14 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import tech.jhipster.web.util.HeaderUtil;
-import tech.jhipster.web.util.reactive.ResponseUtil;
+import tech.jhipster.web.util.ResponseUtil;
 
 /**
  * REST controller for managing {@link com.opportunity.tree.domain.Assumption}.
@@ -34,7 +30,7 @@ public class AssumptionResource {
 
     private static final String ENTITY_NAME = "assumption";
 
-    @Value("${jhipster.clientApp.name:opportunitysolutiontree}")
+    @Value("${jhipster.clientApp.name:opportunitySolutionTree}")
     private String applicationName;
 
     private final AssumptionService assumptionService;
@@ -54,22 +50,15 @@ public class AssumptionResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PostMapping("")
-    public Mono<ResponseEntity<AssumptionDTO>> createAssumption(@Valid @RequestBody AssumptionDTO assumptionDTO) throws URISyntaxException {
+    public ResponseEntity<AssumptionDTO> createAssumption(@Valid @RequestBody AssumptionDTO assumptionDTO) throws URISyntaxException {
         LOG.debug("REST request to save Assumption : {}", assumptionDTO);
         if (assumptionDTO.getId() != null) {
             throw new BadRequestAlertException("A new assumption cannot already have an ID", ENTITY_NAME, "idexists");
         }
-        return assumptionService
-            .save(assumptionDTO)
-            .map(result -> {
-                try {
-                    return ResponseEntity.created(new URI("/api/assumptions/" + result.getId()))
-                        .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                        .body(result);
-                } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+        assumptionDTO = assumptionService.save(assumptionDTO);
+        return ResponseEntity.created(new URI("/api/assumptions/" + assumptionDTO.getId()))
+            .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, assumptionDTO.getId().toString()))
+            .body(assumptionDTO);
     }
 
     /**
@@ -83,7 +72,7 @@ public class AssumptionResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<AssumptionDTO>> updateAssumption(
+    public ResponseEntity<AssumptionDTO> updateAssumption(
         @PathVariable(value = "id", required = false) final Long id,
         @Valid @RequestBody AssumptionDTO assumptionDTO
     ) throws URISyntaxException {
@@ -95,22 +84,14 @@ public class AssumptionResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return assumptionRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!assumptionRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                return assumptionService
-                    .update(assumptionDTO)
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(result ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                            .body(result)
-                    );
-            });
+        assumptionDTO = assumptionService.update(assumptionDTO);
+        return ResponseEntity.ok()
+            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, assumptionDTO.getId().toString()))
+            .body(assumptionDTO);
     }
 
     /**
@@ -125,7 +106,7 @@ public class AssumptionResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PatchMapping(value = "/{id}", consumes = { "application/json", "application/merge-patch+json" })
-    public Mono<ResponseEntity<AssumptionDTO>> partialUpdateAssumption(
+    public ResponseEntity<AssumptionDTO> partialUpdateAssumption(
         @PathVariable(value = "id", required = false) final Long id,
         @NotNull @RequestBody AssumptionDTO assumptionDTO
     ) throws URISyntaxException {
@@ -137,23 +118,16 @@ public class AssumptionResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return assumptionRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!assumptionRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                Mono<AssumptionDTO> result = assumptionService.partialUpdate(assumptionDTO);
+        Optional<AssumptionDTO> result = assumptionService.partialUpdate(assumptionDTO);
 
-                return result
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(res ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, res.getId().toString()))
-                            .body(res)
-                    );
-            });
+        return ResponseUtil.wrapOrNotFound(
+            result,
+            HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, assumptionDTO.getId().toString())
+        );
     }
 
     /**
@@ -162,21 +136,11 @@ public class AssumptionResource {
      * @param eagerload flag to eager load entities from relationships (This is applicable for many-to-many).
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of Assumptions in body.
      */
-    @GetMapping(value = "", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<List<AssumptionDTO>> getAllAssumptions(
+    @GetMapping("")
+    public List<AssumptionDTO> getAllAssumptions(
         @RequestParam(name = "eagerload", required = false, defaultValue = "true") boolean eagerload
     ) {
         LOG.debug("REST request to get all Assumptions");
-        return assumptionService.findAll().collectList();
-    }
-
-    /**
-     * {@code GET  /assumptions} : get all the Assumptions as a stream.
-     * @return the {@link Flux} of Assumptions.
-     */
-    @GetMapping(value = "", produces = MediaType.APPLICATION_NDJSON_VALUE)
-    public Flux<AssumptionDTO> getAllAssumptionsAsStream() {
-        LOG.debug("REST request to get all Assumptions as a stream");
         return assumptionService.findAll();
     }
 
@@ -187,9 +151,9 @@ public class AssumptionResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the assumptionDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<AssumptionDTO>> getAssumption(@PathVariable("id") Long id) {
+    public ResponseEntity<AssumptionDTO> getAssumption(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Assumption : {}", id);
-        Mono<AssumptionDTO> assumptionDTO = assumptionService.findOne(id);
+        Optional<AssumptionDTO> assumptionDTO = assumptionService.findOne(id);
         return ResponseUtil.wrapOrNotFound(assumptionDTO);
     }
 
@@ -200,16 +164,11 @@ public class AssumptionResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Void>> deleteAssumption(@PathVariable("id") Long id) {
+    public ResponseEntity<Void> deleteAssumption(@PathVariable("id") Long id) {
         LOG.debug("REST request to delete Assumption : {}", id);
-        return assumptionService
-            .delete(id)
-            .then(
-                Mono.just(
-                    ResponseEntity.noContent()
-                        .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
-                        .build()
-                )
-            );
+        assumptionService.delete(id);
+        return ResponseEntity.noContent()
+            .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
+            .build();
     }
 }

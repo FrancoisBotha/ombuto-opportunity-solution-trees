@@ -102,7 +102,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a TeamMember', async () => {
-        const patchObject = { role: 'BBBBBB', ...new TeamMember() };
+        const patchObject = { joinedDate: dayjs(currentDate).format(DATE_TIME_FORMAT), ...new TeamMember() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { joinedDate: currentDate, ...returnedFromService };

@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091113"
+    "changelogDate": "20260918101819"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "documentation": "Desired outcome at the top of the tree, e.g. \"Increase weekly active users\".",
   "dto": "mapstruct",
   "fields": [
@@ -64,6 +64,7 @@
       "fieldType": "Instant"
     }
   ],
+  "jpaMetamodelFiltering": true,
   "name": "Outcome",
   "relationships": [
     {

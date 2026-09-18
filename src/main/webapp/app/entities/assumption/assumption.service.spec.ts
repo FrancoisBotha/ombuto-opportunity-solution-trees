@@ -110,7 +110,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Assumption', async () => {
-        const patchObject = { category: 'BBBBBB', importance: 1, validated: true, ...new Assumption() };
+        const patchObject = { statement: 'BBBBBB', importance: 1, validated: true, ...new Assumption() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { createdDate: currentDate, ...returnedFromService };

@@ -2,161 +2,122 @@ package com.opportunity.tree.config;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 import static org.springframework.security.oauth2.core.oidc.StandardClaimNames.PREFERRED_USERNAME;
-import static org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers.pathMatchers;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.opportunity.tree.security.AuthoritiesConstants;
+import com.opportunity.tree.security.*;
 import com.opportunity.tree.security.SecurityUtils;
 import com.opportunity.tree.security.oauth2.AudienceValidator;
+import com.opportunity.tree.security.oauth2.CustomClaimConverter;
 import com.opportunity.tree.web.filter.SpaWebFilter;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Consumer;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.*;
+import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
-import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.oauth2.client.oidc.userinfo.OidcReactiveOAuth2UserService;
+import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
-import org.springframework.security.oauth2.client.userinfo.ReactiveOAuth2UserService;
-import org.springframework.security.oauth2.client.web.server.DefaultServerOAuth2AuthorizationRequestResolver;
-import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
 import org.springframework.security.oauth2.jwt.*;
-import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
-import org.springframework.security.web.server.SecurityWebFilterChain;
-import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
-import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestAttributeHandler;
-import org.springframework.security.web.server.header.ReferrerPolicyServerHttpHeadersWriter;
-import org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter.Mode;
-import org.springframework.security.web.server.util.matcher.NegatedServerWebExchangeMatcher;
-import org.springframework.security.web.server.util.matcher.OrServerWebExchangeMatcher;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.web.csrf.*;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.util.StringUtils;
+import tech.jhipster.config.JHipsterConstants;
 import tech.jhipster.config.JHipsterProperties;
-import tech.jhipster.web.filter.reactive.CookieCsrfFilter;
 
 @Configuration
-@EnableReactiveMethodSecurity
+@EnableMethodSecurity(securedEnabled = true)
 public class SecurityConfiguration {
+
+    private final Environment env;
 
     private final JHipsterProperties jHipsterProperties;
 
     @Value("${spring.security.oauth2.client.provider.oidc.issuer-uri}")
     private String issuerUri;
 
-    private final ReactiveClientRegistrationRepository clientRegistrationRepository;
-
-    // See https://github.com/jhipster/generator-jhipster/issues/18868
-    // We don't use a distributed cache or the user selected cache implementation here on purpose
-    private final Cache<String, Mono<Jwt>> users = Caffeine.newBuilder()
-        .maximumSize(10_000)
-        .expireAfterWrite(Duration.ofHours(1))
-        .recordStats()
-        .build();
-
-    public SecurityConfiguration(ReactiveClientRegistrationRepository clientRegistrationRepository, JHipsterProperties jHipsterProperties) {
-        this.clientRegistrationRepository = clientRegistrationRepository;
+    public SecurityConfiguration(Environment env, JHipsterProperties jHipsterProperties) {
+        this.env = env;
         this.jHipsterProperties = jHipsterProperties;
     }
 
     @Bean
-    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+    public SecurityFilterChain filterChain(HttpSecurity http) {
         http
-            .securityMatcher(
-                new NegatedServerWebExchangeMatcher(new OrServerWebExchangeMatcher(pathMatchers("/assets/**", "/swagger-ui/**")))
-            )
             .cors(withDefaults())
             .csrf(csrf ->
                 csrf
-                    .csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse())
-                    // See https://stackoverflow.com/q/74447118/65681
-                    .csrfTokenRequestHandler(new ServerCsrfTokenRequestAttributeHandler())
+                    .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                    .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
             )
-            // See https://github.com/spring-projects/spring-security/issues/5766
-            .addFilterAt(new CookieCsrfFilter(), SecurityWebFiltersOrder.REACTOR_CONTEXT)
-            .addFilterAfter(new SpaWebFilter(), SecurityWebFiltersOrder.HTTPS_REDIRECT)
+            .addFilterAfter(new SpaWebFilter(), BasicAuthenticationFilter.class)
             .headers(headers ->
                 headers
                     .contentSecurityPolicy(csp -> csp.policyDirectives(jHipsterProperties.getSecurity().getContentSecurityPolicy()))
-                    .frameOptions(frameOptions -> frameOptions.mode(Mode.DENY))
-                    .referrerPolicy(referrer ->
-                        referrer.policy(ReferrerPolicyServerHttpHeadersWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
-                    )
-                    .permissionsPolicy(permissions ->
+                    .frameOptions(FrameOptionsConfig::sameOrigin)
+                    .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                    .permissionsPolicyHeader(permissions ->
                         permissions.policy(
                             "camera=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), sync-xhr=()"
                         )
                     )
             )
-            .authorizeExchange(authz ->
+            .authorizeHttpRequests(authz ->
                 // prettier-ignore
                 authz
-                    .pathMatchers("/").permitAll()
-                    .pathMatchers("/*.*").permitAll()
-                    .pathMatchers("/api/authenticate").permitAll()
-                    .pathMatchers("/api/auth-info").permitAll()
-                    .pathMatchers("/api/admin/**").hasAuthority(AuthoritiesConstants.ADMIN)
-                    .pathMatchers("/api/**").authenticated()
-                    .pathMatchers("/services/**").authenticated()
-                    .pathMatchers("/v3/api-docs/**").hasAuthority(AuthoritiesConstants.ADMIN)
-                    .pathMatchers("/management/health").permitAll()
-                    .pathMatchers("/management/health/**").permitAll()
-                    .pathMatchers("/management/info").permitAll()
-                    .pathMatchers("/management/prometheus").permitAll()
-                    .pathMatchers("/management/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .requestMatchers("/index.html", "/*.js", "/*.txt", "/*.json", "/*.map", "/*.css").permitAll()
+                    .requestMatchers("/*.ico", "/*.png", "/*.svg", "/*.webapp").permitAll()
+                    .requestMatchers("/assets/**").permitAll()
+                    .requestMatchers("/swagger-ui/**").permitAll()
+                    .requestMatchers("/api/authenticate").permitAll()
+                    .requestMatchers("/api/auth-info").permitAll()
+                    .requestMatchers("/api/admin/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .requestMatchers("/api/**").authenticated()
+                    .requestMatchers("/websocket/**").authenticated()
+                    .requestMatchers("/v3/api-docs/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .requestMatchers("/management/health").permitAll()
+                    .requestMatchers("/management/health/**").permitAll()
+                    .requestMatchers("/management/info").permitAll()
+                    .requestMatchers("/management/prometheus").permitAll()
+                    .requestMatchers("/management/**").hasAuthority(AuthoritiesConstants.ADMIN)
             )
-            .oauth2Login(oauth2 -> oauth2.authorizationRequestResolver(authorizationRequestResolver(this.clientRegistrationRepository)))
-            .oauth2Client(withDefaults())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+            .oauth2Login(oauth2 -> oauth2.loginPage("/").userInfoEndpoint(userInfo -> userInfo.oidcUserService(this.oidcUserService())))
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(authenticationConverter())))
+            .oauth2Client(withDefaults());
+        if (env.acceptsProfiles(Profiles.of(JHipsterConstants.SPRING_PROFILE_DEVELOPMENT))) {
+            http
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
+                .authorizeHttpRequests(authz -> authz.requestMatchers("/h2-console/**").permitAll());
+        }
         return http.build();
     }
 
-    private ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver(
-        ReactiveClientRegistrationRepository clientRegistrationRepository
-    ) {
-        DefaultServerOAuth2AuthorizationRequestResolver authorizationRequestResolver = new DefaultServerOAuth2AuthorizationRequestResolver(
-            clientRegistrationRepository
-        );
-        if (this.issuerUri.contains("auth0.com")) {
-            authorizationRequestResolver.setAuthorizationRequestCustomizer(authorizationRequestCustomizer());
-        }
-        return authorizationRequestResolver;
-    }
-
-    private Consumer<OAuth2AuthorizationRequest.Builder> authorizationRequestCustomizer() {
-        return customizer ->
-            customizer.authorizationRequestUri(uriBuilder ->
-                uriBuilder.queryParam("audience", jHipsterProperties.getSecurity().getOauth2().getAudience()).build()
-            );
-    }
-
-    Converter<Jwt, Mono<AbstractAuthenticationToken>> jwtAuthenticationConverter() {
-        ReactiveJwtAuthenticationConverter jwtAuthenticationConverter = new ReactiveJwtAuthenticationConverter();
+    Converter<Jwt, AbstractAuthenticationToken> authenticationConverter() {
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(
-            new Converter<Jwt, Flux<GrantedAuthority>>() {
+            new Converter<Jwt, Collection<GrantedAuthority>>() {
                 @Override
-                public Flux<GrantedAuthority> convert(Jwt jwt) {
-                    return Flux.fromIterable(SecurityUtils.extractAuthorityFromClaims(jwt.getClaims()));
+                public Collection<GrantedAuthority> convert(Jwt jwt) {
+                    return SecurityUtils.extractAuthorityFromClaims(jwt.getClaims());
                 }
             }
         );
@@ -164,109 +125,96 @@ public class SecurityConfiguration {
         return jwtAuthenticationConverter;
     }
 
+    OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService() {
+        final OidcUserService delegate = new OidcUserService();
+
+        return userRequest -> {
+            OidcUser oidcUser = delegate.loadUser(userRequest);
+            return new DefaultOidcUser(oidcUser.getAuthorities(), oidcUser.getIdToken(), oidcUser.getUserInfo(), PREFERRED_USERNAME);
+        };
+    }
+
     /**
      * Map authorities from "groups" or "roles" claim in ID Token.
      *
-     * @return a {@link ReactiveOAuth2UserService} that has the groups from the IdP.
+     * @return a {@link GrantedAuthoritiesMapper} that maps groups from
+     * the IdP to Spring Security Authorities.
      */
     @Bean
-    public ReactiveOAuth2UserService<OidcUserRequest, OidcUser> oidcUserService() {
-        final OidcReactiveOAuth2UserService delegate = new OidcReactiveOAuth2UserService();
+    public GrantedAuthoritiesMapper userAuthoritiesMapper() {
+        return authorities -> {
+            Set<GrantedAuthority> mappedAuthorities = new HashSet<>();
 
-        return userRequest -> {
-            // Delegate to the default implementation for loading a user
-            return delegate
-                .loadUser(userRequest)
-                .map(user -> {
-                    Set<GrantedAuthority> mappedAuthorities = new HashSet<>();
-
-                    user
-                        .getAuthorities()
-                        .forEach(authority -> {
-                            if (authority instanceof OidcUserAuthority) {
-                                OidcUserAuthority oidcUserAuthority = (OidcUserAuthority) authority;
-                                mappedAuthorities.addAll(
-                                    SecurityUtils.extractAuthorityFromClaims(oidcUserAuthority.getUserInfo().getClaims())
-                                );
-                            }
-                        });
-
-                    return new DefaultOidcUser(mappedAuthorities, user.getIdToken(), user.getUserInfo(), PREFERRED_USERNAME);
-                });
+            authorities.forEach(authority -> {
+                // Check for OidcUserAuthority because Spring Security 5.2 returns
+                // each scope as a GrantedAuthority, which we don't care about.
+                if (authority instanceof OidcUserAuthority) {
+                    OidcUserAuthority oidcUserAuthority = (OidcUserAuthority) authority;
+                    mappedAuthorities.addAll(SecurityUtils.extractAuthorityFromClaims(oidcUserAuthority.getUserInfo().getClaims()));
+                }
+            });
+            return mappedAuthorities;
         };
     }
 
     @Bean
-    ReactiveJwtDecoder jwtDecoder(ReactiveClientRegistrationRepository registrations) {
-        Mono<ClientRegistration> clientRegistration = registrations.findByRegistrationId("oidc");
+    JwtDecoder jwtDecoder(ClientRegistrationRepository clientRegistrationRepository, RestTemplateBuilder restTemplateBuilder) {
+        NimbusJwtDecoder jwtDecoder = JwtDecoders.fromOidcIssuerLocation(issuerUri);
 
-        return clientRegistration
-            .map(oidc ->
-                createJwtDecoder(
-                    oidc.getProviderDetails().getIssuerUri(),
-                    oidc.getProviderDetails().getJwkSetUri(),
-                    oidc.getProviderDetails().getUserInfoEndpoint().getUri()
-                )
-            )
-            .block();
-    }
-
-    private ReactiveJwtDecoder createJwtDecoder(String issuerUri, String jwkSetUri, String userInfoUri) {
-        NimbusReactiveJwtDecoder jwtDecoder = new NimbusReactiveJwtDecoder(jwkSetUri);
         OAuth2TokenValidator<Jwt> audienceValidator = new AudienceValidator(jHipsterProperties.getSecurity().getOauth2().getAudience());
         OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(issuerUri);
         OAuth2TokenValidator<Jwt> withAudience = new DelegatingOAuth2TokenValidator<>(withIssuer, audienceValidator);
 
         jwtDecoder.setJwtValidator(withAudience);
+        jwtDecoder.setClaimSetConverter(
+            new CustomClaimConverter(clientRegistrationRepository.findByRegistrationId("oidc"), restTemplateBuilder.build())
+        );
 
-        return new ReactiveJwtDecoder() {
-            @Override
-            public Mono<Jwt> decode(String token) throws JwtException {
-                return jwtDecoder.decode(token).flatMap(jwt -> enrich(token, jwt));
-            }
+        return jwtDecoder;
+    }
 
-            private Mono<Jwt> enrich(String token, Jwt jwt) {
-                // Only look up user information if identity claims are missing
-                if (jwt.hasClaim("given_name") && jwt.hasClaim("family_name")) {
-                    return Mono.just(jwt);
-                }
-                // Get user info from `users` cache if present
-                return Optional.ofNullable(users.getIfPresent(jwt.getSubject())).orElseGet(
-                    () -> // Retrieve user info from OAuth provider if not already loaded
-                        WebClient.create()
-                            .get()
-                            .uri(userInfoUri)
-                            .headers(headers -> headers.setBearerAuth(token))
-                            .retrieve()
-                            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                            .map(userInfo ->
-                                Jwt.withTokenValue(jwt.getTokenValue())
-                                    .subject(jwt.getSubject())
-                                    .audience(jwt.getAudience())
-                                    .headers(headers -> headers.putAll(jwt.getHeaders()))
-                                    .claims(claims -> {
-                                        String username = userInfo.get("preferred_username").toString();
-                                        // special handling for Auth0
-                                        if (userInfo.get("sub").toString().contains("|") && username.contains("@")) {
-                                            userInfo.put("email", username);
-                                        }
-                                        // Allow full name in a name claim - happens with Auth0
-                                        if (userInfo.get("name") != null) {
-                                            String[] name = userInfo.get("name").toString().split("\\s+");
-                                            if (name.length > 0) {
-                                                userInfo.put("given_name", name[0]);
-                                                userInfo.put("family_name", String.join(" ", Arrays.copyOfRange(name, 1, name.length)));
-                                            }
-                                        }
-                                        claims.putAll(userInfo);
-                                    })
-                                    .claims(claims -> claims.putAll(jwt.getClaims()))
-                                    .build()
-                            )
-                            // Put user info into the `users` cache
-                            .doOnNext(newJwt -> users.put(jwt.getSubject(), Mono.just(newJwt)))
-                );
+    /**
+     * Custom CSRF handler to provide BREACH protection for Single-Page Applications (SPA).
+     *
+     * @see <a href="https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html#csrf-integration-javascript-spa">Spring Security Documentation - Integrating with CSRF Protection</a>
+     * @see <a href="https://github.com/jhipster/generator-jhipster/pull/25907">JHipster - use customized SpaCsrfTokenRequestHandler to handle CSRF token</a>
+     * @see <a href="https://stackoverflow.com/q/74447118/65681">CSRF protection not working with Spring Security 6</a>
+     */
+    static final class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
+
+        private final CsrfTokenRequestHandler plain = new CsrfTokenRequestAttributeHandler();
+        private final CsrfTokenRequestHandler xor = new XorCsrfTokenRequestAttributeHandler();
+
+        @Override
+        public void handle(HttpServletRequest request, HttpServletResponse response, Supplier<CsrfToken> csrfToken) {
+            /*
+             * Always use XorCsrfTokenRequestAttributeHandler to provide BREACH protection of
+             * the CsrfToken when it is rendered in the response body.
+             */
+            this.xor.handle(request, response, csrfToken);
+
+            // Render the token value to a cookie by causing the deferred token to be loaded.
+            csrfToken.get();
+        }
+
+        @Override
+        public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
+            /*
+             * If the request contains a request header, use CsrfTokenRequestAttributeHandler
+             * to resolve the CsrfToken. This applies when a single-page application includes
+             * the header value automatically, which was obtained via a cookie containing the
+             * raw CsrfToken.
+             */
+            if (StringUtils.hasText(request.getHeader(csrfToken.getHeaderName()))) {
+                return this.plain.resolveCsrfTokenValue(request, csrfToken);
             }
-        };
+            /*
+             * In all other cases (e.g. if the request contains a request parameter), use
+             * XorCsrfTokenRequestAttributeHandler to resolve the CsrfToken. This applies
+             * when a server-side rendered form includes the _csrf request parameter as a
+             * hidden input.
+             */
+            return this.xor.resolveCsrfTokenValue(request, csrfToken);
+        }
     }
 }

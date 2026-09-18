@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091118"
+    "changelogDate": "20260918102319"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "documentation": "Something that must be true for a solution to work (assumption mapping).",
   "dto": "mapstruct",
   "fields": [

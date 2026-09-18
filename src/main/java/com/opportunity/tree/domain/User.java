@@ -2,6 +2,7 @@ package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.opportunity.tree.config.Constants;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -12,61 +13,66 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.domain.Persistable;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * A user.
  */
-@Table("jhi_user")
-public class User extends AbstractAuditingEntity<String> implements Serializable, Persistable<String> {
+@Entity
+@Table(name = "jhi_user")
+@Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
+public class User extends AbstractAuditingEntity<String> implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @Column(name = "id")
     private String id;
 
     @NotNull
     @Pattern(regexp = Constants.LOGIN_REGEX)
     @Size(min = 1, max = 50)
-    @Column("login")
+    @Column(name = "login", length = 50, unique = true, nullable = false)
     private String login;
 
     @Size(max = 50)
-    @Column("first_name")
+    @Column(name = "first_name", length = 50)
     private String firstName;
 
     @Size(max = 50)
-    @Column("last_name")
+    @Column(name = "last_name", length = 50)
     private String lastName;
 
     @Email
     @Size(min = 5, max = 254)
-    @Column("email")
+    @Column(name = "email", length = 254, unique = true)
     private String email;
 
     @NotNull
-    @Column("activated")
+    @Column(name = "activated", nullable = false)
     private boolean activated = false;
 
     @Size(min = 2, max = 10)
-    @Column("lang_key")
+    @Column(name = "lang_key", length = 10)
     private String langKey;
 
     @Size(max = 256)
-    @Column("image_url")
+    @Column(name = "image_url", length = 256)
     private String imageUrl;
 
     @JsonIgnore
-    @org.springframework.data.annotation.Transient
+    @ManyToMany
+    @JoinTable(
+        name = "jhi_user_authority",
+        joinColumns = { @JoinColumn(name = "user_id", referencedColumnName = "id") },
+        inverseJoinColumns = { @JoinColumn(name = "authority_name", referencedColumnName = "name") }
+    )
+    @Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
+    @BatchSize(size = 20)
     private Set<Authority> authorities = new HashSet<>();
-
-    @org.springframework.data.annotation.Transient
-    private boolean isPersisted;
 
     public String getId() {
         return id;
@@ -139,16 +145,6 @@ public class User extends AbstractAuditingEntity<String> implements Serializable
 
     public void setAuthorities(Set<Authority> authorities) {
         this.authorities = authorities;
-    }
-
-    @Override
-    public boolean isNew() {
-        return !isPersisted;
-    }
-
-    public User setIsPersisted() {
-        this.isPersisted = true;
-        return this;
     }
 
     @Override

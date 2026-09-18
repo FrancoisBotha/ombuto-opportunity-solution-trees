@@ -1,9 +1,10 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.service.dto.AssumptionDTO;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Interface for managing {@link com.opportunity.tree.domain.Assumption}.
@@ -15,7 +16,7 @@ public interface AssumptionService {
      * @param assumptionDTO the entity to save.
      * @return the persisted entity.
      */
-    Mono<AssumptionDTO> save(AssumptionDTO assumptionDTO);
+    AssumptionDTO save(AssumptionDTO assumptionDTO);
 
     /**
      * Updates a assumption.
@@ -23,7 +24,7 @@ public interface AssumptionService {
      * @param assumptionDTO the entity to update.
      * @return the persisted entity.
      */
-    Mono<AssumptionDTO> update(AssumptionDTO assumptionDTO);
+    AssumptionDTO update(AssumptionDTO assumptionDTO);
 
     /**
      * Partially updates a assumption.
@@ -31,14 +32,14 @@ public interface AssumptionService {
      * @param assumptionDTO the entity to update partially.
      * @return the persisted entity.
      */
-    Mono<AssumptionDTO> partialUpdate(AssumptionDTO assumptionDTO);
+    Optional<AssumptionDTO> partialUpdate(AssumptionDTO assumptionDTO);
 
     /**
      * Get all the assumptions.
      *
      * @return the list of entities.
      */
-    Flux<AssumptionDTO> findAll();
+    List<AssumptionDTO> findAll();
 
     /**
      * Get all the assumptions with eager load of many-to-many relationships.
@@ -46,14 +47,7 @@ public interface AssumptionService {
      * @param pageable the pagination information.
      * @return the list of entities.
      */
-    Flux<AssumptionDTO> findAllWithEagerRelationships(Pageable pageable);
-
-    /**
-     * Returns the number of assumptions available.
-     * @return the number of entities in the database.
-     *
-     */
-    Mono<Long> countAll();
+    Page<AssumptionDTO> findAllWithEagerRelationships(Pageable pageable);
 
     /**
      * Get the "id" assumption.
@@ -61,13 +55,12 @@ public interface AssumptionService {
      * @param id the id of the entity.
      * @return the entity.
      */
-    Mono<AssumptionDTO> findOne(Long id);
+    Optional<AssumptionDTO> findOne(Long id);
 
     /**
      * Delete the "id" assumption.
      *
      * @param id the id of the entity.
-     * @return a Mono to signal the deletion
      */
-    Mono<Void> delete(Long id);
+    void delete(Long id);
 }

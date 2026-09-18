@@ -1,9 +1,10 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.service.dto.SolutionLinkDTO;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Interface for managing {@link com.opportunity.tree.domain.SolutionLink}.
@@ -15,7 +16,7 @@ public interface SolutionLinkService {
      * @param solutionLinkDTO the entity to save.
      * @return the persisted entity.
      */
-    Mono<SolutionLinkDTO> save(SolutionLinkDTO solutionLinkDTO);
+    SolutionLinkDTO save(SolutionLinkDTO solutionLinkDTO);
 
     /**
      * Updates a solutionLink.
@@ -23,7 +24,7 @@ public interface SolutionLinkService {
      * @param solutionLinkDTO the entity to update.
      * @return the persisted entity.
      */
-    Mono<SolutionLinkDTO> update(SolutionLinkDTO solutionLinkDTO);
+    SolutionLinkDTO update(SolutionLinkDTO solutionLinkDTO);
 
     /**
      * Partially updates a solutionLink.
@@ -31,14 +32,14 @@ public interface SolutionLinkService {
      * @param solutionLinkDTO the entity to update partially.
      * @return the persisted entity.
      */
-    Mono<SolutionLinkDTO> partialUpdate(SolutionLinkDTO solutionLinkDTO);
+    Optional<SolutionLinkDTO> partialUpdate(SolutionLinkDTO solutionLinkDTO);
 
     /**
      * Get all the solutionLinks.
      *
      * @return the list of entities.
      */
-    Flux<SolutionLinkDTO> findAll();
+    List<SolutionLinkDTO> findAll();
 
     /**
      * Get all the solutionLinks with eager load of many-to-many relationships.
@@ -46,14 +47,7 @@ public interface SolutionLinkService {
      * @param pageable the pagination information.
      * @return the list of entities.
      */
-    Flux<SolutionLinkDTO> findAllWithEagerRelationships(Pageable pageable);
-
-    /**
-     * Returns the number of solutionLinks available.
-     * @return the number of entities in the database.
-     *
-     */
-    Mono<Long> countAll();
+    Page<SolutionLinkDTO> findAllWithEagerRelationships(Pageable pageable);
 
     /**
      * Get the "id" solutionLink.
@@ -61,13 +55,12 @@ public interface SolutionLinkService {
      * @param id the id of the entity.
      * @return the entity.
      */
-    Mono<SolutionLinkDTO> findOne(Long id);
+    Optional<SolutionLinkDTO> findOne(Long id);
 
     /**
      * Delete the "id" solutionLink.
      *
      * @param id the id of the entity.
-     * @return a Mono to signal the deletion
      */
-    Mono<Void> delete(Long id);
+    void delete(Long id);
 }

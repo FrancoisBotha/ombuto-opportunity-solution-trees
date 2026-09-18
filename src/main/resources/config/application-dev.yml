@@ -32,9 +32,15 @@ spring:
       enabled: true
       profiles:
         active: dev
-  jackson:
+  jackson2:
     serialization:
       indent-output: true
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    url: jdbc:h2:file:./target/h2db/db/opportunitySolutionTree;DB_CLOSE_DELAY=-1
+    hikari:
+      poolName: Hikari
+      auto-commit: false
   h2:
     console:
       # JHipster uses a custom h2-console initializer
@@ -42,11 +48,8 @@ spring:
   liquibase:
     # Remove 'faker' if you do not want the sample data to be loaded automatically
     contexts: dev, faker
-    url: jdbc:h2:file:./target/h2db/db/opportunity-solution-tree;DB_CLOSE_DELAY=-1
   messages:
     cache-duration: PT1S # 1 second, see the ISO 8601 standard
-  r2dbc:
-    url: r2dbc:h2:file:///./target/h2db/db/opportunity-solution-tree;DB_CLOSE_DELAY=-1
   thymeleaf:
     cache: false
 
@@ -62,6 +65,10 @@ server:
 # ===================================================================
 
 jhipster:
+  cache: # Cache configuration
+    ehcache: # Ehcache configuration
+      time-to-live-seconds: 3600 # By default objects stay 1 hour in the cache
+      max-entries: 100 # Number of objects in each cache entry
   # CORS is only enabled by default with the "dev" profile
   cors:
     # Allow Ionic for JHipster by default (* no longer allowed in Spring Boot 2.4+)

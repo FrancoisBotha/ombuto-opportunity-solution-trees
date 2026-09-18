@@ -1,101 +1,81 @@
 package com.opportunity.tree.web.rest;
 
 import static com.opportunity.tree.test.util.OAuth2TestUtil.TEST_USER_LOGIN;
-import static com.opportunity.tree.test.util.OAuth2TestUtil.authenticationToken;
 import static com.opportunity.tree.test.util.OAuth2TestUtil.registerAuthenticationToken;
-import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.*;
+import static com.opportunity.tree.test.util.OAuth2TestUtil.testAuthenticationToken;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.security.AuthoritiesConstants;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.test.context.TestSecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the {@link AccountResource} REST controller.
  */
-@AutoConfigureWebTestClient(timeout = IntegrationTest.DEFAULT_TIMEOUT)
+@AutoConfigureMockMvc
 @IntegrationTest
 class AccountResourceIT {
 
     @Autowired
     private UserRepository userRepository;
 
-    private Map<String, Object> claims;
+    @Autowired
+    private MockMvc restAccountMockMvc;
 
     @Autowired
-    private WebTestClient webTestClient;
+    OAuth2AuthorizedClientService authorizedClientService;
 
     @Autowired
-    private ReactiveOAuth2AuthorizedClientService authorizedClientService;
-
-    @Autowired
-    private ClientRegistration clientRegistration;
-
-    @BeforeEach
-    void setup() {
-        claims = new HashMap<>();
-        claims.put("groups", Collections.singletonList(AuthoritiesConstants.ADMIN));
-        claims.put("sub", "jane");
-        claims.put("email", "jane.doe@jhipster.com");
-    }
+    ClientRegistration clientRegistration;
 
     @AfterEach
     void cleanup() {
         // Remove syncUserWithIdp users
-        userRepository.deleteAllUserAuthorities().block();
-        userRepository.deleteAll().block();
+        userRepository.deleteAll();
     }
 
     @Test
-    void testGetExistingAccount() {
-        webTestClient
-            .mutateWith(
-                mockAuthentication(registerAuthenticationToken(authorizedClientService, clientRegistration, authenticationToken(claims)))
-            )
-            .mutateWith(csrf())
-            .get()
-            .uri("/api/account")
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON_VALUE)
-            .expectBody()
-            .jsonPath("$.login")
-            .isEqualTo("jane")
-            .jsonPath("$.email")
-            .isEqualTo("jane.doe@jhipster.com")
-            .jsonPath("$.authorities")
-            .isEqualTo(AuthoritiesConstants.ADMIN);
+    @Transactional
+    void testGetExistingAccount() throws Exception {
+        TestSecurityContextHolder.getContext().setAuthentication(
+            registerAuthenticationToken(authorizedClientService, clientRegistration, testAuthenticationToken())
+        );
+
+        restAccountMockMvc
+            .perform(get("/api/account").accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.login").value(TEST_USER_LOGIN))
+            .andExpect(jsonPath("$.email").value("john.doe@jhipster.com"))
+            .andExpect(jsonPath("$.authorities").value(AuthoritiesConstants.ADMIN));
     }
 
     @Test
-    void testGetUnknownAccount() {
-        webTestClient.get().uri("/api/account").accept(MediaType.APPLICATION_JSON).exchange().expectStatus().is3xxRedirection();
+    void testGetUnknownAccount() throws Exception {
+        restAccountMockMvc.perform(get("/api/account").accept(MediaType.APPLICATION_JSON)).andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithUnauthenticatedMockUser
-    void testNonAuthenticatedUser() {
-        webTestClient.get().uri("/api/authenticate").exchange().expectStatus().isUnauthorized();
+    void testNonAuthenticatedUser() throws Exception {
+        restAccountMockMvc.perform(get("/api/authenticate")).andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithMockUser(TEST_USER_LOGIN)
-    void testAuthenticatedUser() {
-        webTestClient.get().uri("/api/authenticate").exchange().expectStatus().isNoContent();
+    void testAuthenticatedUser() throws Exception {
+        restAccountMockMvc.perform(get("/api/authenticate").with(request -> request)).andExpect(status().isNoContent());
     }
 }

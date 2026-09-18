@@ -4,9 +4,10 @@ import static com.opportunity.tree.domain.TeamMemberAsserts.*;
 import static com.opportunity.tree.web.rest.TestUtil.createUpdateProxyForBean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
@@ -14,16 +15,15 @@ import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.TeamRole;
-import com.opportunity.tree.repository.EntityManager;
 import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.service.TeamMemberService;
 import com.opportunity.tree.service.dto.TeamMemberDTO;
 import com.opportunity.tree.service.mapper.TeamMemberMapper;
-import java.time.Duration;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
@@ -33,18 +33,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Flux;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the {@link TeamMemberResource} REST controller.
  */
 @IntegrationTest
 @ExtendWith(MockitoExtension.class)
-@AutoConfigureWebTestClient(timeout = IntegrationTest.DEFAULT_ENTITY_TIMEOUT)
+@AutoConfigureMockMvc
 @WithMockUser
 class TeamMemberResourceIT {
 
@@ -82,7 +84,7 @@ class TeamMemberResourceIT {
     private EntityManager em;
 
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc restTeamMemberMockMvc;
 
     private TeamMember teamMember;
 
@@ -98,10 +100,18 @@ class TeamMemberResourceIT {
         TeamMember teamMember = new TeamMember().role(DEFAULT_ROLE).joinedDate(DEFAULT_JOINED_DATE);
         // Add required entity
         Team team;
-        team = em.insert(TeamResourceIT.createEntity()).block();
+        if (TestUtil.findAll(em, Team.class).isEmpty()) {
+            team = TeamResourceIT.createEntity();
+            em.persist(team);
+            em.flush();
+        } else {
+            team = TestUtil.findAll(em, Team.class).get(0);
+        }
         teamMember.setTeam(team);
         // Add required entity
-        User user = em.insert(UserResourceIT.createEntity()).block();
+        User user = UserResourceIT.createEntity();
+        em.persist(user);
+        em.flush();
         teamMember.setUser(user);
         return teamMember;
     }
@@ -116,27 +126,20 @@ class TeamMemberResourceIT {
         TeamMember updatedTeamMember = new TeamMember().role(UPDATED_ROLE).joinedDate(UPDATED_JOINED_DATE);
         // Add required entity
         Team team;
-        team = em.insert(TeamResourceIT.createUpdatedEntity()).block();
+        if (TestUtil.findAll(em, Team.class).isEmpty()) {
+            team = TeamResourceIT.createUpdatedEntity();
+            em.persist(team);
+            em.flush();
+        } else {
+            team = TestUtil.findAll(em, Team.class).get(0);
+        }
         updatedTeamMember.setTeam(team);
         // Add required entity
-        User user = em.insert(UserResourceIT.createEntity()).block();
+        User user = UserResourceIT.createEntity();
+        em.persist(user);
+        em.flush();
         updatedTeamMember.setUser(user);
         return updatedTeamMember;
-    }
-
-    public static void deleteEntities(EntityManager em) {
-        try {
-            em.deleteAll(TeamMember.class).block();
-        } catch (Exception e) {
-            // It can fail, if other entities are still referring this - it will be removed later.
-        }
-        TeamResourceIT.deleteEntities(em);
-        UserResourceIT.deleteEntities(em);
-    }
-
-    @BeforeEach
-    void setupCsrf() {
-        webTestClient = webTestClient.mutateWith(csrf());
     }
 
     @BeforeEach
@@ -147,30 +150,29 @@ class TeamMemberResourceIT {
     @AfterEach
     void cleanup() {
         if (insertedTeamMember != null) {
-            teamMemberRepository.delete(insertedTeamMember).block();
+            teamMemberRepository.delete(insertedTeamMember);
             insertedTeamMember = null;
         }
-        deleteEntities(em);
-        userRepository.deleteAllUserAuthorities().block();
-        userRepository.deleteAll().block();
+        userRepository.deleteAll();
     }
 
     @Test
+    @Transactional
     void createTeamMember() throws Exception {
         long databaseSizeBeforeCreate = getRepositoryCount();
         // Create the TeamMember
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
-        var returnedTeamMemberDTO = webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(TeamMemberDTO.class)
-            .returnResult()
-            .getResponseBody();
+        var returnedTeamMemberDTO = om.readValue(
+            restTeamMemberMockMvc
+                .perform(
+                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(teamMemberDTO))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            TeamMemberDTO.class
+        );
 
         // Validate the TeamMember in the database
         assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
@@ -181,6 +183,7 @@ class TeamMemberResourceIT {
     }
 
     @Test
+    @Transactional
     void createTeamMemberWithExistingId() throws Exception {
         // Create the TeamMember with an existing ID
         teamMember.setId(1L);
@@ -189,20 +192,16 @@ class TeamMemberResourceIT {
         long databaseSizeBeforeCreate = getRepositoryCount();
 
         // An entity with an existing ID cannot be created, so this API call must fail
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restTeamMemberMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(teamMemberDTO)))
+            .andExpect(status().isBadRequest());
 
         // Validate the TeamMember in the database
         assertSameRepositoryCount(databaseSizeBeforeCreate);
     }
 
     @Test
+    @Transactional
     void checkRoleIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -211,19 +210,15 @@ class TeamMemberResourceIT {
         // Create the TeamMember, which fails.
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restTeamMemberMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(teamMemberDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkJoinedDateIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -232,145 +227,92 @@ class TeamMemberResourceIT {
         // Create the TeamMember, which fails.
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restTeamMemberMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(teamMemberDTO)))
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
-    void getAllTeamMembersAsStream() {
+    @Transactional
+    void getAllTeamMembers() throws Exception {
         // Initialize the database
-        teamMemberRepository.save(teamMember).block();
-
-        List<TeamMember> teamMemberList = webTestClient
-            .get()
-            .uri(ENTITY_API_URL)
-            .accept(MediaType.APPLICATION_NDJSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_NDJSON)
-            .returnResult(TeamMemberDTO.class)
-            .getResponseBody()
-            .map(teamMemberMapper::toEntity)
-            .filter(teamMember::equals)
-            .collectList()
-            .block(Duration.ofSeconds(5));
-
-        assertThat(teamMemberList).isNotNull();
-        assertThat(teamMemberList).hasSize(1);
-        TeamMember testTeamMember = teamMemberList.get(0);
-
-        // Test fails because reactive api returns an empty object instead of null
-        // assertTeamMemberAllPropertiesEquals(teamMember, testTeamMember);
-        assertTeamMemberUpdatableFieldsEquals(teamMember, testTeamMember);
-    }
-
-    @Test
-    void getAllTeamMembers() {
-        // Initialize the database
-        insertedTeamMember = teamMemberRepository.save(teamMember).block();
+        insertedTeamMember = teamMemberRepository.saveAndFlush(teamMember);
 
         // Get all the teamMemberList
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL + "?sort=id,desc")
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.[*].id")
-            .value(hasItem(teamMember.getId().intValue()))
-            .jsonPath("$.[*].role")
-            .value(hasItem(DEFAULT_ROLE.toString()))
-            .jsonPath("$.[*].joinedDate")
-            .value(hasItem(DEFAULT_JOINED_DATE.toString()));
+        restTeamMemberMockMvc
+            .perform(get(ENTITY_API_URL + "?sort=id,desc"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.[*].id").value(hasItem(teamMember.getId().intValue())))
+            .andExpect(jsonPath("$.[*].role").value(hasItem(DEFAULT_ROLE.toString())))
+            .andExpect(jsonPath("$.[*].joinedDate").value(hasItem(DEFAULT_JOINED_DATE.toString())));
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllTeamMembersWithEagerRelationshipsIsEnabled() {
-        when(teamMemberServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllTeamMembersWithEagerRelationshipsIsEnabled() throws Exception {
+        when(teamMemberServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=true").exchange().expectStatus().isOk();
+        restTeamMemberMockMvc.perform(get(ENTITY_API_URL + "?eagerload=true")).andExpect(status().isOk());
 
         verify(teamMemberServiceMock, times(1)).findAllWithEagerRelationships(any());
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllTeamMembersWithEagerRelationshipsIsNotEnabled() {
-        when(teamMemberServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllTeamMembersWithEagerRelationshipsIsNotEnabled() throws Exception {
+        when(teamMemberServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=false").exchange().expectStatus().isOk();
-        verify(teamMemberRepositoryMock, times(1)).findAllWithEagerRelationships(any());
+        restTeamMemberMockMvc.perform(get(ENTITY_API_URL + "?eagerload=false")).andExpect(status().isOk());
+        verify(teamMemberRepositoryMock, times(1)).findAll(any(Pageable.class));
     }
 
     @Test
-    void getTeamMember() {
+    @Transactional
+    void getTeamMember() throws Exception {
         // Initialize the database
-        insertedTeamMember = teamMemberRepository.save(teamMember).block();
+        insertedTeamMember = teamMemberRepository.saveAndFlush(teamMember);
 
         // Get the teamMember
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, teamMember.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.id")
-            .value(is(teamMember.getId().intValue()))
-            .jsonPath("$.role")
-            .value(is(DEFAULT_ROLE.toString()))
-            .jsonPath("$.joinedDate")
-            .value(is(DEFAULT_JOINED_DATE.toString()));
+        restTeamMemberMockMvc
+            .perform(get(ENTITY_API_URL_ID, teamMember.getId()))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.id").value(teamMember.getId().intValue()))
+            .andExpect(jsonPath("$.role").value(DEFAULT_ROLE.toString()))
+            .andExpect(jsonPath("$.joinedDate").value(DEFAULT_JOINED_DATE.toString()));
     }
 
     @Test
-    void getNonExistingTeamMember() {
+    @Transactional
+    void getNonExistingTeamMember() throws Exception {
         // Get the teamMember
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, Long.MAX_VALUE)
-            .accept(MediaType.APPLICATION_PROBLEM_JSON)
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+        restTeamMemberMockMvc.perform(get(ENTITY_API_URL_ID, Long.MAX_VALUE)).andExpect(status().isNotFound());
     }
 
     @Test
+    @Transactional
     void putExistingTeamMember() throws Exception {
         // Initialize the database
-        insertedTeamMember = teamMemberRepository.save(teamMember).block();
+        insertedTeamMember = teamMemberRepository.saveAndFlush(teamMember);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
         // Update the teamMember
-        TeamMember updatedTeamMember = teamMemberRepository.findById(teamMember.getId()).block();
+        TeamMember updatedTeamMember = teamMemberRepository.findById(teamMember.getId()).orElseThrow();
+        // Disconnect from session so that the updates on updatedTeamMember are not directly saved in db
+        em.detach(updatedTeamMember);
         updatedTeamMember.role(UPDATED_ROLE).joinedDate(UPDATED_JOINED_DATE);
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(updatedTeamMember);
 
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, teamMemberDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restTeamMemberMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, teamMemberDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(teamMemberDTO))
+            )
+            .andExpect(status().isOk());
 
         // Validate the TeamMember in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -378,6 +320,7 @@ class TeamMemberResourceIT {
     }
 
     @Test
+    @Transactional
     void putNonExistingTeamMember() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         teamMember.setId(longCount.incrementAndGet());
@@ -386,20 +329,21 @@ class TeamMemberResourceIT {
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, teamMemberDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restTeamMemberMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, teamMemberDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(teamMemberDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the TeamMember in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithIdMismatchTeamMember() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         teamMember.setId(longCount.incrementAndGet());
@@ -408,20 +352,21 @@ class TeamMemberResourceIT {
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restTeamMemberMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(teamMemberDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the TeamMember in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithMissingIdPathParamTeamMember() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         teamMember.setId(longCount.incrementAndGet());
@@ -430,23 +375,19 @@ class TeamMemberResourceIT {
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restTeamMemberMockMvc
+            .perform(put(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(teamMemberDTO)))
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the TeamMember in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void partialUpdateTeamMemberWithPatch() throws Exception {
         // Initialize the database
-        insertedTeamMember = teamMemberRepository.save(teamMember).block();
+        insertedTeamMember = teamMemberRepository.saveAndFlush(teamMember);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -454,16 +395,16 @@ class TeamMemberResourceIT {
         TeamMember partialUpdatedTeamMember = new TeamMember();
         partialUpdatedTeamMember.setId(teamMember.getId());
 
-        partialUpdatedTeamMember.joinedDate(UPDATED_JOINED_DATE);
+        partialUpdatedTeamMember.role(UPDATED_ROLE);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedTeamMember.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedTeamMember))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restTeamMemberMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedTeamMember.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedTeamMember))
+            )
+            .andExpect(status().isOk());
 
         // Validate the TeamMember in the database
 
@@ -475,9 +416,10 @@ class TeamMemberResourceIT {
     }
 
     @Test
+    @Transactional
     void fullUpdateTeamMemberWithPatch() throws Exception {
         // Initialize the database
-        insertedTeamMember = teamMemberRepository.save(teamMember).block();
+        insertedTeamMember = teamMemberRepository.saveAndFlush(teamMember);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -487,14 +429,14 @@ class TeamMemberResourceIT {
 
         partialUpdatedTeamMember.role(UPDATED_ROLE).joinedDate(UPDATED_JOINED_DATE);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedTeamMember.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedTeamMember))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restTeamMemberMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedTeamMember.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedTeamMember))
+            )
+            .andExpect(status().isOk());
 
         // Validate the TeamMember in the database
 
@@ -503,6 +445,7 @@ class TeamMemberResourceIT {
     }
 
     @Test
+    @Transactional
     void patchNonExistingTeamMember() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         teamMember.setId(longCount.incrementAndGet());
@@ -511,20 +454,21 @@ class TeamMemberResourceIT {
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, teamMemberDTO.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restTeamMemberMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, teamMemberDTO.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(teamMemberDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the TeamMember in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithIdMismatchTeamMember() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         teamMember.setId(longCount.incrementAndGet());
@@ -533,20 +477,21 @@ class TeamMemberResourceIT {
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restTeamMemberMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(teamMemberDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the TeamMember in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithMissingIdPathParamTeamMember() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         teamMember.setId(longCount.incrementAndGet());
@@ -555,41 +500,35 @@ class TeamMemberResourceIT {
         TeamMemberDTO teamMemberDTO = teamMemberMapper.toDto(teamMember);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(teamMemberDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restTeamMemberMockMvc
+            .perform(
+                patch(ENTITY_API_URL).with(csrf()).contentType("application/merge-patch+json").content(om.writeValueAsBytes(teamMemberDTO))
+            )
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the TeamMember in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
-    void deleteTeamMember() {
+    @Transactional
+    void deleteTeamMember() throws Exception {
         // Initialize the database
-        insertedTeamMember = teamMemberRepository.save(teamMember).block();
+        insertedTeamMember = teamMemberRepository.saveAndFlush(teamMember);
 
         long databaseSizeBeforeDelete = getRepositoryCount();
 
         // Delete the teamMember
-        webTestClient
-            .delete()
-            .uri(ENTITY_API_URL_ID, teamMember.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+        restTeamMemberMockMvc
+            .perform(delete(ENTITY_API_URL_ID, teamMember.getId()).with(csrf()).accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isNoContent());
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
     }
 
     protected long getRepositoryCount() {
-        return teamMemberRepository.count().block();
+        return teamMemberRepository.count();
     }
 
     protected void assertIncrementedRepositoryCount(long countBefore) {
@@ -605,18 +544,14 @@ class TeamMemberResourceIT {
     }
 
     protected TeamMember getPersistedTeamMember(TeamMember teamMember) {
-        return teamMemberRepository.findById(teamMember.getId()).block();
+        return teamMemberRepository.findById(teamMember.getId()).orElseThrow();
     }
 
     protected void assertPersistedTeamMemberToMatchAllProperties(TeamMember expectedTeamMember) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertTeamMemberAllPropertiesEquals(expectedTeamMember, getPersistedTeamMember(expectedTeamMember));
-        assertTeamMemberUpdatableFieldsEquals(expectedTeamMember, getPersistedTeamMember(expectedTeamMember));
+        assertTeamMemberAllPropertiesEquals(expectedTeamMember, getPersistedTeamMember(expectedTeamMember));
     }
 
     protected void assertPersistedTeamMemberToMatchUpdatableProperties(TeamMember expectedTeamMember) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertTeamMemberAllUpdatablePropertiesEquals(expectedTeamMember, getPersistedTeamMember(expectedTeamMember));
-        assertTeamMemberUpdatableFieldsEquals(expectedTeamMember, getPersistedTeamMember(expectedTeamMember));
+        assertTeamMemberAllUpdatablePropertiesEquals(expectedTeamMember, getPersistedTeamMember(expectedTeamMember));
     }
 }

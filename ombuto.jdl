@@ -5,6 +5,31 @@
  * Tree shape:  Product -> Outcome -> Opportunity (nested) -> Solution -> Assumption -> Experiment
  */
 
+application {
+  config {
+    baseName opportunitySolutionTree
+    applicationType monolith
+    packageName com.opportunity.tree
+    authenticationType oauth2
+    reactive false
+    websocket spring-websocket
+    databaseType sql
+    devDatabaseType h2Disk
+    prodDatabaseType postgresql
+    cacheProvider ehcache
+    enableHibernateCache true
+    buildTool maven
+    clientFramework vue
+    clientTheme pulse
+    clientThemeVariant primary
+    withAdminUi true
+    enableTranslation false
+    nativeLanguage en
+    testFrameworks [cucumber]
+  }
+  entities *
+}
+
 /* ------------------------------------------------------------------ */
 /* Enums                                                               */
 /* ------------------------------------------------------------------ */
@@ -231,3 +256,4 @@ relationship ManyToMany {
 dto * with mapstruct
 service * with serviceImpl
 paginate Opportunity, Solution, Interview, Comment, Experiment with pagination
+filter Opportunity, Solution, Outcome, Interview

@@ -4,22 +4,22 @@ import static com.opportunity.tree.domain.OpportunityLinkAsserts.*;
 import static com.opportunity.tree.web.rest.TestUtil.createUpdateProxyForBean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.OpportunityLink;
 import com.opportunity.tree.domain.enumeration.LinkType;
-import com.opportunity.tree.repository.EntityManager;
 import com.opportunity.tree.repository.OpportunityLinkRepository;
 import com.opportunity.tree.service.OpportunityLinkService;
 import com.opportunity.tree.service.dto.OpportunityLinkDTO;
 import com.opportunity.tree.service.mapper.OpportunityLinkMapper;
-import java.time.Duration;
-import java.util.List;
+import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
@@ -29,26 +29,28 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import reactor.core.publisher.Flux;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for the {@link OpportunityLinkResource} REST controller.
  */
 @IntegrationTest
 @ExtendWith(MockitoExtension.class)
-@AutoConfigureWebTestClient(timeout = IntegrationTest.DEFAULT_ENTITY_TIMEOUT)
+@AutoConfigureMockMvc
 @WithMockUser
 class OpportunityLinkResourceIT {
 
     private static final String DEFAULT_NAME = "AAAAAAAAAA";
     private static final String UPDATED_NAME = "BBBBBBBBBB";
 
-    private static final String DEFAULT_URL = "https://^1`vG";
-    private static final String UPDATED_URL = "http://=A|";
+    private static final String DEFAULT_URL = "https://i%}S\" ";
+    private static final String UPDATED_URL = "https://{A%";
 
     private static final LinkType DEFAULT_TYPE = LinkType.PROTOTYPE;
     private static final LinkType UPDATED_TYPE = LinkType.TICKET;
@@ -81,7 +83,7 @@ class OpportunityLinkResourceIT {
     private EntityManager em;
 
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc restOpportunityLinkMockMvc;
 
     private OpportunityLink opportunityLink;
 
@@ -101,7 +103,13 @@ class OpportunityLinkResourceIT {
             .sortOrder(DEFAULT_SORT_ORDER);
         // Add required entity
         Opportunity opportunity;
-        opportunity = em.insert(OpportunityResourceIT.createEntity(em)).block();
+        if (TestUtil.findAll(em, Opportunity.class).isEmpty()) {
+            opportunity = OpportunityResourceIT.createEntity(em);
+            em.persist(opportunity);
+            em.flush();
+        } else {
+            opportunity = TestUtil.findAll(em, Opportunity.class).get(0);
+        }
         opportunityLink.setOpportunity(opportunity);
         return opportunityLink;
     }
@@ -120,23 +128,15 @@ class OpportunityLinkResourceIT {
             .sortOrder(UPDATED_SORT_ORDER);
         // Add required entity
         Opportunity opportunity;
-        opportunity = em.insert(OpportunityResourceIT.createUpdatedEntity(em)).block();
+        if (TestUtil.findAll(em, Opportunity.class).isEmpty()) {
+            opportunity = OpportunityResourceIT.createUpdatedEntity(em);
+            em.persist(opportunity);
+            em.flush();
+        } else {
+            opportunity = TestUtil.findAll(em, Opportunity.class).get(0);
+        }
         updatedOpportunityLink.setOpportunity(opportunity);
         return updatedOpportunityLink;
-    }
-
-    public static void deleteEntities(EntityManager em) {
-        try {
-            em.deleteAll(OpportunityLink.class).block();
-        } catch (Exception e) {
-            // It can fail, if other entities are still referring this - it will be removed later.
-        }
-        OpportunityResourceIT.deleteEntities(em);
-    }
-
-    @BeforeEach
-    void setupCsrf() {
-        webTestClient = webTestClient.mutateWith(csrf());
     }
 
     @BeforeEach
@@ -147,28 +147,31 @@ class OpportunityLinkResourceIT {
     @AfterEach
     void cleanup() {
         if (insertedOpportunityLink != null) {
-            opportunityLinkRepository.delete(insertedOpportunityLink).block();
+            opportunityLinkRepository.delete(insertedOpportunityLink);
             insertedOpportunityLink = null;
         }
-        deleteEntities(em);
     }
 
     @Test
+    @Transactional
     void createOpportunityLink() throws Exception {
         long databaseSizeBeforeCreate = getRepositoryCount();
         // Create the OpportunityLink
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
-        var returnedOpportunityLinkDTO = webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(OpportunityLinkDTO.class)
-            .returnResult()
-            .getResponseBody();
+        var returnedOpportunityLinkDTO = om.readValue(
+            restOpportunityLinkMockMvc
+                .perform(
+                    post(ENTITY_API_URL)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsBytes(opportunityLinkDTO))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            OpportunityLinkDTO.class
+        );
 
         // Validate the OpportunityLink in the database
         assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
@@ -179,6 +182,7 @@ class OpportunityLinkResourceIT {
     }
 
     @Test
+    @Transactional
     void createOpportunityLinkWithExistingId() throws Exception {
         // Create the OpportunityLink with an existing ID
         opportunityLink.setId(1L);
@@ -187,20 +191,18 @@ class OpportunityLinkResourceIT {
         long databaseSizeBeforeCreate = getRepositoryCount();
 
         // An entity with an existing ID cannot be created, so this API call must fail
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the OpportunityLink in the database
         assertSameRepositoryCount(databaseSizeBeforeCreate);
     }
 
     @Test
+    @Transactional
     void checkNameIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -209,19 +211,17 @@ class OpportunityLinkResourceIT {
         // Create the OpportunityLink, which fails.
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkUrlIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -230,19 +230,17 @@ class OpportunityLinkResourceIT {
         // Create the OpportunityLink, which fails.
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkTypeIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -251,19 +249,17 @@ class OpportunityLinkResourceIT {
         // Create the OpportunityLink, which fails.
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
+    @Transactional
     void checkSortOrderIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
@@ -272,153 +268,98 @@ class OpportunityLinkResourceIT {
         // Create the OpportunityLink, which fails.
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
-        webTestClient
-            .post()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
-    void getAllOpportunityLinksAsStream() {
+    @Transactional
+    void getAllOpportunityLinks() throws Exception {
         // Initialize the database
-        opportunityLinkRepository.save(opportunityLink).block();
-
-        List<OpportunityLink> opportunityLinkList = webTestClient
-            .get()
-            .uri(ENTITY_API_URL)
-            .accept(MediaType.APPLICATION_NDJSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_NDJSON)
-            .returnResult(OpportunityLinkDTO.class)
-            .getResponseBody()
-            .map(opportunityLinkMapper::toEntity)
-            .filter(opportunityLink::equals)
-            .collectList()
-            .block(Duration.ofSeconds(5));
-
-        assertThat(opportunityLinkList).isNotNull();
-        assertThat(opportunityLinkList).hasSize(1);
-        OpportunityLink testOpportunityLink = opportunityLinkList.get(0);
-
-        // Test fails because reactive api returns an empty object instead of null
-        // assertOpportunityLinkAllPropertiesEquals(opportunityLink, testOpportunityLink);
-        assertOpportunityLinkUpdatableFieldsEquals(opportunityLink, testOpportunityLink);
-    }
-
-    @Test
-    void getAllOpportunityLinks() {
-        // Initialize the database
-        insertedOpportunityLink = opportunityLinkRepository.save(opportunityLink).block();
+        insertedOpportunityLink = opportunityLinkRepository.saveAndFlush(opportunityLink);
 
         // Get all the opportunityLinkList
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL + "?sort=id,desc")
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.[*].id")
-            .value(hasItem(opportunityLink.getId().intValue()))
-            .jsonPath("$.[*].name")
-            .value(hasItem(DEFAULT_NAME))
-            .jsonPath("$.[*].url")
-            .value(hasItem(DEFAULT_URL))
-            .jsonPath("$.[*].type")
-            .value(hasItem(DEFAULT_TYPE.toString()))
-            .jsonPath("$.[*].sortOrder")
-            .value(hasItem(DEFAULT_SORT_ORDER));
+        restOpportunityLinkMockMvc
+            .perform(get(ENTITY_API_URL + "?sort=id,desc"))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.[*].id").value(hasItem(opportunityLink.getId().intValue())))
+            .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
+            .andExpect(jsonPath("$.[*].url").value(hasItem(DEFAULT_URL)))
+            .andExpect(jsonPath("$.[*].type").value(hasItem(DEFAULT_TYPE.toString())))
+            .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)));
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllOpportunityLinksWithEagerRelationshipsIsEnabled() {
-        when(opportunityLinkServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllOpportunityLinksWithEagerRelationshipsIsEnabled() throws Exception {
+        when(opportunityLinkServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=true").exchange().expectStatus().isOk();
+        restOpportunityLinkMockMvc.perform(get(ENTITY_API_URL + "?eagerload=true")).andExpect(status().isOk());
 
         verify(opportunityLinkServiceMock, times(1)).findAllWithEagerRelationships(any());
     }
 
     @SuppressWarnings({ "unchecked" })
-    void getAllOpportunityLinksWithEagerRelationshipsIsNotEnabled() {
-        when(opportunityLinkServiceMock.findAllWithEagerRelationships(any())).thenReturn(Flux.empty());
+    void getAllOpportunityLinksWithEagerRelationshipsIsNotEnabled() throws Exception {
+        when(opportunityLinkServiceMock.findAllWithEagerRelationships(any())).thenReturn(new PageImpl(new ArrayList<>()));
 
-        webTestClient.get().uri(ENTITY_API_URL + "?eagerload=false").exchange().expectStatus().isOk();
-        verify(opportunityLinkRepositoryMock, times(1)).findAllWithEagerRelationships(any());
+        restOpportunityLinkMockMvc.perform(get(ENTITY_API_URL + "?eagerload=false")).andExpect(status().isOk());
+        verify(opportunityLinkRepositoryMock, times(1)).findAll(any(Pageable.class));
     }
 
     @Test
-    void getOpportunityLink() {
+    @Transactional
+    void getOpportunityLink() throws Exception {
         // Initialize the database
-        insertedOpportunityLink = opportunityLinkRepository.save(opportunityLink).block();
+        insertedOpportunityLink = opportunityLinkRepository.saveAndFlush(opportunityLink);
 
         // Get the opportunityLink
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, opportunityLink.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentType(MediaType.APPLICATION_JSON)
-            .expectBody()
-            .jsonPath("$.id")
-            .value(is(opportunityLink.getId().intValue()))
-            .jsonPath("$.name")
-            .value(is(DEFAULT_NAME))
-            .jsonPath("$.url")
-            .value(is(DEFAULT_URL))
-            .jsonPath("$.type")
-            .value(is(DEFAULT_TYPE.toString()))
-            .jsonPath("$.sortOrder")
-            .value(is(DEFAULT_SORT_ORDER));
+        restOpportunityLinkMockMvc
+            .perform(get(ENTITY_API_URL_ID, opportunityLink.getId()))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.id").value(opportunityLink.getId().intValue()))
+            .andExpect(jsonPath("$.name").value(DEFAULT_NAME))
+            .andExpect(jsonPath("$.url").value(DEFAULT_URL))
+            .andExpect(jsonPath("$.type").value(DEFAULT_TYPE.toString()))
+            .andExpect(jsonPath("$.sortOrder").value(DEFAULT_SORT_ORDER));
     }
 
     @Test
-    void getNonExistingOpportunityLink() {
+    @Transactional
+    void getNonExistingOpportunityLink() throws Exception {
         // Get the opportunityLink
-        webTestClient
-            .get()
-            .uri(ENTITY_API_URL_ID, Long.MAX_VALUE)
-            .accept(MediaType.APPLICATION_PROBLEM_JSON)
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+        restOpportunityLinkMockMvc.perform(get(ENTITY_API_URL_ID, Long.MAX_VALUE)).andExpect(status().isNotFound());
     }
 
     @Test
+    @Transactional
     void putExistingOpportunityLink() throws Exception {
         // Initialize the database
-        insertedOpportunityLink = opportunityLinkRepository.save(opportunityLink).block();
+        insertedOpportunityLink = opportunityLinkRepository.saveAndFlush(opportunityLink);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
         // Update the opportunityLink
-        OpportunityLink updatedOpportunityLink = opportunityLinkRepository.findById(opportunityLink.getId()).block();
+        OpportunityLink updatedOpportunityLink = opportunityLinkRepository.findById(opportunityLink.getId()).orElseThrow();
+        // Disconnect from session so that the updates on updatedOpportunityLink are not directly saved in db
+        em.detach(updatedOpportunityLink);
         updatedOpportunityLink.name(UPDATED_NAME).url(UPDATED_URL).type(UPDATED_TYPE).sortOrder(UPDATED_SORT_ORDER);
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(updatedOpportunityLink);
 
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, opportunityLinkDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restOpportunityLinkMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, opportunityLinkDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isOk());
 
         // Validate the OpportunityLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -426,6 +367,7 @@ class OpportunityLinkResourceIT {
     }
 
     @Test
+    @Transactional
     void putNonExistingOpportunityLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         opportunityLink.setId(longCount.incrementAndGet());
@@ -434,20 +376,21 @@ class OpportunityLinkResourceIT {
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, opportunityLinkDTO.getId())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, opportunityLinkDTO.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the OpportunityLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithIdMismatchOpportunityLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         opportunityLink.setId(longCount.incrementAndGet());
@@ -456,20 +399,21 @@ class OpportunityLinkResourceIT {
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                put(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the OpportunityLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void putWithMissingIdPathParamOpportunityLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         opportunityLink.setId(longCount.incrementAndGet());
@@ -478,23 +422,21 @@ class OpportunityLinkResourceIT {
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .put()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restOpportunityLinkMockMvc
+            .perform(
+                put(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the OpportunityLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void partialUpdateOpportunityLinkWithPatch() throws Exception {
         // Initialize the database
-        insertedOpportunityLink = opportunityLinkRepository.save(opportunityLink).block();
+        insertedOpportunityLink = opportunityLinkRepository.saveAndFlush(opportunityLink);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -502,16 +444,16 @@ class OpportunityLinkResourceIT {
         OpportunityLink partialUpdatedOpportunityLink = new OpportunityLink();
         partialUpdatedOpportunityLink.setId(opportunityLink.getId());
 
-        partialUpdatedOpportunityLink.sortOrder(UPDATED_SORT_ORDER);
+        partialUpdatedOpportunityLink.name(UPDATED_NAME).sortOrder(UPDATED_SORT_ORDER);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedOpportunityLink.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedOpportunityLink))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restOpportunityLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedOpportunityLink.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedOpportunityLink))
+            )
+            .andExpect(status().isOk());
 
         // Validate the OpportunityLink in the database
 
@@ -523,9 +465,10 @@ class OpportunityLinkResourceIT {
     }
 
     @Test
+    @Transactional
     void fullUpdateOpportunityLinkWithPatch() throws Exception {
         // Initialize the database
-        insertedOpportunityLink = opportunityLinkRepository.save(opportunityLink).block();
+        insertedOpportunityLink = opportunityLinkRepository.saveAndFlush(opportunityLink);
 
         long databaseSizeBeforeUpdate = getRepositoryCount();
 
@@ -535,14 +478,14 @@ class OpportunityLinkResourceIT {
 
         partialUpdatedOpportunityLink.name(UPDATED_NAME).url(UPDATED_URL).type(UPDATED_TYPE).sortOrder(UPDATED_SORT_ORDER);
 
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, partialUpdatedOpportunityLink.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(partialUpdatedOpportunityLink))
-            .exchange()
-            .expectStatus()
-            .isOk();
+        restOpportunityLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, partialUpdatedOpportunityLink.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(partialUpdatedOpportunityLink))
+            )
+            .andExpect(status().isOk());
 
         // Validate the OpportunityLink in the database
 
@@ -554,6 +497,7 @@ class OpportunityLinkResourceIT {
     }
 
     @Test
+    @Transactional
     void patchNonExistingOpportunityLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         opportunityLink.setId(longCount.incrementAndGet());
@@ -562,20 +506,21 @@ class OpportunityLinkResourceIT {
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
         // If the entity doesn't have an ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, opportunityLinkDTO.getId())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, opportunityLinkDTO.getId())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the OpportunityLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithIdMismatchOpportunityLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         opportunityLink.setId(longCount.incrementAndGet());
@@ -584,20 +529,21 @@ class OpportunityLinkResourceIT {
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL_ID, longCount.incrementAndGet())
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+        restOpportunityLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL_ID, longCount.incrementAndGet())
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isBadRequest());
 
         // Validate the OpportunityLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
+    @Transactional
     void patchWithMissingIdPathParamOpportunityLink() throws Exception {
         long databaseSizeBeforeUpdate = getRepositoryCount();
         opportunityLink.setId(longCount.incrementAndGet());
@@ -606,41 +552,38 @@ class OpportunityLinkResourceIT {
         OpportunityLinkDTO opportunityLinkDTO = opportunityLinkMapper.toDto(opportunityLink);
 
         // If url ID doesn't match entity ID, it will throw BadRequestAlertException
-        webTestClient
-            .patch()
-            .uri(ENTITY_API_URL)
-            .contentType(MediaType.valueOf("application/merge-patch+json"))
-            .bodyValue(om.writeValueAsBytes(opportunityLinkDTO))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(405);
+        restOpportunityLinkMockMvc
+            .perform(
+                patch(ENTITY_API_URL)
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsBytes(opportunityLinkDTO))
+            )
+            .andExpect(status().isMethodNotAllowed());
 
         // Validate the OpportunityLink in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
     }
 
     @Test
-    void deleteOpportunityLink() {
+    @Transactional
+    void deleteOpportunityLink() throws Exception {
         // Initialize the database
-        insertedOpportunityLink = opportunityLinkRepository.save(opportunityLink).block();
+        insertedOpportunityLink = opportunityLinkRepository.saveAndFlush(opportunityLink);
 
         long databaseSizeBeforeDelete = getRepositoryCount();
 
         // Delete the opportunityLink
-        webTestClient
-            .delete()
-            .uri(ENTITY_API_URL_ID, opportunityLink.getId())
-            .accept(MediaType.APPLICATION_JSON)
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+        restOpportunityLinkMockMvc
+            .perform(delete(ENTITY_API_URL_ID, opportunityLink.getId()).with(csrf()).accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isNoContent());
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
     }
 
     protected long getRepositoryCount() {
-        return opportunityLinkRepository.count().block();
+        return opportunityLinkRepository.count();
     }
 
     protected void assertIncrementedRepositoryCount(long countBefore) {
@@ -656,18 +599,14 @@ class OpportunityLinkResourceIT {
     }
 
     protected OpportunityLink getPersistedOpportunityLink(OpportunityLink opportunityLink) {
-        return opportunityLinkRepository.findById(opportunityLink.getId()).block();
+        return opportunityLinkRepository.findById(opportunityLink.getId()).orElseThrow();
     }
 
     protected void assertPersistedOpportunityLinkToMatchAllProperties(OpportunityLink expectedOpportunityLink) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertOpportunityLinkAllPropertiesEquals(expectedOpportunityLink, getPersistedOpportunityLink(expectedOpportunityLink));
-        assertOpportunityLinkUpdatableFieldsEquals(expectedOpportunityLink, getPersistedOpportunityLink(expectedOpportunityLink));
+        assertOpportunityLinkAllPropertiesEquals(expectedOpportunityLink, getPersistedOpportunityLink(expectedOpportunityLink));
     }
 
     protected void assertPersistedOpportunityLinkToMatchUpdatableProperties(OpportunityLink expectedOpportunityLink) {
-        // Test fails because reactive api returns an empty object instead of null
-        // assertOpportunityLinkAllUpdatablePropertiesEquals(expectedOpportunityLink, getPersistedOpportunityLink(expectedOpportunityLink));
-        assertOpportunityLinkUpdatableFieldsEquals(expectedOpportunityLink, getPersistedOpportunityLink(expectedOpportunityLink));
+        assertOpportunityLinkAllUpdatablePropertiesEquals(expectedOpportunityLink, getPersistedOpportunityLink(expectedOpportunityLink));
     }
 }

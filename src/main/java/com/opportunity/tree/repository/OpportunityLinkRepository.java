@@ -1,63 +1,42 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.OpportunityLink;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
- * Spring Data R2DBC repository for the OpportunityLink entity.
+ * Spring Data JPA repository for the OpportunityLink entity.
  */
-@SuppressWarnings("unused")
 @Repository
-public interface OpportunityLinkRepository extends ReactiveCrudRepository<OpportunityLink, Long>, OpportunityLinkRepositoryInternal {
-    @Override
-    Mono<OpportunityLink> findOneWithEagerRelationships(Long id);
+public interface OpportunityLinkRepository extends JpaRepository<OpportunityLink, Long> {
+    default Optional<OpportunityLink> findOneWithEagerRelationships(Long id) {
+        return this.findOneWithToOneRelationships(id);
+    }
 
-    @Override
-    Flux<OpportunityLink> findAllWithEagerRelationships();
+    default List<OpportunityLink> findAllWithEagerRelationships() {
+        return this.findAllWithToOneRelationships();
+    }
 
-    @Override
-    Flux<OpportunityLink> findAllWithEagerRelationships(Pageable page);
+    default Page<OpportunityLink> findAllWithEagerRelationships(Pageable pageable) {
+        return this.findAllWithToOneRelationships(pageable);
+    }
 
-    @Query("SELECT * FROM opportunity_link entity WHERE entity.opportunity_id = :id")
-    Flux<OpportunityLink> findByOpportunity(Long id);
+    @Query(
+        value = "select opportunityLink from OpportunityLink opportunityLink left join fetch opportunityLink.opportunity",
+        countQuery = "select count(opportunityLink) from OpportunityLink opportunityLink"
+    )
+    Page<OpportunityLink> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("SELECT * FROM opportunity_link entity WHERE entity.opportunity_id IS NULL")
-    Flux<OpportunityLink> findAllWhereOpportunityIsNull();
+    @Query("select opportunityLink from OpportunityLink opportunityLink left join fetch opportunityLink.opportunity")
+    List<OpportunityLink> findAllWithToOneRelationships();
 
-    @Override
-    <S extends OpportunityLink> Mono<S> save(S entity);
-
-    @Override
-    Flux<OpportunityLink> findAll();
-
-    @Override
-    Mono<OpportunityLink> findById(Long id);
-
-    @Override
-    Mono<Void> deleteById(Long id);
-}
-
-interface OpportunityLinkRepositoryInternal {
-    <S extends OpportunityLink> Mono<S> save(S entity);
-
-    Flux<OpportunityLink> findAllBy(Pageable pageable);
-
-    Flux<OpportunityLink> findAll();
-
-    Mono<OpportunityLink> findById(Long id);
-    // this is not supported at the moment because of https://github.com/jhipster/generator-jhipster/issues/18269
-    // Flux<OpportunityLink> findAllBy(Pageable pageable, Criteria criteria);
-
-    Mono<OpportunityLink> findOneWithEagerRelationships(Long id);
-
-    Flux<OpportunityLink> findAllWithEagerRelationships();
-
-    Flux<OpportunityLink> findAllWithEagerRelationships(Pageable page);
-
-    Mono<Void> deleteById(Long id);
+    @Query(
+        "select opportunityLink from OpportunityLink opportunityLink left join fetch opportunityLink.opportunity where opportunityLink.id =:id"
+    )
+    Optional<OpportunityLink> findOneWithToOneRelationships(@Param("id") Long id);
 }

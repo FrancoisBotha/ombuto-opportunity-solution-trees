@@ -10,18 +10,14 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import tech.jhipster.web.util.HeaderUtil;
-import tech.jhipster.web.util.reactive.ResponseUtil;
+import tech.jhipster.web.util.ResponseUtil;
 
 /**
  * REST controller for managing {@link com.opportunity.tree.domain.TeamMember}.
@@ -34,7 +30,7 @@ public class TeamMemberResource {
 
     private static final String ENTITY_NAME = "teamMember";
 
-    @Value("${jhipster.clientApp.name:opportunitysolutiontree}")
+    @Value("${jhipster.clientApp.name:opportunitySolutionTree}")
     private String applicationName;
 
     private final TeamMemberService teamMemberService;
@@ -54,22 +50,15 @@ public class TeamMemberResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PostMapping("")
-    public Mono<ResponseEntity<TeamMemberDTO>> createTeamMember(@Valid @RequestBody TeamMemberDTO teamMemberDTO) throws URISyntaxException {
+    public ResponseEntity<TeamMemberDTO> createTeamMember(@Valid @RequestBody TeamMemberDTO teamMemberDTO) throws URISyntaxException {
         LOG.debug("REST request to save TeamMember : {}", teamMemberDTO);
         if (teamMemberDTO.getId() != null) {
             throw new BadRequestAlertException("A new teamMember cannot already have an ID", ENTITY_NAME, "idexists");
         }
-        return teamMemberService
-            .save(teamMemberDTO)
-            .map(result -> {
-                try {
-                    return ResponseEntity.created(new URI("/api/team-members/" + result.getId()))
-                        .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                        .body(result);
-                } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+        teamMemberDTO = teamMemberService.save(teamMemberDTO);
+        return ResponseEntity.created(new URI("/api/team-members/" + teamMemberDTO.getId()))
+            .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, teamMemberDTO.getId().toString()))
+            .body(teamMemberDTO);
     }
 
     /**
@@ -83,7 +72,7 @@ public class TeamMemberResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<TeamMemberDTO>> updateTeamMember(
+    public ResponseEntity<TeamMemberDTO> updateTeamMember(
         @PathVariable(value = "id", required = false) final Long id,
         @Valid @RequestBody TeamMemberDTO teamMemberDTO
     ) throws URISyntaxException {
@@ -95,22 +84,14 @@ public class TeamMemberResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return teamMemberRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!teamMemberRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                return teamMemberService
-                    .update(teamMemberDTO)
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(result ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                            .body(result)
-                    );
-            });
+        teamMemberDTO = teamMemberService.update(teamMemberDTO);
+        return ResponseEntity.ok()
+            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, teamMemberDTO.getId().toString()))
+            .body(teamMemberDTO);
     }
 
     /**
@@ -125,7 +106,7 @@ public class TeamMemberResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PatchMapping(value = "/{id}", consumes = { "application/json", "application/merge-patch+json" })
-    public Mono<ResponseEntity<TeamMemberDTO>> partialUpdateTeamMember(
+    public ResponseEntity<TeamMemberDTO> partialUpdateTeamMember(
         @PathVariable(value = "id", required = false) final Long id,
         @NotNull @RequestBody TeamMemberDTO teamMemberDTO
     ) throws URISyntaxException {
@@ -137,23 +118,16 @@ public class TeamMemberResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return teamMemberRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!teamMemberRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                Mono<TeamMemberDTO> result = teamMemberService.partialUpdate(teamMemberDTO);
+        Optional<TeamMemberDTO> result = teamMemberService.partialUpdate(teamMemberDTO);
 
-                return result
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(res ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, res.getId().toString()))
-                            .body(res)
-                    );
-            });
+        return ResponseUtil.wrapOrNotFound(
+            result,
+            HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, teamMemberDTO.getId().toString())
+        );
     }
 
     /**
@@ -162,21 +136,11 @@ public class TeamMemberResource {
      * @param eagerload flag to eager load entities from relationships (This is applicable for many-to-many).
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of Team Members in body.
      */
-    @GetMapping(value = "", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<List<TeamMemberDTO>> getAllTeamMembers(
+    @GetMapping("")
+    public List<TeamMemberDTO> getAllTeamMembers(
         @RequestParam(name = "eagerload", required = false, defaultValue = "true") boolean eagerload
     ) {
         LOG.debug("REST request to get all TeamMembers");
-        return teamMemberService.findAll().collectList();
-    }
-
-    /**
-     * {@code GET  /team-members} : get all the Team Members as a stream.
-     * @return the {@link Flux} of Team Members.
-     */
-    @GetMapping(value = "", produces = MediaType.APPLICATION_NDJSON_VALUE)
-    public Flux<TeamMemberDTO> getAllTeamMembersAsStream() {
-        LOG.debug("REST request to get all TeamMembers as a stream");
         return teamMemberService.findAll();
     }
 
@@ -187,9 +151,9 @@ public class TeamMemberResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the teamMemberDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<TeamMemberDTO>> getTeamMember(@PathVariable("id") Long id) {
+    public ResponseEntity<TeamMemberDTO> getTeamMember(@PathVariable("id") Long id) {
         LOG.debug("REST request to get TeamMember : {}", id);
-        Mono<TeamMemberDTO> teamMemberDTO = teamMemberService.findOne(id);
+        Optional<TeamMemberDTO> teamMemberDTO = teamMemberService.findOne(id);
         return ResponseUtil.wrapOrNotFound(teamMemberDTO);
     }
 
@@ -200,16 +164,11 @@ public class TeamMemberResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Void>> deleteTeamMember(@PathVariable("id") Long id) {
+    public ResponseEntity<Void> deleteTeamMember(@PathVariable("id") Long id) {
         LOG.debug("REST request to delete TeamMember : {}", id);
-        return teamMemberService
-            .delete(id)
-            .then(
-                Mono.just(
-                    ResponseEntity.noContent()
-                        .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
-                        .build()
-                )
-            );
+        teamMemberService.delete(id);
+        return ResponseEntity.noContent()
+            .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
+            .build();
     }
 }

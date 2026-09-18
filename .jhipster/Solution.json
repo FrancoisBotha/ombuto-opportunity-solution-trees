@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091116"
+    "changelogDate": "20260918102119"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "dto": "mapstruct",
   "fields": [
     {
@@ -44,6 +44,7 @@
       "fieldType": "Instant"
     }
   ],
+  "jpaMetamodelFiltering": true,
   "name": "Solution",
   "pagination": "pagination",
   "relationships": [

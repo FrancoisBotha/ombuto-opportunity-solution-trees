@@ -10,18 +10,14 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import tech.jhipster.web.util.HeaderUtil;
-import tech.jhipster.web.util.reactive.ResponseUtil;
+import tech.jhipster.web.util.ResponseUtil;
 
 /**
  * REST controller for managing {@link com.opportunity.tree.domain.Team}.
@@ -34,7 +30,7 @@ public class TeamResource {
 
     private static final String ENTITY_NAME = "team";
 
-    @Value("${jhipster.clientApp.name:opportunitysolutiontree}")
+    @Value("${jhipster.clientApp.name:opportunitySolutionTree}")
     private String applicationName;
 
     private final TeamService teamService;
@@ -54,22 +50,15 @@ public class TeamResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PostMapping("")
-    public Mono<ResponseEntity<TeamDTO>> createTeam(@Valid @RequestBody TeamDTO teamDTO) throws URISyntaxException {
+    public ResponseEntity<TeamDTO> createTeam(@Valid @RequestBody TeamDTO teamDTO) throws URISyntaxException {
         LOG.debug("REST request to save Team : {}", teamDTO);
         if (teamDTO.getId() != null) {
             throw new BadRequestAlertException("A new team cannot already have an ID", ENTITY_NAME, "idexists");
         }
-        return teamService
-            .save(teamDTO)
-            .map(result -> {
-                try {
-                    return ResponseEntity.created(new URI("/api/teams/" + result.getId()))
-                        .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                        .body(result);
-                } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+        teamDTO = teamService.save(teamDTO);
+        return ResponseEntity.created(new URI("/api/teams/" + teamDTO.getId()))
+            .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, teamDTO.getId().toString()))
+            .body(teamDTO);
     }
 
     /**
@@ -83,7 +72,7 @@ public class TeamResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PutMapping("/{id}")
-    public Mono<ResponseEntity<TeamDTO>> updateTeam(
+    public ResponseEntity<TeamDTO> updateTeam(
         @PathVariable(value = "id", required = false) final Long id,
         @Valid @RequestBody TeamDTO teamDTO
     ) throws URISyntaxException {
@@ -95,22 +84,14 @@ public class TeamResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return teamRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!teamRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                return teamService
-                    .update(teamDTO)
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(result ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
-                            .body(result)
-                    );
-            });
+        teamDTO = teamService.update(teamDTO);
+        return ResponseEntity.ok()
+            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, teamDTO.getId().toString()))
+            .body(teamDTO);
     }
 
     /**
@@ -125,7 +106,7 @@ public class TeamResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PatchMapping(value = "/{id}", consumes = { "application/json", "application/merge-patch+json" })
-    public Mono<ResponseEntity<TeamDTO>> partialUpdateTeam(
+    public ResponseEntity<TeamDTO> partialUpdateTeam(
         @PathVariable(value = "id", required = false) final Long id,
         @NotNull @RequestBody TeamDTO teamDTO
     ) throws URISyntaxException {
@@ -137,23 +118,16 @@ public class TeamResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        return teamRepository
-            .existsById(id)
-            .flatMap(exists -> {
-                if (!exists) {
-                    return Mono.error(new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound"));
-                }
+        if (!teamRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
-                Mono<TeamDTO> result = teamService.partialUpdate(teamDTO);
+        Optional<TeamDTO> result = teamService.partialUpdate(teamDTO);
 
-                return result
-                    .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
-                    .map(res ->
-                        ResponseEntity.ok()
-                            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, res.getId().toString()))
-                            .body(res)
-                    );
-            });
+        return ResponseUtil.wrapOrNotFound(
+            result,
+            HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, teamDTO.getId().toString())
+        );
     }
 
     /**
@@ -161,19 +135,9 @@ public class TeamResource {
      *
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of Teams in body.
      */
-    @GetMapping(value = "", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Mono<List<TeamDTO>> getAllTeams() {
+    @GetMapping("")
+    public List<TeamDTO> getAllTeams() {
         LOG.debug("REST request to get all Teams");
-        return teamService.findAll().collectList();
-    }
-
-    /**
-     * {@code GET  /teams} : get all the Teams as a stream.
-     * @return the {@link Flux} of Teams.
-     */
-    @GetMapping(value = "", produces = MediaType.APPLICATION_NDJSON_VALUE)
-    public Flux<TeamDTO> getAllTeamsAsStream() {
-        LOG.debug("REST request to get all Teams as a stream");
         return teamService.findAll();
     }
 
@@ -184,9 +148,9 @@ public class TeamResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the teamDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
-    public Mono<ResponseEntity<TeamDTO>> getTeam(@PathVariable("id") Long id) {
+    public ResponseEntity<TeamDTO> getTeam(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Team : {}", id);
-        Mono<TeamDTO> teamDTO = teamService.findOne(id);
+        Optional<TeamDTO> teamDTO = teamService.findOne(id);
         return ResponseUtil.wrapOrNotFound(teamDTO);
     }
 
@@ -197,16 +161,11 @@ public class TeamResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
-    public Mono<ResponseEntity<Void>> deleteTeam(@PathVariable("id") Long id) {
+    public ResponseEntity<Void> deleteTeam(@PathVariable("id") Long id) {
         LOG.debug("REST request to delete Team : {}", id);
-        return teamService
-            .delete(id)
-            .then(
-                Mono.just(
-                    ResponseEntity.noContent()
-                        .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
-                        .build()
-                )
-            );
+        teamService.delete(id);
+        return ResponseEntity.noContent()
+            .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
+            .build();
     }
 }

@@ -1,63 +1,40 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.SolutionLink;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
- * Spring Data R2DBC repository for the SolutionLink entity.
+ * Spring Data JPA repository for the SolutionLink entity.
  */
-@SuppressWarnings("unused")
 @Repository
-public interface SolutionLinkRepository extends ReactiveCrudRepository<SolutionLink, Long>, SolutionLinkRepositoryInternal {
-    @Override
-    Mono<SolutionLink> findOneWithEagerRelationships(Long id);
+public interface SolutionLinkRepository extends JpaRepository<SolutionLink, Long> {
+    default Optional<SolutionLink> findOneWithEagerRelationships(Long id) {
+        return this.findOneWithToOneRelationships(id);
+    }
 
-    @Override
-    Flux<SolutionLink> findAllWithEagerRelationships();
+    default List<SolutionLink> findAllWithEagerRelationships() {
+        return this.findAllWithToOneRelationships();
+    }
 
-    @Override
-    Flux<SolutionLink> findAllWithEagerRelationships(Pageable page);
+    default Page<SolutionLink> findAllWithEagerRelationships(Pageable pageable) {
+        return this.findAllWithToOneRelationships(pageable);
+    }
 
-    @Query("SELECT * FROM solution_link entity WHERE entity.solution_id = :id")
-    Flux<SolutionLink> findBySolution(Long id);
+    @Query(
+        value = "select solutionLink from SolutionLink solutionLink left join fetch solutionLink.solution",
+        countQuery = "select count(solutionLink) from SolutionLink solutionLink"
+    )
+    Page<SolutionLink> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("SELECT * FROM solution_link entity WHERE entity.solution_id IS NULL")
-    Flux<SolutionLink> findAllWhereSolutionIsNull();
+    @Query("select solutionLink from SolutionLink solutionLink left join fetch solutionLink.solution")
+    List<SolutionLink> findAllWithToOneRelationships();
 
-    @Override
-    <S extends SolutionLink> Mono<S> save(S entity);
-
-    @Override
-    Flux<SolutionLink> findAll();
-
-    @Override
-    Mono<SolutionLink> findById(Long id);
-
-    @Override
-    Mono<Void> deleteById(Long id);
-}
-
-interface SolutionLinkRepositoryInternal {
-    <S extends SolutionLink> Mono<S> save(S entity);
-
-    Flux<SolutionLink> findAllBy(Pageable pageable);
-
-    Flux<SolutionLink> findAll();
-
-    Mono<SolutionLink> findById(Long id);
-    // this is not supported at the moment because of https://github.com/jhipster/generator-jhipster/issues/18269
-    // Flux<SolutionLink> findAllBy(Pageable pageable, Criteria criteria);
-
-    Mono<SolutionLink> findOneWithEagerRelationships(Long id);
-
-    Flux<SolutionLink> findAllWithEagerRelationships();
-
-    Flux<SolutionLink> findAllWithEagerRelationships(Pageable page);
-
-    Mono<Void> deleteById(Long id);
+    @Query("select solutionLink from SolutionLink solutionLink left join fetch solutionLink.solution where solutionLink.id =:id")
+    Optional<SolutionLink> findOneWithToOneRelationships(@Param("id") Long id);
 }

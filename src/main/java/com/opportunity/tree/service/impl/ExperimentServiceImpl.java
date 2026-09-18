@@ -1,16 +1,17 @@
 package com.opportunity.tree.service.impl;
 
+import com.opportunity.tree.domain.Experiment;
 import com.opportunity.tree.repository.ExperimentRepository;
 import com.opportunity.tree.service.ExperimentService;
 import com.opportunity.tree.service.dto.ExperimentDTO;
 import com.opportunity.tree.service.mapper.ExperimentMapper;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Implementation for managing {@link com.opportunity.tree.domain.Experiment}.
@@ -31,19 +32,23 @@ public class ExperimentServiceImpl implements ExperimentService {
     }
 
     @Override
-    public Mono<ExperimentDTO> save(ExperimentDTO experimentDTO) {
+    public ExperimentDTO save(ExperimentDTO experimentDTO) {
         LOG.debug("Request to save Experiment : {}", experimentDTO);
-        return experimentRepository.save(experimentMapper.toEntity(experimentDTO)).map(experimentMapper::toDto);
+        Experiment experiment = experimentMapper.toEntity(experimentDTO);
+        experiment = experimentRepository.save(experiment);
+        return experimentMapper.toDto(experiment);
     }
 
     @Override
-    public Mono<ExperimentDTO> update(ExperimentDTO experimentDTO) {
+    public ExperimentDTO update(ExperimentDTO experimentDTO) {
         LOG.debug("Request to update Experiment : {}", experimentDTO);
-        return experimentRepository.save(experimentMapper.toEntity(experimentDTO)).map(experimentMapper::toDto);
+        Experiment experiment = experimentMapper.toEntity(experimentDTO);
+        experiment = experimentRepository.save(experiment);
+        return experimentMapper.toDto(experiment);
     }
 
     @Override
-    public Mono<ExperimentDTO> partialUpdate(ExperimentDTO experimentDTO) {
+    public Optional<ExperimentDTO> partialUpdate(ExperimentDTO experimentDTO) {
         LOG.debug("Request to partially update Experiment : {}", experimentDTO);
 
         return experimentRepository
@@ -53,35 +58,31 @@ public class ExperimentServiceImpl implements ExperimentService {
 
                 return existingExperiment;
             })
-            .flatMap(experimentRepository::save)
+            .map(experimentRepository::save)
             .map(experimentMapper::toDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Flux<ExperimentDTO> findAll(Pageable pageable) {
+    public Page<ExperimentDTO> findAll(Pageable pageable) {
         LOG.debug("Request to get all Experiments");
-        return experimentRepository.findAllBy(pageable).map(experimentMapper::toDto);
+        return experimentRepository.findAll(pageable).map(experimentMapper::toDto);
     }
 
-    public Flux<ExperimentDTO> findAllWithEagerRelationships(Pageable pageable) {
+    public Page<ExperimentDTO> findAllWithEagerRelationships(Pageable pageable) {
         return experimentRepository.findAllWithEagerRelationships(pageable).map(experimentMapper::toDto);
-    }
-
-    public Mono<Long> countAll() {
-        return experimentRepository.count();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Mono<ExperimentDTO> findOne(Long id) {
+    public Optional<ExperimentDTO> findOne(Long id) {
         LOG.debug("Request to get Experiment : {}", id);
         return experimentRepository.findOneWithEagerRelationships(id).map(experimentMapper::toDto);
     }
 
     @Override
-    public Mono<Void> delete(Long id) {
+    public void delete(Long id) {
         LOG.debug("Request to delete Experiment : {}", id);
-        return experimentRepository.deleteById(id);
+        experimentRepository.deleteById(id);
     }
 }

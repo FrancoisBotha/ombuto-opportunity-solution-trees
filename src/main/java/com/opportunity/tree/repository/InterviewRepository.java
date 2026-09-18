@@ -1,71 +1,45 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.Interview;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.r2dbc.repository.Query;
-import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
- * Spring Data R2DBC repository for the Interview entity.
+ * Spring Data JPA repository for the Interview entity.
  */
-@SuppressWarnings("unused")
 @Repository
-public interface InterviewRepository extends ReactiveCrudRepository<Interview, Long>, InterviewRepositoryInternal {
-    Flux<Interview> findAllBy(Pageable pageable);
+public interface InterviewRepository extends JpaRepository<Interview, Long>, JpaSpecificationExecutor<Interview> {
+    @Query("select interview from Interview interview where interview.interviewer.login = ?#{authentication.name}")
+    List<Interview> findByInterviewerIsCurrentUser();
 
-    @Override
-    Mono<Interview> findOneWithEagerRelationships(Long id);
+    default Optional<Interview> findOneWithEagerRelationships(Long id) {
+        return this.findOneWithToOneRelationships(id);
+    }
 
-    @Override
-    Flux<Interview> findAllWithEagerRelationships();
+    default List<Interview> findAllWithEagerRelationships() {
+        return this.findAllWithToOneRelationships();
+    }
 
-    @Override
-    Flux<Interview> findAllWithEagerRelationships(Pageable page);
+    default Page<Interview> findAllWithEagerRelationships(Pageable pageable) {
+        return this.findAllWithToOneRelationships(pageable);
+    }
 
-    @Query("SELECT * FROM interview entity WHERE entity.product_id = :id")
-    Flux<Interview> findByProduct(Long id);
+    @Query(
+        value = "select interview from Interview interview left join fetch interview.product left join fetch interview.interviewer",
+        countQuery = "select count(interview) from Interview interview"
+    )
+    Page<Interview> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("SELECT * FROM interview entity WHERE entity.product_id IS NULL")
-    Flux<Interview> findAllWhereProductIsNull();
+    @Query("select interview from Interview interview left join fetch interview.product left join fetch interview.interviewer")
+    List<Interview> findAllWithToOneRelationships();
 
-    @Query("SELECT * FROM interview entity WHERE entity.interviewer_id = :id")
-    Flux<Interview> findByInterviewer(Long id);
-
-    @Query("SELECT * FROM interview entity WHERE entity.interviewer_id IS NULL")
-    Flux<Interview> findAllWhereInterviewerIsNull();
-
-    @Override
-    <S extends Interview> Mono<S> save(S entity);
-
-    @Override
-    Flux<Interview> findAll();
-
-    @Override
-    Mono<Interview> findById(Long id);
-
-    @Override
-    Mono<Void> deleteById(Long id);
-}
-
-interface InterviewRepositoryInternal {
-    <S extends Interview> Mono<S> save(S entity);
-
-    Flux<Interview> findAllBy(Pageable pageable);
-
-    Flux<Interview> findAll();
-
-    Mono<Interview> findById(Long id);
-    // this is not supported at the moment because of https://github.com/jhipster/generator-jhipster/issues/18269
-    // Flux<Interview> findAllBy(Pageable pageable, Criteria criteria);
-
-    Mono<Interview> findOneWithEagerRelationships(Long id);
-
-    Flux<Interview> findAllWithEagerRelationships();
-
-    Flux<Interview> findAllWithEagerRelationships(Pageable page);
-
-    Mono<Void> deleteById(Long id);
+    @Query(
+        "select interview from Interview interview left join fetch interview.product left join fetch interview.interviewer where interview.id =:id"
+    )
+    Optional<Interview> findOneWithToOneRelationships(@Param("id") Long id);
 }

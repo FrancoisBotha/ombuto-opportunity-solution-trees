@@ -2,20 +2,22 @@ package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.opportunity.tree.domain.enumeration.OpportunityStatus;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Customer need, pain point or desire. Nested via parent to form sub-opportunities.
  */
-@Table("opportunity")
+@Entity
+@Table(name = "opportunity")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Opportunity implements Serializable {
 
@@ -23,71 +25,79 @@ public class Opportunity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 2, max = 200)
-    @Column("title")
+    @Column(name = "title", length = 200, nullable = false)
     private String title;
 
-    @Column("description")
+    @Lob
+    @Column(name = "description")
     private String description;
 
-    @NotNull(message = "must not be null")
-    @Column("status")
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     private OpportunityStatus status;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Min(value = 1)
     @Max(value = 5)
-    @Column("value")
+    @Column(name = "value", nullable = false)
     private Integer value;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Min(value = 1)
     @Max(value = 5)
-    @Column("complexity")
+    @Column(name = "complexity", nullable = false)
     private Integer complexity;
 
-    @NotNull(message = "must not be null")
-    @Column("sort_order")
+    @NotNull
+    @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
-    @NotNull(message = "must not be null")
-    @Column("created_date")
+    @NotNull
+    @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
-    @Column("last_modified_date")
+    @Column(name = "last_modified_date")
     private Instant lastModifiedDate;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     @JsonIgnoreProperties(value = { "product", "owner" }, allowSetters = true)
     private Outcome outcome;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "outcome", "parent", "owner", "interviews", "tags" }, allowSetters = true)
     private Opportunity parent;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(fetch = FetchType.LAZY)
     private User owner;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "rel_opportunity__interview",
+        joinColumns = @JoinColumn(name = "opportunity_id"),
+        inverseJoinColumns = @JoinColumn(name = "interview_id")
+    )
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "product", "interviewer", "opportunities" }, allowSetters = true)
     private Set<Interview> interviews = new HashSet<>();
 
-    @org.springframework.data.annotation.Transient
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "rel_opportunity__tag",
+        joinColumns = @JoinColumn(name = "opportunity_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "team", "opportunities", "solutions" }, allowSetters = true)
     private Set<Tag> tags = new HashSet<>();
-
-    @Column("outcome_id")
-    private Long outcomeId;
-
-    @Column("parent_id")
-    private Long parentId;
-
-    @Column("owner_id")
-    private String ownerId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -214,7 +224,6 @@ public class Opportunity implements Serializable {
 
     public void setOutcome(Outcome outcome) {
         this.outcome = outcome;
-        this.outcomeId = outcome != null ? outcome.getId() : null;
     }
 
     public Opportunity outcome(Outcome outcome) {
@@ -228,7 +237,6 @@ public class Opportunity implements Serializable {
 
     public void setParent(Opportunity opportunity) {
         this.parent = opportunity;
-        this.parentId = opportunity != null ? opportunity.getId() : null;
     }
 
     public Opportunity parent(Opportunity opportunity) {
@@ -242,7 +250,6 @@ public class Opportunity implements Serializable {
 
     public void setOwner(User user) {
         this.owner = user;
-        this.ownerId = user != null ? user.getId() : null;
     }
 
     public Opportunity owner(User user) {
@@ -294,30 +301,6 @@ public class Opportunity implements Serializable {
     public Opportunity removeTag(Tag tag) {
         this.tags.remove(tag);
         return this;
-    }
-
-    public Long getOutcomeId() {
-        return this.outcomeId;
-    }
-
-    public void setOutcomeId(Long outcome) {
-        this.outcomeId = outcome;
-    }
-
-    public Long getParentId() {
-        return this.parentId;
-    }
-
-    public void setParentId(Long opportunity) {
-        this.parentId = opportunity;
-    }
-
-    public String getOwnerId() {
-        return this.ownerId;
-    }
-
-    public void setOwnerId(String user) {
-        this.ownerId = user;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

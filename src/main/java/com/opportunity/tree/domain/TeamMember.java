@@ -1,18 +1,20 @@
 package com.opportunity.tree.domain;
 
 import com.opportunity.tree.domain.enumeration.TeamRole;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Join entity between JHipster User and Team, carrying a role.
  */
-@Table("team_member")
+@Entity
+@Table(name = "team_member")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class TeamMember implements Serializable {
 
@@ -20,28 +22,27 @@ public class TeamMember implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
-    @Column("role")
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
     private TeamRole role;
 
-    @NotNull(message = "must not be null")
-    @Column("joined_date")
+    @NotNull
+    @Column(name = "joined_date", nullable = false)
     private Instant joinedDate;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     private Team team;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     private User user;
-
-    @Column("team_id")
-    private Long teamId;
-
-    @Column("user_id")
-    private String userId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -90,7 +91,6 @@ public class TeamMember implements Serializable {
 
     public void setTeam(Team team) {
         this.team = team;
-        this.teamId = team != null ? team.getId() : null;
     }
 
     public TeamMember team(Team team) {
@@ -104,28 +104,11 @@ public class TeamMember implements Serializable {
 
     public void setUser(User user) {
         this.user = user;
-        this.userId = user != null ? user.getId() : null;
     }
 
     public TeamMember user(User user) {
         this.setUser(user);
         return this;
-    }
-
-    public Long getTeamId() {
-        return this.teamId;
-    }
-
-    public void setTeamId(Long team) {
-        this.teamId = team;
-    }
-
-    public String getUserId() {
-        return this.userId;
-    }
-
-    public void setUserId(String user) {
-        this.userId = user;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

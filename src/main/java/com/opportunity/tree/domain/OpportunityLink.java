@@ -2,17 +2,19 @@ package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.opportunity.tree.domain.enumeration.LinkType;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.relational.core.mapping.Column;
-import org.springframework.data.relational.core.mapping.Table;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
  * Named external URL attached to an opportunity, e.g. \"Customer Interview\" pointing at a call recording.
  */
-@Table("opportunity_link")
+@Entity
+@Table(name = "opportunity_link")
+@Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class OpportunityLink implements Serializable {
 
@@ -20,34 +22,35 @@ public class OpportunityLink implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column("id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sequenceGenerator")
+    @SequenceGenerator(name = "sequenceGenerator")
+    @Column(name = "id")
     private Long id;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(min = 1, max = 100)
-    @Column("name")
+    @Column(name = "name", length = 100, nullable = false)
     private String name;
 
-    @NotNull(message = "must not be null")
+    @NotNull
     @Size(max = 2000)
     @Pattern(regexp = "^https?:\\/\\/.+")
-    @Column("url")
+    @Column(name = "url", length = 2000, nullable = false)
     private String url;
 
-    @NotNull(message = "must not be null")
-    @Column("type")
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
     private LinkType type;
 
-    @NotNull(message = "must not be null")
-    @Column("sort_order")
+    @NotNull
+    @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
-    @org.springframework.data.annotation.Transient
+    @ManyToOne(optional = false)
+    @NotNull
     @JsonIgnoreProperties(value = { "outcome", "parent", "owner", "interviews", "tags" }, allowSetters = true)
     private Opportunity opportunity;
-
-    @Column("opportunity_id")
-    private Long opportunityId;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -122,20 +125,11 @@ public class OpportunityLink implements Serializable {
 
     public void setOpportunity(Opportunity opportunity) {
         this.opportunity = opportunity;
-        this.opportunityId = opportunity != null ? opportunity.getId() : null;
     }
 
     public OpportunityLink opportunity(Opportunity opportunity) {
         this.setOpportunity(opportunity);
         return this;
-    }
-
-    public Long getOpportunityId() {
-        return this.opportunityId;
-    }
-
-    public void setOpportunityId(Long opportunity) {
-        this.opportunityId = opportunity;
     }
 
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here

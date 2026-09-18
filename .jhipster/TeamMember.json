@@ -1,8 +1,8 @@
 {
   "annotations": {
-    "changelogDate": "20260918091111"
+    "changelogDate": "20260918101619"
   },
-  "applications": ["*"],
+  "applications": ["opportunitySolutionTree"],
   "documentation": "Join entity between JHipster User and Team, carrying a role.",
   "dto": "mapstruct",
   "fields": [

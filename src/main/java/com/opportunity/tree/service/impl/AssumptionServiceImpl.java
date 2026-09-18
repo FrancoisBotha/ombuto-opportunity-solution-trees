@@ -1,16 +1,20 @@
 package com.opportunity.tree.service.impl;
 
+import com.opportunity.tree.domain.Assumption;
 import com.opportunity.tree.repository.AssumptionRepository;
 import com.opportunity.tree.service.AssumptionService;
 import com.opportunity.tree.service.dto.AssumptionDTO;
 import com.opportunity.tree.service.mapper.AssumptionMapper;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Service Implementation for managing {@link com.opportunity.tree.domain.Assumption}.
@@ -31,19 +35,23 @@ public class AssumptionServiceImpl implements AssumptionService {
     }
 
     @Override
-    public Mono<AssumptionDTO> save(AssumptionDTO assumptionDTO) {
+    public AssumptionDTO save(AssumptionDTO assumptionDTO) {
         LOG.debug("Request to save Assumption : {}", assumptionDTO);
-        return assumptionRepository.save(assumptionMapper.toEntity(assumptionDTO)).map(assumptionMapper::toDto);
+        Assumption assumption = assumptionMapper.toEntity(assumptionDTO);
+        assumption = assumptionRepository.save(assumption);
+        return assumptionMapper.toDto(assumption);
     }
 
     @Override
-    public Mono<AssumptionDTO> update(AssumptionDTO assumptionDTO) {
+    public AssumptionDTO update(AssumptionDTO assumptionDTO) {
         LOG.debug("Request to update Assumption : {}", assumptionDTO);
-        return assumptionRepository.save(assumptionMapper.toEntity(assumptionDTO)).map(assumptionMapper::toDto);
+        Assumption assumption = assumptionMapper.toEntity(assumptionDTO);
+        assumption = assumptionRepository.save(assumption);
+        return assumptionMapper.toDto(assumption);
     }
 
     @Override
-    public Mono<AssumptionDTO> partialUpdate(AssumptionDTO assumptionDTO) {
+    public Optional<AssumptionDTO> partialUpdate(AssumptionDTO assumptionDTO) {
         LOG.debug("Request to partially update Assumption : {}", assumptionDTO);
 
         return assumptionRepository
@@ -53,35 +61,31 @@ public class AssumptionServiceImpl implements AssumptionService {
 
                 return existingAssumption;
             })
-            .flatMap(assumptionRepository::save)
+            .map(assumptionRepository::save)
             .map(assumptionMapper::toDto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Flux<AssumptionDTO> findAll() {
+    public List<AssumptionDTO> findAll() {
         LOG.debug("Request to get all Assumptions");
-        return assumptionRepository.findAll().map(assumptionMapper::toDto);
+        return assumptionRepository.findAll().stream().map(assumptionMapper::toDto).collect(Collectors.toCollection(LinkedList::new));
     }
 
-    public Flux<AssumptionDTO> findAllWithEagerRelationships(Pageable pageable) {
+    public Page<AssumptionDTO> findAllWithEagerRelationships(Pageable pageable) {
         return assumptionRepository.findAllWithEagerRelationships(pageable).map(assumptionMapper::toDto);
-    }
-
-    public Mono<Long> countAll() {
-        return assumptionRepository.count();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Mono<AssumptionDTO> findOne(Long id) {
+    public Optional<AssumptionDTO> findOne(Long id) {
         LOG.debug("Request to get Assumption : {}", id);
         return assumptionRepository.findOneWithEagerRelationships(id).map(assumptionMapper::toDto);
     }
 
     @Override
-    public Mono<Void> delete(Long id) {
+    public void delete(Long id) {
         LOG.debug("Request to delete Assumption : {}", id);
-        return assumptionRepository.deleteById(id);
+        assumptionRepository.deleteById(id);
     }
 }
