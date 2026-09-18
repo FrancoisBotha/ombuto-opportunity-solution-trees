@@ -72,6 +72,7 @@ export default defineComponent({
 
     const currentPath = computed(() => router.currentRoute.value.path);
     const isTeamsActive = computed(() => currentPath.value === '/teams' || currentPath.value.startsWith('/teams/'));
+    const isTreesActive = computed(() => currentPath.value === '/trees' || currentPath.value.startsWith('/trees/'));
 
     const isLinkActive = (link: SidebarLink) =>
       link.prefix ? currentPath.value === link.path || currentPath.value.startsWith(`${link.path}/`) : currentPath.value === link.path;
@@ -122,6 +123,7 @@ export default defineComponent({
       authenticated,
       currentPath,
       isTeamsActive,
+      isTreesActive,
       groups: [treeGroup, discoveryGroup],
       isLinkActive,
       groupHasActive,

@@ -23,6 +23,15 @@
         <span class="menu-tooltip">Teams</span>
       </li>
 
+      <!-- Trees (signed-in users) -->
+      <li v-if="authenticated" :class="{ active: isTreesActive }" data-cy="treesMenu">
+        <router-link to="/trees" class="menu-item">
+          <font-awesome-icon class="va-icon" icon="sitemap" />
+          <span class="nav-item">Trees</span>
+        </router-link>
+        <span class="menu-tooltip">Trees</span>
+      </li>
+
       <!-- Entity groups -->
       <template v-for="group in groups" :key="group.key">
         <li class="section" :class="{ active: !openGroups[group.key] && groupHasActive(group) }">
