@@ -4,11 +4,13 @@ import { useRoute } from 'vue-router';
 import { useAlertService } from '@/shared/alert/alert.service';
 
 import type { IMyTeam, IUpdateTeamRequest } from './my-team.model';
+import TeamMembers from './team-members.vue';
 import TeamsService from './teams.service';
 import { useTeamsStore } from './teams.store';
 
 export default defineComponent({
   name: 'TeamDetail',
+  components: { TeamMembers },
   setup() {
     const teamsService = inject('teamsService', () => new TeamsService(), true);
     const alertService = inject('alertService', () => useAlertService(), true);

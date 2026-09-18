@@ -47,6 +47,9 @@
           </button>
         </div>
       </form>
+
+      <hr class="my-4" />
+      <team-members :team-id="teamId" />
     </div>
   </div>
 </template>

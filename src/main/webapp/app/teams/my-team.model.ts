@@ -19,3 +19,28 @@ export interface IUpdateTeamRequest {
   name: string;
   description?: string | null;
 }
+
+export interface ITeamMember {
+  id: number;
+  userId: string;
+  login: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  role: TeamRole;
+  joinedDate?: string | null;
+}
+
+export interface IUserSearchResult {
+  id: string;
+  login: string;
+  name: string;
+}
+
+export interface IAddTeamMemberRequest {
+  userId: string;
+  role: TeamRole;
+}
+
+export interface IChangeTeamMemberRoleRequest {
+  role: TeamRole;
+}
