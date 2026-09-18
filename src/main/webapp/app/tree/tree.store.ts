@@ -26,6 +26,9 @@ export interface TreeState {
   loaded: boolean;
   error: TreeLoadError | null;
   errorMessage: string | null;
+  selectedNodeType: TreeNodeType | null;
+  selectedNodeId: number | null;
+  focusedProductId: number | null;
 }
 
 const walkOpportunities = (opps: IOpportunityTreeNode[], parent: TreeNode | ITeamTree, index: Map<string, NodeIndexEntry>): void => {
@@ -105,6 +108,9 @@ export const useTreeStore = defineStore('tree', {
     loaded: false,
     error: null,
     errorMessage: null,
+    selectedNodeType: null,
+    selectedNodeId: null,
+    focusedProductId: null,
   }),
   getters: {
     canEdit: state => (state.tree ? !!state.tree.canEdit : false),
@@ -180,6 +186,30 @@ export const useTreeStore = defineStore('tree', {
       this.loaded = false;
       this.error = null;
       this.errorMessage = null;
+      this.selectedNodeType = null;
+      this.selectedNodeId = null;
+      this.focusedProductId = null;
+    },
+    selectNode(type: TreeNodeType, id: number) {
+      this.selectedNodeType = type;
+      this.selectedNodeId = id;
+    },
+    clearSelection() {
+      this.selectedNodeType = null;
+      this.selectedNodeId = null;
+    },
+    focusProduct(productId: number) {
+      this.focusedProductId = productId;
+      if (this.selectedNodeType && this.selectedNodeId != null) {
+        // Clear a selection that no longer sits under the focused product.
+        const idx = buildIndex(this.tree);
+        if (!idx.get(key(this.selectedNodeType, this.selectedNodeId))) {
+          this.clearSelection();
+        }
+      }
+    },
+    clearFocus() {
+      this.focusedProductId = null;
     },
     /** Insert a node under the given parent (append last). */
     insertNode(parentType: TreeNodeType | 'team', parentId: number | null, childType: TreeNodeType, child: TreeNode): boolean {
