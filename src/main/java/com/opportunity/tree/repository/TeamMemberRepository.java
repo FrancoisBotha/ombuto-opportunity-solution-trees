@@ -17,6 +17,8 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     @Query("select teamMember from TeamMember teamMember where teamMember.user.login = ?#{authentication.name}")
     List<TeamMember> findByUserIsCurrentUser();
 
+    List<TeamMember> findAllByUserLogin(String login);
+
     default Optional<TeamMember> findOneWithEagerRelationships(Long id) {
         return this.findOneWithToOneRelationships(id);
     }
