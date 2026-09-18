@@ -1,0 +1,21 @@
+// Layout
+$navbar-height: 2.5rem;
+$sidebar-collapsed-width: 3.25rem;
+$sidebar-expanded-width: 230px;
+$sidebar-transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+// Navbar
+$navbar-bg-color: #2c3531;
+$navbar-fg-color: #d1e8e2;
+
+// Sidebar menu
+$sidebar-menu-bg-color: #263029;
+$sidebar-menu-fg-color: #c5d6d0;
+$sidebar-menu-muted-color: #7f958c;
+$sidebar-menu-hover-bg-color: rgba(255, 255, 255, 0.06);
+$sidebar-menu-active-bg-color: rgba(55, 164, 115, 0.18);
+$sidebar-menu-accent-color: #37a473;
+$sidebar-menu-tooltip-bg-color: #161b18;
+
+// Main content
+$main-content-bg-color: rgb(247, 246, 250);

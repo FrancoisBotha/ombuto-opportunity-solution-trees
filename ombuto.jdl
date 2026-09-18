@@ -1,0 +1,233 @@
+/*
+ * Ombuto Opportunity Solution Tree
+ * Collaborative (WebSocket) OST tool following Teresa Torres' continuous discovery model.
+ *
+ * Tree shape:  Product -> Outcome -> Opportunity (nested) -> Solution -> Assumption -> Experiment
+ */
+
+/* ------------------------------------------------------------------ */
+/* Enums                                                               */
+/* ------------------------------------------------------------------ */
+
+enum TeamRole {
+  OWNER, EDITOR, VIEWER
+}
+
+enum OutcomeStatus {
+  DRAFT, ACTIVE, ACHIEVED, ABANDONED
+}
+
+enum OpportunityStatus {
+  IDENTIFIED, EXPLORING, PRIORITISED, IN_PROGRESS, ADDRESSED, PARKED, DISCARDED
+}
+
+enum SolutionStatus {
+  IDEA, ASSUMPTION_MAPPING, TESTING, VALIDATED, INVALIDATED, SHIPPED, DROPPED
+}
+
+enum AssumptionCategory {
+  DESIRABILITY, VIABILITY, FEASIBILITY, USABILITY, ETHICAL
+}
+
+enum ExperimentStatus {
+  PLANNED, RUNNING, COMPLETED, CANCELLED
+}
+
+enum ExperimentResult {
+  SUPPORTED, REFUTED, INCONCLUSIVE
+}
+
+enum LinkType {
+  PROTOTYPE, TICKET, DOCUMENT, INTERVIEW, ANALYTICS, DESIGN, OTHER
+}
+
+/* ------------------------------------------------------------------ */
+/* Organisation                                                        */
+/* ------------------------------------------------------------------ */
+
+entity Team {
+  name String required minlength(2) maxlength(100)
+  description TextBlob
+  createdDate Instant required
+}
+
+/** Join entity between JHipster User and Team, carrying a role. */
+entity TeamMember {
+  role TeamRole required
+  joinedDate Instant required
+}
+
+entity Product {
+  name String required minlength(2) maxlength(100)
+  description TextBlob
+  vision TextBlob
+  archived Boolean required
+  createdDate Instant required
+}
+
+/* ------------------------------------------------------------------ */
+/* The tree                                                            */
+/* ------------------------------------------------------------------ */
+
+/** Desired outcome at the top of the tree, e.g. "Increase weekly active users". */
+entity Outcome {
+  title String required minlength(2) maxlength(200)
+  description TextBlob
+  metric String maxlength(200)
+  targetValue String maxlength(100)
+  currentValue String maxlength(100)
+  status OutcomeStatus required
+  startDate LocalDate
+  targetDate LocalDate
+  sortOrder Integer required
+  createdDate Instant required
+  lastModifiedDate Instant
+}
+
+/** Customer need, pain point or desire. Nested via parent to form sub-opportunities. */
+entity Opportunity {
+  title String required minlength(2) maxlength(200)
+  description TextBlob
+  status OpportunityStatus required
+  value Integer required min(1) max(5)
+  complexity Integer required min(1) max(5)
+  sortOrder Integer required
+  createdDate Instant required
+  lastModifiedDate Instant
+}
+
+/** Named external URL attached to an opportunity, e.g. "Customer Interview" pointing at a call recording. */
+entity OpportunityLink {
+  name String required minlength(1) maxlength(100)
+  url String required maxlength(2000) pattern(/^https?:\/\/.+/)
+  type LinkType required
+  sortOrder Integer required
+}
+
+entity Solution {
+  title String required minlength(2) maxlength(200)
+  description TextBlob
+  status SolutionStatus required
+  effort Integer min(1) max(5)
+  sortOrder Integer required
+  createdDate Instant required
+  lastModifiedDate Instant
+}
+
+/** Named external URL attached to a solution (prototype, ticket, design). */
+entity SolutionLink {
+  name String required minlength(1) maxlength(100)
+  url String required maxlength(2000) pattern(/^https?:\/\/.+/)
+  type LinkType required
+  sortOrder Integer required
+}
+
+/* ------------------------------------------------------------------ */
+/* Discovery                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Something that must be true for a solution to work (assumption mapping). */
+entity Assumption {
+  statement String required minlength(2) maxlength(500)
+  category AssumptionCategory required
+  importance Integer required min(1) max(5)
+  evidence Integer required min(1) max(5)
+  validated Boolean
+  createdDate Instant required
+}
+
+/** A test run against one or more assumptions. */
+entity Experiment {
+  title String required minlength(2) maxlength(200)
+  hypothesis TextBlob
+  method String maxlength(200)
+  successCriteria TextBlob
+  status ExperimentStatus required
+  result ExperimentResult
+  learnings TextBlob
+  startDate LocalDate
+  endDate LocalDate
+  createdDate Instant required
+}
+
+/** Weekly customer interview or other evidence source; opportunities are mined from these. */
+entity Interview {
+  title String required minlength(2) maxlength(200)
+  participant String maxlength(200)
+  interviewDate LocalDate required
+  notes TextBlob
+  recordingUrl String maxlength(2000)
+  createdDate Instant required
+}
+
+/* ------------------------------------------------------------------ */
+/* Collaboration                                                       */
+/* ------------------------------------------------------------------ */
+
+/** Threaded comment on any tree node. Exactly one of the node relationships is set. */
+entity Comment {
+  body TextBlob required
+  createdDate Instant required
+  editedDate Instant
+}
+
+/** Tag for cross-cutting labels (persona, segment, theme). */
+entity Tag {
+  name String required minlength(1) maxlength(50)
+  colour String maxlength(7) pattern(/^#[0-9A-Fa-f]{6}$/)
+}
+
+/* ------------------------------------------------------------------ */
+/* Relationships                                                       */
+/* ------------------------------------------------------------------ */
+
+relationship ManyToOne {
+  TeamMember{team(name) required} to Team
+  TeamMember{user(login) required} to User with builtInEntity
+
+  Product{team(name) required} to Team
+
+  Outcome{product(name) required} to Product
+  Outcome{owner(login)} to User with builtInEntity
+
+  Opportunity{outcome(title) required} to Outcome
+  Opportunity{parent(title)} to Opportunity
+  Opportunity{owner(login)} to User with builtInEntity
+
+  OpportunityLink{opportunity(title) required} to Opportunity
+
+  Solution{opportunity(title) required} to Opportunity
+  Solution{owner(login)} to User with builtInEntity
+
+  SolutionLink{solution(title) required} to Solution
+
+  Assumption{solution(title) required} to Solution
+
+  Experiment{solution(title) required} to Solution
+
+  Interview{product(name) required} to Product
+  Interview{interviewer(login)} to User with builtInEntity
+
+  Comment{author(login) required} to User with builtInEntity
+  Comment{parent} to Comment
+  Comment{outcome(title)} to Outcome
+  Comment{opportunity(title)} to Opportunity
+  Comment{solution(title)} to Solution
+
+  Tag{team(name) required} to Team
+}
+
+relationship ManyToMany {
+  Experiment{assumption(statement)} to Assumption{experiment(title)}
+  Opportunity{interview(title)} to Interview{opportunity(title)}
+  Opportunity{tag(name)} to Tag{opportunity(title)}
+  Solution{tag(name)} to Tag{solution(title)}
+}
+
+/* ------------------------------------------------------------------ */
+/* Options                                                             */
+/* ------------------------------------------------------------------ */
+
+dto * with mapstruct
+service * with serviceImpl
+paginate Opportunity, Solution, Interview, Comment, Experiment with pagination

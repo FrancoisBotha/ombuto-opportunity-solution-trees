@@ -1,0 +1,67 @@
+{
+  "annotations": {
+    "changelogDate": "20260918091118"
+  },
+  "applications": ["*"],
+  "documentation": "Something that must be true for a solution to work (assumption mapping).",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "statement",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "500",
+      "fieldValidateRulesMinlength": "2"
+    },
+    {
+      "fieldName": "category",
+      "fieldType": "AssumptionCategory",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "DESIRABILITY,VIABILITY,FEASIBILITY,USABILITY,ETHICAL"
+    },
+    {
+      "fieldName": "importance",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min", "max"],
+      "fieldValidateRulesMax": "5",
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "fieldName": "evidence",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min", "max"],
+      "fieldValidateRulesMax": "5",
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "fieldName": "validated",
+      "fieldType": "Boolean"
+    },
+    {
+      "fieldName": "createdDate",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "Assumption",
+  "relationships": [
+    {
+      "otherEntityField": "title",
+      "otherEntityName": "solution",
+      "relationshipName": "solution",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    },
+    {
+      "otherEntityField": "title",
+      "otherEntityName": "experiment",
+      "otherEntityRelationshipName": "assumption",
+      "relationshipName": "experiment",
+      "relationshipSide": "right",
+      "relationshipType": "many-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

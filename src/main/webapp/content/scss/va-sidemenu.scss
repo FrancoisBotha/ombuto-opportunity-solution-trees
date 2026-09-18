@@ -1,0 +1,273 @@
+/* ==========================================================================
+Collapsible sidebar menu + main content layout
+========================================================================== */
+
+@import 'va-variables';
+
+$row-height: 2.5rem;
+$row-radius: 0.5rem;
+$row-gutter: 0.4rem;
+
+.sidebar {
+  box-sizing: border-box;
+  position: fixed;
+  top: $navbar-height;
+  left: 0;
+  height: calc(100vh - #{$navbar-height});
+  width: $sidebar-collapsed-width;
+  background-color: $sidebar-menu-bg-color;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  transition: $sidebar-transition;
+  z-index: 1020;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+  }
+
+  &.active {
+    width: $sidebar-expanded-width;
+  }
+
+  .menu-toggle-button {
+    height: $row-height;
+    margin: $row-gutter $row-gutter 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(#{$sidebar-collapsed-width} - #{$row-gutter * 2});
+    color: $sidebar-menu-muted-color;
+    border-radius: $row-radius;
+    cursor: pointer;
+    transition:
+      color 0.15s,
+      background-color 0.15s;
+
+    &:hover {
+      color: #fff;
+      background-color: $sidebar-menu-hover-bg-color;
+    }
+  }
+
+  ul {
+    padding: 0 $row-gutter;
+    margin: 0;
+  }
+
+  li {
+    position: relative;
+    list-style-type: none;
+    margin: 1px 0;
+    border-radius: $row-radius;
+    line-height: $row-height;
+    transition: background-color 0.15s;
+
+    &:hover {
+      background-color: $sidebar-menu-hover-bg-color;
+    }
+
+    &.active {
+      background-color: $sidebar-menu-active-bg-color;
+
+      .menu-item,
+      .menu-item-parent {
+        color: #fff;
+      }
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0.55rem;
+        bottom: 0.55rem;
+        width: 3px;
+        border-radius: 0 2px 2px 0;
+        background-color: $sidebar-menu-accent-color;
+      }
+    }
+
+    /* Group headers */
+    &.section {
+      margin-top: 0.6rem;
+
+      .menu-item-parent {
+        color: $sidebar-menu-muted-color;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      &:hover .menu-item-parent {
+        color: $sidebar-menu-fg-color;
+      }
+    }
+  }
+
+  .menu-item,
+  .menu-item-parent {
+    color: $sidebar-menu-fg-color;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    height: $row-height;
+    width: 100%;
+    cursor: pointer;
+    transition: color 0.15s;
+
+    &:hover {
+      color: #fff;
+    }
+  }
+
+  .va-icon {
+    flex: 0 0 auto;
+    width: calc(#{$sidebar-collapsed-width} - #{$row-gutter * 2});
+    text-align: center;
+    font-size: 0.95rem;
+    opacity: 0.9;
+  }
+
+  /* Group header icons stay normal size; the small label is what shrinks */
+  li.section .va-icon {
+    font-size: 0.85rem;
+  }
+
+  .menu-item-child .va-icon {
+    font-size: 0.85rem;
+    opacity: 0.75;
+  }
+
+  /* Labels: hidden when collapsed, fade in when expanded */
+  .nav-item {
+    display: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 0.5rem;
+  }
+
+  &.active .nav-item {
+    display: block;
+    animation: va-fade-in 0.2s ease 0.05s both;
+  }
+
+  /* Chevron on group headers: only when expanded */
+  .va-icon-toggle {
+    display: none;
+  }
+
+  &.active .va-icon-toggle {
+    display: block;
+    margin-left: auto;
+    margin-right: 0.6rem;
+    font-size: 0.65rem;
+    opacity: 0.6;
+  }
+
+  /* Hover tooltip when collapsed (not Bootstrap's .tooltip) */
+  .menu-tooltip {
+    position: absolute;
+    left: calc(#{$sidebar-collapsed-width} - #{$row-gutter} + 0.5rem);
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    color: #fff;
+    background-color: $sidebar-menu-tooltip-bg-color;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    border-radius: 0.4rem;
+    padding: 0 0.7rem;
+    font-size: 0.8rem;
+    line-height: 1.8rem;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity 0.15s,
+      transform 0.15s;
+    white-space: nowrap;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: -4px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 4px solid transparent;
+      border-right-color: $sidebar-menu-tooltip-bg-color;
+      border-left: 0;
+    }
+  }
+
+  li:hover .menu-tooltip {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  &.active .menu-tooltip {
+    display: none;
+  }
+}
+
+@keyframes va-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Main content area shifts with the sidebar */
+.main-content {
+  position: relative;
+  top: $navbar-height;
+  margin-left: $sidebar-collapsed-width;
+  width: calc(100% - #{$sidebar-collapsed-width});
+  min-height: calc(100vh - #{$navbar-height});
+  transition:
+    margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.expanded {
+    margin-left: $sidebar-expanded-width;
+    width: calc(100% - #{$sidebar-expanded-width});
+  }
+
+  &.no-sidebar {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+.va-container {
+  position: relative;
+  padding: 1.5rem;
+  background-color: $main-content-bg-color;
+  min-height: calc(100vh - #{$navbar-height});
+  display: flex;
+  flex-direction: column;
+}
+
+/* Slide transition for collapsible groups */
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  opacity: 0;
+  transform: translateY(-0.4rem);
+}

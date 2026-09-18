@@ -1,0 +1,43 @@
+{
+  "annotations": {
+    "changelogDate": "20260918091111"
+  },
+  "applications": ["*"],
+  "documentation": "Join entity between JHipster User and Team, carrying a role.",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "role",
+      "fieldType": "TeamRole",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "OWNER,EDITOR,VIEWER"
+    },
+    {
+      "fieldName": "joinedDate",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "TeamMember",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "team",
+      "relationshipName": "team",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    },
+    {
+      "otherEntityField": "login",
+      "otherEntityName": "user",
+      "relationshipName": "user",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required",
+      "relationshipWithBuiltInEntity": true
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

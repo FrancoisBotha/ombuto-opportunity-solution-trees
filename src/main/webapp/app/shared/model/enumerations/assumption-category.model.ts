@@ -1,0 +1,11 @@
+export enum AssumptionCategory {
+  DESIRABILITY = 'DESIRABILITY',
+
+  VIABILITY = 'VIABILITY',
+
+  FEASIBILITY = 'FEASIBILITY',
+
+  USABILITY = 'USABILITY',
+
+  ETHICAL = 'ETHICAL',
+}

@@ -1,0 +1,15 @@
+export enum LinkType {
+  PROTOTYPE = 'PROTOTYPE',
+
+  TICKET = 'TICKET',
+
+  DOCUMENT = 'DOCUMENT',
+
+  INTERVIEW = 'INTERVIEW',
+
+  ANALYTICS = 'ANALYTICS',
+
+  DESIGN = 'DESIGN',
+
+  OTHER = 'OTHER',
+}

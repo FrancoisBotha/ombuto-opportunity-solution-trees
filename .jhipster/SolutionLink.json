@@ -1,0 +1,48 @@
+{
+  "annotations": {
+    "changelogDate": "20260918091117"
+  },
+  "applications": ["*"],
+  "documentation": "Named external URL attached to a solution (prototype, ticket, design).",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "100",
+      "fieldValidateRulesMinlength": "1"
+    },
+    {
+      "fieldName": "url",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "maxlength", "pattern"],
+      "fieldValidateRulesMaxlength": "2000",
+      "fieldValidateRulesPattern": "^https?:\\/\\/.+"
+    },
+    {
+      "fieldName": "type",
+      "fieldType": "LinkType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "PROTOTYPE,TICKET,DOCUMENT,INTERVIEW,ANALYTICS,DESIGN,OTHER"
+    },
+    {
+      "fieldName": "sortOrder",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "SolutionLink",
+  "relationships": [
+    {
+      "otherEntityField": "title",
+      "otherEntityName": "solution",
+      "relationshipName": "solution",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

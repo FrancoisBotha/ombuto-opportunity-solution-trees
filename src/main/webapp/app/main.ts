@@ -17,6 +17,8 @@ import App from './app.vue';
 import router from './router';
 
 import '../content/scss/global.scss';
+import '../content/scss/va-navbar.scss';
+import '../content/scss/va-sidemenu.scss';
 import '../content/scss/vendor.scss';
 
 const pinia = createPinia();

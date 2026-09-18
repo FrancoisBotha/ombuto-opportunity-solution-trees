@@ -1,0 +1,55 @@
+package com.opportunity.tree.service.mapper;
+
+import com.opportunity.tree.domain.Comment;
+import com.opportunity.tree.domain.Opportunity;
+import com.opportunity.tree.domain.Outcome;
+import com.opportunity.tree.domain.Solution;
+import com.opportunity.tree.domain.User;
+import com.opportunity.tree.service.dto.CommentDTO;
+import com.opportunity.tree.service.dto.OpportunityDTO;
+import com.opportunity.tree.service.dto.OutcomeDTO;
+import com.opportunity.tree.service.dto.SolutionDTO;
+import com.opportunity.tree.service.dto.UserDTO;
+import org.mapstruct.*;
+
+/**
+ * Mapper for the entity {@link Comment} and its DTO {@link CommentDTO}.
+ */
+@Mapper(componentModel = "spring")
+public interface CommentMapper extends EntityMapper<CommentDTO, Comment> {
+    @Mapping(target = "author", source = "author", qualifiedByName = "userLogin")
+    @Mapping(target = "parent", source = "parent", qualifiedByName = "commentId")
+    @Mapping(target = "outcome", source = "outcome", qualifiedByName = "outcomeTitle")
+    @Mapping(target = "opportunity", source = "opportunity", qualifiedByName = "opportunityTitle")
+    @Mapping(target = "solution", source = "solution", qualifiedByName = "solutionTitle")
+    CommentDTO toDto(Comment s);
+
+    @Named("userLogin")
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "id", source = "id")
+    @Mapping(target = "login", source = "login")
+    UserDTO toDtoUserLogin(User user);
+
+    @Named("commentId")
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "id", source = "id")
+    CommentDTO toDtoCommentId(Comment comment);
+
+    @Named("outcomeTitle")
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "id", source = "id")
+    @Mapping(target = "title", source = "title")
+    OutcomeDTO toDtoOutcomeTitle(Outcome outcome);
+
+    @Named("opportunityTitle")
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "id", source = "id")
+    @Mapping(target = "title", source = "title")
+    OpportunityDTO toDtoOpportunityTitle(Opportunity opportunity);
+
+    @Named("solutionTitle")
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "id", source = "id")
+    @Mapping(target = "title", source = "title")
+    SolutionDTO toDtoSolutionTitle(Solution solution);
+}

@@ -1,0 +1,31 @@
+id;title;description;status;value;complexity;sort_order;created_date;last_modified_date;outcome_id
+1;cop;../fake-data/blob/hipster.txt;IN_PROGRESS;3;3;31836;2026-09-17T13:27:32;2026-09-17T13:36:47;1
+2;yuck carnival;../fake-data/blob/hipster.txt;PRIORITISED;5;4;10918;2026-09-17T17:03:34;2026-09-18T05:48:20;2
+3;er as;../fake-data/blob/hipster.txt;ADDRESSED;2;3;10922;2026-09-17T17:35:28;2026-09-17T19:09:45;3
+4;catch;../fake-data/blob/hipster.txt;PARKED;2;4;22691;2026-09-17T23:45:23;2026-09-17T22:53:23;4
+5;steel which unearth;../fake-data/blob/hipster.txt;IN_PROGRESS;3;4;1796;2026-09-17T16:36:31;2026-09-18T03:02:44;5
+6;fluff once industrialize;../fake-data/blob/hipster.txt;ADDRESSED;4;1;18996;2026-09-17T15:35:21;2026-09-17T09:36:07;6
+7;yuck;../fake-data/blob/hipster.txt;ADDRESSED;1;1;6454;2026-09-17T13:48:17;2026-09-18T00:20:44;7
+8;whereas indeed brr;../fake-data/blob/hipster.txt;IDENTIFIED;3;5;24775;2026-09-17T17:44:25;2026-09-17T11:46:05;8
+9;into oof colorful;../fake-data/blob/hipster.txt;PRIORITISED;2;2;9219;2026-09-18T03:07:22;2026-09-18T03:24:10;9
+10;loyally;../fake-data/blob/hipster.txt;DISCARDED;3;4;14834;2026-09-17T23:04:52;2026-09-17T16:39:06;10
+11;afore;../fake-data/blob/hipster.txt;PARKED;3;1;15750;2026-09-17T14:19:25;2026-09-18T08:53:46;11
+12;separate gee;../fake-data/blob/hipster.txt;IDENTIFIED;3;2;8762;2026-09-18T06:28:57;2026-09-18T06:34:04;12
+13;ectoderm bleakly;../fake-data/blob/hipster.txt;EXPLORING;4;1;5750;2026-09-17T10:53:32;2026-09-17T11:02:27;13
+14;noisily fold;../fake-data/blob/hipster.txt;IN_PROGRESS;5;3;7340;2026-09-18T07:22:18;2026-09-18T08:20:09;14
+15;at well-groomed singe;../fake-data/blob/hipster.txt;DISCARDED;2;2;12445;2026-09-18T07:53:56;2026-09-18T08:39:17;15
+16;carefully jeopardise well-worn;../fake-data/blob/hipster.txt;EXPLORING;4;4;29417;2026-09-18T07:58:19;2026-09-17T11:20:17;16
+17;yowza;../fake-data/blob/hipster.txt;PRIORITISED;1;5;31675;2026-09-18T00:02:42;2026-09-17T14:11:16;17
+18;axe;../fake-data/blob/hipster.txt;PARKED;3;5;14161;2026-09-17T09:58:33;2026-09-17T23:55:56;18
+19;ick;../fake-data/blob/hipster.txt;IN_PROGRESS;2;3;26577;2026-09-18T00:32:59;2026-09-17T12:30:59;19
+20;ouch;../fake-data/blob/hipster.txt;ADDRESSED;1;2;11538;2026-09-18T03:38:38;2026-09-17T19:56:20;20
+21;handsome;../fake-data/blob/hipster.txt;DISCARDED;5;1;5777;2026-09-17T16:37:22;2026-09-18T07:59:17;21
+22;because carefree;../fake-data/blob/hipster.txt;DISCARDED;3;2;17066;2026-09-18T05:37:36;2026-09-18T01:05:53;22
+23;circle;../fake-data/blob/hipster.txt;PARKED;3;1;13230;2026-09-17T09:11:28;2026-09-17T19:34:17;23
+24;or likewise;../fake-data/blob/hipster.txt;IDENTIFIED;5;5;12636;2026-09-17T11:52:40;2026-09-18T04:38:05;24
+25;awkwardly sorrowful;../fake-data/blob/hipster.txt;PRIORITISED;4;2;29473;2026-09-18T05:22:10;2026-09-18T02:12:37;25
+26;gadzooks overburden so;../fake-data/blob/hipster.txt;PRIORITISED;2;5;30519;2026-09-18T07:57:02;2026-09-17T15:52:08;26
+27;catalyze inasmuch an;../fake-data/blob/hipster.txt;PRIORITISED;3;4;16452;2026-09-18T08:09:11;2026-09-17T18:07:13;27
+28;cardboard mature necklace;../fake-data/blob/hipster.txt;DISCARDED;2;3;9128;2026-09-17T23:09:18;2026-09-17T19:42:12;28
+29;croon fuss fully;../fake-data/blob/hipster.txt;PRIORITISED;1;2;9287;2026-09-17T15:11:38;2026-09-18T08:24:24;29
+30;ew through than;../fake-data/blob/hipster.txt;IN_PROGRESS;1;2;3322;2026-09-17T15:39:36;2026-09-18T06:59:05;30

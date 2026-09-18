@@ -1,0 +1,53 @@
+{
+  "annotations": {
+    "changelogDate": "20260918091122"
+  },
+  "applications": ["*"],
+  "documentation": "Tag for cross-cutting labels (persona, segment, theme).",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "50",
+      "fieldValidateRulesMinlength": "1"
+    },
+    {
+      "fieldName": "colour",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength", "pattern"],
+      "fieldValidateRulesMaxlength": "7",
+      "fieldValidateRulesPattern": "^#[0-9A-Fa-f]{6}$"
+    }
+  ],
+  "name": "Tag",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "team",
+      "relationshipName": "team",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    },
+    {
+      "otherEntityField": "title",
+      "otherEntityName": "opportunity",
+      "otherEntityRelationshipName": "tag",
+      "relationshipName": "opportunity",
+      "relationshipSide": "right",
+      "relationshipType": "many-to-many"
+    },
+    {
+      "otherEntityField": "title",
+      "otherEntityName": "solution",
+      "otherEntityRelationshipName": "tag",
+      "relationshipName": "solution",
+      "relationshipSide": "right",
+      "relationshipType": "many-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

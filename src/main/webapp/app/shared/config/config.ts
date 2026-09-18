@@ -38,6 +38,20 @@ import { faUserPlus } from '@fortawesome/free-solid-svg-icons/faUserPlus';
 import { faUsers } from '@fortawesome/free-solid-svg-icons/faUsers';
 import { faUsersCog } from '@fortawesome/free-solid-svg-icons/faUsersCog';
 import { faWrench } from '@fortawesome/free-solid-svg-icons/faWrench';
+import { faBox } from '@fortawesome/free-solid-svg-icons/faBox';
+import { faBullseye } from '@fortawesome/free-solid-svg-icons/faBullseye';
+import { faChevronDown } from '@fortawesome/free-solid-svg-icons/faChevronDown';
+import { faChevronUp } from '@fortawesome/free-solid-svg-icons/faChevronUp';
+import { faComment } from '@fortawesome/free-solid-svg-icons/faComment';
+import { faComments } from '@fortawesome/free-solid-svg-icons/faComments';
+import { faFlask } from '@fortawesome/free-solid-svg-icons/faFlask';
+import { faLightbulb } from '@fortawesome/free-solid-svg-icons/faLightbulb';
+import { faLink } from '@fortawesome/free-solid-svg-icons/faLink';
+import { faPuzzlePiece } from '@fortawesome/free-solid-svg-icons/faPuzzlePiece';
+import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons/faQuestionCircle';
+import { faSitemap } from '@fortawesome/free-solid-svg-icons/faSitemap';
+import { faTag } from '@fortawesome/free-solid-svg-icons/faTag';
+import { faVial } from '@fortawesome/free-solid-svg-icons/faVial';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 export function initFortAwesome(vue: App) {
@@ -81,5 +95,19 @@ export function initFortAwesome(vue: App) {
     faUsers,
     faUsersCog,
     faWrench,
+    faBox,
+    faBullseye,
+    faChevronDown,
+    faChevronUp,
+    faComment,
+    faComments,
+    faFlask,
+    faLightbulb,
+    faLink,
+    faPuzzlePiece,
+    faQuestionCircle,
+    faSitemap,
+    faTag,
+    faVial,
   );
 }

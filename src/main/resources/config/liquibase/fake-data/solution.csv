@@ -1,0 +1,31 @@
+id;title;description;status;effort;sort_order;created_date;last_modified_date;opportunity_id
+1;between aha vista;../fake-data/blob/hipster.txt;IDEA;2;21146;2026-09-18T03:37:29;2026-09-18T03:09:43;1
+2;edge;../fake-data/blob/hipster.txt;INVALIDATED;1;18289;2026-09-17T11:00:33;2026-09-17T10:01:01;2
+3;majestically minus luck;../fake-data/blob/hipster.txt;SHIPPED;2;25193;2026-09-17T18:08:22;2026-09-18T04:11:33;3
+4;decongestant;../fake-data/blob/hipster.txt;SHIPPED;4;5882;2026-09-18T00:57:22;2026-09-17T22:34:50;4
+5;amid;../fake-data/blob/hipster.txt;VALIDATED;2;10907;2026-09-18T07:44:10;2026-09-17T15:46:45;5
+6;pry yippee;../fake-data/blob/hipster.txt;DROPPED;4;1964;2026-09-17T20:22:49;2026-09-17T16:58:16;6
+7;mealy;../fake-data/blob/hipster.txt;ASSUMPTION_MAPPING;3;22906;2026-09-18T02:18:17;2026-09-17T19:07:49;7
+8;optimistically into;../fake-data/blob/hipster.txt;TESTING;2;18897;2026-09-18T08:29:51;2026-09-17T15:58:34;8
+9;by pfft mmm;../fake-data/blob/hipster.txt;VALIDATED;4;21945;2026-09-17T13:26:13;2026-09-18T02:23:43;9
+10;enlightened why following;../fake-data/blob/hipster.txt;TESTING;2;17667;2026-09-17T13:52:06;2026-09-17T09:20:22;10
+11;bad;../fake-data/blob/hipster.txt;SHIPPED;1;30188;2026-09-17T21:10:14;2026-09-18T01:11:57;11
+12;after;../fake-data/blob/hipster.txt;VALIDATED;1;10929;2026-09-17T15:12:06;2026-09-17T22:16:23;12
+13;like;../fake-data/blob/hipster.txt;DROPPED;2;30597;2026-09-17T20:31:02;2026-09-18T07:57:26;13
+14;yearly bank how;../fake-data/blob/hipster.txt;IDEA;5;27711;2026-09-18T06:04:13;2026-09-17T21:06:01;14
+15;while;../fake-data/blob/hipster.txt;INVALIDATED;1;23327;2026-09-18T02:17:10;2026-09-17T17:00:48;15
+16;fooey anenst;../fake-data/blob/hipster.txt;VALIDATED;5;15986;2026-09-18T08:29:31;2026-09-18T05:23:27;16
+17;pish;../fake-data/blob/hipster.txt;INVALIDATED;3;23731;2026-09-18T08:21:14;2026-09-18T08:32:52;17
+18;ick sharply;../fake-data/blob/hipster.txt;VALIDATED;1;14756;2026-09-18T02:50:15;2026-09-17T11:53:38;18
+19;even huzzah;../fake-data/blob/hipster.txt;TESTING;5;28485;2026-09-17T10:17:06;2026-09-17T16:18:06;19
+20;on when;../fake-data/blob/hipster.txt;TESTING;4;3543;2026-09-18T05:02:10;2026-09-17T13:29:05;20
+21;burly often;../fake-data/blob/hipster.txt;SHIPPED;2;19192;2026-09-17T10:39:22;2026-09-17T13:45:05;21
+22;snarling respray antelope;../fake-data/blob/hipster.txt;INVALIDATED;2;17845;2026-09-18T08:11:29;2026-09-17T19:09:17;22
+23;yippee plan;../fake-data/blob/hipster.txt;SHIPPED;4;28548;2026-09-17T15:43:06;2026-09-17T14:47:07;23
+24;alongside trek;../fake-data/blob/hipster.txt;IDEA;2;26183;2026-09-17T17:36:02;2026-09-17T14:47:47;24
+25;ethyl soft;../fake-data/blob/hipster.txt;VALIDATED;5;9130;2026-09-17T21:14:59;2026-09-18T03:17:39;25
+26;snow before;../fake-data/blob/hipster.txt;TESTING;2;3580;2026-09-18T02:43:57;2026-09-17T14:18:26;26
+27;quaintly meanwhile;../fake-data/blob/hipster.txt;VALIDATED;1;10901;2026-09-17T13:08:39;2026-09-17T16:52:28;27
+28;plagiarise duh;../fake-data/blob/hipster.txt;ASSUMPTION_MAPPING;1;4101;2026-09-17T21:29:17;2026-09-17T22:39:29;28
+29;above;../fake-data/blob/hipster.txt;VALIDATED;5;31218;2026-09-18T08:00:04;2026-09-17T14:59:41;29
+30;barring likewise bungalow;../fake-data/blob/hipster.txt;ASSUMPTION_MAPPING;3;28003;2026-09-18T04:05:38;2026-09-18T06:31:01;30

@@ -1,0 +1,81 @@
+{
+  "annotations": {
+    "changelogDate": "20260918091119"
+  },
+  "applications": ["*"],
+  "documentation": "A test run against one or more assumptions.",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "title",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "200",
+      "fieldValidateRulesMinlength": "2"
+    },
+    {
+      "fieldName": "hypothesis",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "method",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "200"
+    },
+    {
+      "fieldName": "successCriteria",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "ExperimentStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "PLANNED,RUNNING,COMPLETED,CANCELLED"
+    },
+    {
+      "fieldName": "result",
+      "fieldType": "ExperimentResult",
+      "fieldValues": "SUPPORTED,REFUTED,INCONCLUSIVE"
+    },
+    {
+      "fieldName": "learnings",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "startDate",
+      "fieldType": "LocalDate"
+    },
+    {
+      "fieldName": "endDate",
+      "fieldType": "LocalDate"
+    },
+    {
+      "fieldName": "createdDate",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "Experiment",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "title",
+      "otherEntityName": "solution",
+      "relationshipName": "solution",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one",
+      "relationshipValidateRules": "required"
+    },
+    {
+      "otherEntityField": "statement",
+      "otherEntityName": "assumption",
+      "otherEntityRelationshipName": "experiment",
+      "relationshipName": "assumption",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}
