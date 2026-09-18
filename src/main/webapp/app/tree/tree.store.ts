@@ -1,15 +1,7 @@
 import { defineStore } from 'pinia';
 
-import type {
-  IOpportunityTreeNode,
-  IOutcomeTreeNode,
-  IProductTreeNode,
-  ISolutionTreeNode,
-  ITeamTree,
-  TreeNode,
-  TreeNodeType,
-} from './tree.model';
-import TreeService from './tree.service';
+import type { IOpportunityTreeNode, IOutcomeTreeNode, IProductTreeNode, ITeamTree, TreeNode, TreeNodeType } from './tree.model';
+import TreeService, { type CreateChildInput, type CreateProductInput } from './tree.service';
 
 export type TreeLoadError = 'forbidden' | 'not-found' | 'unknown';
 
@@ -19,6 +11,8 @@ interface NodeIndexEntry {
   parent: TreeNode | ITeamTree | null;
 }
 
+export type TreeWriteError = 'forbidden' | 'validation' | 'unknown';
+
 export interface TreeState {
   teamId: number | null;
   tree: ITeamTree | null;
@@ -26,6 +20,8 @@ export interface TreeState {
   loaded: boolean;
   error: TreeLoadError | null;
   errorMessage: string | null;
+  writeError: TreeWriteError | null;
+  writeErrorMessage: string | null;
   selectedNodeType: TreeNodeType | null;
   selectedNodeId: number | null;
   focusedProductId: number | null;
@@ -108,6 +104,8 @@ export const useTreeStore = defineStore('tree', {
     loaded: false,
     error: null,
     errorMessage: null,
+    writeError: null,
+    writeErrorMessage: null,
     selectedNodeType: null,
     selectedNodeId: null,
     focusedProductId: null,
@@ -186,9 +184,15 @@ export const useTreeStore = defineStore('tree', {
       this.loaded = false;
       this.error = null;
       this.errorMessage = null;
+      this.writeError = null;
+      this.writeErrorMessage = null;
       this.selectedNodeType = null;
       this.selectedNodeId = null;
       this.focusedProductId = null;
+    },
+    clearWriteError() {
+      this.writeError = null;
+      this.writeErrorMessage = null;
     },
     selectNode(type: TreeNodeType, id: number) {
       this.selectedNodeType = type;
@@ -250,6 +254,146 @@ export const useTreeStore = defineStore('tree', {
       if (idx < 0) return false;
       arr.splice(idx, 1);
       return true;
+    },
+    /** Create a new top-level product via the API and append it to the tree. */
+    async addProduct(input: CreateProductInput, service?: TreeService): Promise<IProductTreeNode | null> {
+      if (!this.tree || this.teamId == null) return null;
+      const svc = service ?? new TreeService();
+      this.clearWriteError();
+      try {
+        const created = await svc.createProduct(this.teamId, input);
+        this.insertNode('team', null, 'product', created);
+        return created;
+      } catch (err: any) {
+        this.recordWriteError(err);
+        return null;
+      }
+    },
+    /** Create a child node under the given parent via the API and append it in the store. */
+    async addChild(
+      parentType: TreeNodeType,
+      parentId: number,
+      childType: TreeNodeType,
+      input: CreateChildInput,
+      service?: TreeService,
+    ): Promise<TreeNode | null> {
+      if (!this.tree) return null;
+      const svc = service ?? new TreeService();
+      this.clearWriteError();
+      try {
+        let created: TreeNode | null = null;
+        if (parentType === 'product' && childType === 'outcome') {
+          created = await svc.createOutcome(parentId, input);
+        } else if (parentType === 'outcome' && childType === 'opportunity') {
+          created = await svc.createOpportunityUnderOutcome(parentId, input);
+        } else if (parentType === 'opportunity' && childType === 'opportunity') {
+          const outcomeId = this.enclosingOutcomeId(parentId);
+          if (outcomeId == null) return null;
+          created = await svc.createOpportunityUnderOpportunity(parentId, outcomeId, input);
+        } else if (parentType === 'opportunity' && childType === 'solution') {
+          created = await svc.createSolution(parentId, input);
+        } else {
+          this.writeError = 'validation';
+          this.writeErrorMessage = `Cannot add a ${childType} under a ${parentType}.`;
+          return null;
+        }
+        if (created) {
+          this.insertNode(parentType, parentId, childType, created);
+        }
+        return created;
+      } catch (err: any) {
+        this.recordWriteError(err);
+        return null;
+      }
+    },
+    /**
+     * Delete a node via the API and remove it (with descendants) from the store.
+     * If the node was selected or was the focused product, clears that state.
+     */
+    async deleteNode(type: TreeNodeType, id: number, service?: TreeService): Promise<boolean> {
+      if (!this.tree) return false;
+      const svc = service ?? new TreeService();
+      this.clearWriteError();
+      try {
+        await svc.deleteNode(type, id);
+      } catch (err: any) {
+        this.recordWriteError(err);
+        return false;
+      }
+      // Collect descendant keys BEFORE mutating so we can clear a selection sitting under this subtree.
+      const doomed = new Set<string>();
+      doomed.add(key(type, id));
+      const node = this.findNode(type, id);
+      if (node) {
+        const collect = (t: TreeNodeType, n: TreeNode) => {
+          if (t === 'product') {
+            for (const o of (n as IProductTreeNode).outcomes ?? []) {
+              doomed.add(key('outcome', o.id));
+              collect('outcome', o);
+            }
+          } else if (t === 'outcome') {
+            for (const o of (n as IOutcomeTreeNode).opportunities ?? []) {
+              doomed.add(key('opportunity', o.id));
+              collect('opportunity', o);
+            }
+          } else if (t === 'opportunity') {
+            for (const c of (n as IOpportunityTreeNode).children ?? []) {
+              doomed.add(key('opportunity', c.id));
+              collect('opportunity', c);
+            }
+            for (const s of (n as IOpportunityTreeNode).solutions ?? []) {
+              doomed.add(key('solution', s.id));
+            }
+          }
+        };
+        collect(type, node);
+      }
+      this.removeNode(type, id);
+      if (type === 'product' && this.focusedProductId === id) {
+        this.focusedProductId = null;
+      }
+      if (this.selectedNodeType && this.selectedNodeId != null) {
+        if (doomed.has(key(this.selectedNodeType, this.selectedNodeId))) {
+          this.clearSelection();
+        }
+      }
+      return true;
+    },
+    enclosingOutcomeId(opportunityId: number): number | null {
+      if (!this.tree) return null;
+      const index = buildIndex(this.tree);
+      let currentType: TreeNodeType = 'opportunity';
+      let currentId = opportunityId;
+      // Walk parents until we hit an outcome parent.
+      for (let hop = 0; hop < 1000; hop++) {
+        const entry = index.get(key(currentType, currentId));
+        if (!entry) return null;
+        const parent = entry.parent;
+        if (!parent) return null;
+        // If parent is an outcome (has 'opportunities' array but no 'children'), we found it.
+        if ((parent as IOutcomeTreeNode).opportunities && !(parent as IOpportunityTreeNode).children) {
+          return (parent as IOutcomeTreeNode).id;
+        }
+        // parent must be another opportunity
+        currentType = 'opportunity';
+        currentId = (parent as IOpportunityTreeNode).id;
+      }
+      return null;
+    },
+    recordWriteError(err: any) {
+      const status = err?.response?.status;
+      if (status === 403) {
+        this.writeError = 'forbidden';
+        this.writeErrorMessage = 'You do not have permission to modify this tree.';
+      } else if (status === 400) {
+        this.writeError = 'validation';
+        const body = err?.response?.data;
+        const detail = (body && (body.title || body.detail)) || 'The server rejected the request.';
+        this.writeErrorMessage = String(detail);
+      } else {
+        this.writeError = 'unknown';
+        this.writeErrorMessage = 'Something went wrong. Please try again.';
+      }
     },
   },
 });

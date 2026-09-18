@@ -16,6 +16,28 @@
     <div v-if="status" class="tree-node-card__status" data-cy="treeNodeStatus">
       <span class="badge">{{ status }}</span>
     </div>
+    <div v-if="canEdit" class="tree-node-card__actions" :data-cy="`treeNodeActions-${type}-${nodeId}`">
+      <button
+        v-for="ct in validChildren"
+        :key="ct"
+        type="button"
+        class="btn btn-sm btn-outline-primary tree-node-card__add-child"
+        :data-cy="`treeNodeAddChild-${type}-${nodeId}-${ct}`"
+        :title="`Add ${childTypeLabel(ct)}`"
+        @click="onAddChild(ct, $event)"
+      >
+        + {{ childTypeLabel(ct) }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-danger tree-node-card__delete"
+        :data-cy="`treeNodeDelete-${type}-${nodeId}`"
+        title="Delete"
+        @click="onDelete($event)"
+      >
+        Delete
+      </button>
+    </div>
   </div>
 </template>
 

@@ -1,6 +1,7 @@
 import { computed, defineComponent, type PropType } from 'vue';
 
 import type { IOpportunityTreeNode, IOutcomeTreeNode, IProductTreeNode, ISolutionTreeNode, TreeNode, TreeNodeType } from './tree.model';
+import { validChildTypes } from './tree.model';
 
 export default defineComponent({
   name: 'TreeNodeCard',
@@ -17,12 +18,16 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    canEdit: {
+      type: Boolean,
+      default: false,
+    },
     x: { type: Number, default: 0 },
     y: { type: Number, default: 0 },
     width: { type: Number, default: 200 },
     height: { type: Number, default: 80 },
   },
-  emits: ['select'],
+  emits: ['select', 'add-child', 'delete'],
   setup(props, { emit }) {
     const nodeId = computed<number>(() => (props.node as { id: number }).id);
     const title = computed<string>(() => {
@@ -65,6 +70,41 @@ export default defineComponent({
       event.stopPropagation();
       emit('select');
     };
-    return { nodeId, title, status, typeLabel, cardClasses, style, onClick };
+    const validChildren = computed<TreeNodeType[]>(() => validChildTypes(props.type));
+    const canAddChild = computed(() => props.canEdit && validChildren.value.length > 0);
+    const onAddChild = (childType: TreeNodeType, event: Event) => {
+      event.stopPropagation();
+      emit('add-child', { parentType: props.type, parentId: nodeId.value, childType });
+    };
+    const onDelete = (event: Event) => {
+      event.stopPropagation();
+      emit('delete', { type: props.type, id: nodeId.value });
+    };
+    const childTypeLabel = (t: TreeNodeType) => {
+      switch (t) {
+        case 'product':
+          return 'Product';
+        case 'outcome':
+          return 'Outcome';
+        case 'opportunity':
+          return 'Opportunity';
+        case 'solution':
+          return 'Solution';
+      }
+    };
+    return {
+      nodeId,
+      title,
+      status,
+      typeLabel,
+      cardClasses,
+      style,
+      onClick,
+      validChildren,
+      canAddChild,
+      onAddChild,
+      onDelete,
+      childTypeLabel,
+    };
   },
 });

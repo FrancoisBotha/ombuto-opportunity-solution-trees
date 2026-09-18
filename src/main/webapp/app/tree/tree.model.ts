@@ -62,3 +62,21 @@ export interface ITeamTree {
 }
 
 export type TreeNode = IProductTreeNode | IOutcomeTreeNode | IOpportunityTreeNode | ISolutionTreeNode;
+
+/**
+ * Which child node types can be created under a node of the given type.
+ * Product -> Outcome; Outcome -> Opportunity; Opportunity -> Opportunity | Solution; Solution -> none.
+ */
+export const validChildTypes = (parent: TreeNodeType): TreeNodeType[] => {
+  switch (parent) {
+    case 'product':
+      return ['outcome'];
+    case 'outcome':
+      return ['opportunity'];
+    case 'opportunity':
+      return ['opportunity', 'solution'];
+    case 'solution':
+    default:
+      return [];
+  }
+};

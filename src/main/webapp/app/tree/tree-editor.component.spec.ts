@@ -318,6 +318,166 @@ describe('TreeEditor Component', () => {
     console.log(`[TREE-005 render-perf] nodes=${cards.length} elapsed_ms=${elapsed.toFixed(1)}`);
   });
 
+  it('opens the add-product modal from the toolbar and creates a product on submit', async () => {
+    treeServiceStub.getTeamTree.resolves(populatedTree());
+    (treeServiceStub as any).createProduct = sinon.stub().resolves({ id: 999, name: 'Brand new', outcomes: [] });
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    expect(wrapper.find('[data-cy="treeEditorAddProduct"]').exists()).toBe(true);
+    await wrapper.find('[data-cy="treeEditorAddProduct"]').trigger('click');
+    expect(wrapper.find('[data-cy="treeEditorAddProductModal"]').exists()).toBe(true);
+    await wrapper.find('[data-cy="addProductName"]').setValue('Brand new');
+    await wrapper.find('[data-cy="addProductVision"]').setValue('a vision');
+    await wrapper.find('[data-cy="treeEditorAddProductModal"] form').trigger('submit.prevent');
+    await flush(wrapper);
+    expect((treeServiceStub as any).createProduct.calledOnce).toBe(true);
+    const store = useTreeStore();
+    expect(store.products.map(p => p.id)).toContain(999);
+    // New product renders as a top-level branch without a reload.
+    expect(wrapper.find('[data-cy="treeNode-product-999"]').exists()).toBe(true);
+    expect(treeServiceStub.getTeamTree.callCount).toBe(1);
+  });
+
+  it('opens the add-product modal from the empty state "Add your first product" call to action', async () => {
+    treeServiceStub.getTeamTree.resolves(sampleTree());
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    await wrapper.find('[data-cy="treeEditorAddFirstProduct"]').trigger('click');
+    expect(wrapper.find('[data-cy="treeEditorAddProductModal"]').exists()).toBe(true);
+  });
+
+  it('hides the add-product, add-child and delete affordances when canEdit is false', async () => {
+    const readOnly = populatedTree();
+    readOnly.canEdit = false;
+    treeServiceStub.getTeamTree.resolves(readOnly);
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    expect(wrapper.find('[data-cy="treeEditorAddProduct"]').exists()).toBe(false);
+    expect(wrapper.find('[data-cy="treeNodeAddChild-product-1-outcome"]').exists()).toBe(false);
+    expect(wrapper.find('[data-cy="treeNodeDelete-product-1"]').exists()).toBe(false);
+    // Empty-state call-to-action stays disabled when read-only.
+    const empty = sampleTree();
+    empty.canEdit = false;
+    treeServiceStub.getTeamTree.resetHistory();
+    treeServiceStub.getTeamTree.resolves(empty);
+    const wrapper2 = mountFull(treeServiceStub);
+    await flush(wrapper2);
+    const btn = wrapper2.find('[data-cy="treeEditorAddFirstProduct"]');
+    expect(btn.exists()).toBe(true);
+    expect((btn.element as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('only offers valid child types on the "add child" affordance for each node type', async () => {
+    treeServiceStub.getTeamTree.resolves(populatedTree());
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    // Product -> Outcome only.
+    expect(wrapper.find('[data-cy="treeNodeAddChild-product-1-outcome"]').exists()).toBe(true);
+    expect(wrapper.find('[data-cy="treeNodeAddChild-product-1-opportunity"]').exists()).toBe(false);
+    expect(wrapper.find('[data-cy="treeNodeAddChild-product-1-solution"]').exists()).toBe(false);
+    // Outcome -> Opportunity only.
+    expect(wrapper.find('[data-cy="treeNodeAddChild-outcome-10-opportunity"]').exists()).toBe(true);
+    expect(wrapper.find('[data-cy="treeNodeAddChild-outcome-10-outcome"]').exists()).toBe(false);
+    expect(wrapper.find('[data-cy="treeNodeAddChild-outcome-10-solution"]').exists()).toBe(false);
+    // Opportunity -> Opportunity + Solution.
+    expect(wrapper.find('[data-cy="treeNodeAddChild-opportunity-100-opportunity"]').exists()).toBe(true);
+    expect(wrapper.find('[data-cy="treeNodeAddChild-opportunity-100-solution"]').exists()).toBe(true);
+    // Solution -> nothing.
+    expect(wrapper.find('[data-cy="treeNodeAddChild-solution-1000-opportunity"]').exists()).toBe(false);
+    expect(wrapper.find('[data-cy="treeNodeAddChild-solution-1000-solution"]').exists()).toBe(false);
+  });
+
+  it('adds a child node under the selected parent via the API and appends it last on the canvas', async () => {
+    treeServiceStub.getTeamTree.resolves(populatedTree());
+    (treeServiceStub as any).createOutcome = sinon.stub().resolves({ id: 55, title: 'Added', opportunities: [] });
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    await wrapper.find('[data-cy="treeNodeAddChild-product-1-outcome"]').trigger('click');
+    expect(wrapper.find('[data-cy="treeEditorAddChildModal"]').exists()).toBe(true);
+    await wrapper.find('[data-cy="addChildTitle"]').setValue('Added');
+    await wrapper.find('[data-cy="treeEditorAddChildModal"] form').trigger('submit.prevent');
+    await flush(wrapper);
+    expect((treeServiceStub as any).createOutcome.calledOnce).toBe(true);
+    const store = useTreeStore();
+    expect(store.childrenOf('product', 1).map(n => (n as any).id)).toEqual([10, 55]);
+    expect(wrapper.find('[data-cy="treeNode-outcome-55"]').exists()).toBe(true);
+  });
+
+  it('confirms deletion in a dialog that states how many descendants will be removed', async () => {
+    treeServiceStub.getTeamTree.resolves(populatedTree());
+    (treeServiceStub as any).deleteNode = sinon.stub().resolves(undefined);
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    // Product 1 owns outcome 10 + opportunity 100 + solution 1000 = 3 descendants.
+    await wrapper.find('[data-cy="treeNodeDelete-product-1"]').trigger('click');
+    const modal = wrapper.find('[data-cy="treeEditorDeleteModal"]');
+    expect(modal.exists()).toBe(true);
+    expect(modal.find('[data-cy="deleteConfirmCount"]').text()).toBe('3');
+    await modal.find('[data-cy="deleteConfirm"]').trigger('click');
+    await flush(wrapper);
+    expect((treeServiceStub as any).deleteNode.calledOnceWith('product', 1)).toBe(true);
+    const store = useTreeStore();
+    expect(store.findNode('product', 1)).toBeNull();
+    expect(wrapper.find('[data-cy="treeNode-product-1"]').exists()).toBe(false);
+  });
+
+  it('cancelling the delete confirmation leaves the tree unchanged', async () => {
+    treeServiceStub.getTeamTree.resolves(populatedTree());
+    (treeServiceStub as any).deleteNode = sinon.stub().resolves(undefined);
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    await wrapper.find('[data-cy="treeNodeDelete-product-1"]').trigger('click');
+    await wrapper.find('[data-cy="deleteCancel"]').trigger('click');
+    await flush(wrapper);
+    expect((treeServiceStub as any).deleteNode.called).toBe(false);
+    const store = useTreeStore();
+    expect(store.findNode('product', 1)).not.toBeNull();
+  });
+
+  it('shows a server validation error and leaves the store unchanged', async () => {
+    treeServiceStub.getTeamTree.resolves(populatedTree());
+    (treeServiceStub as any).createOutcome = sinon
+      .stub()
+      .rejects({ response: { status: 400, data: { title: 'title must be at least 2 chars' } } });
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    await wrapper.find('[data-cy="treeNodeAddChild-product-1-outcome"]').trigger('click');
+    await wrapper.find('[data-cy="addChildTitle"]').setValue('Bad');
+    await wrapper.find('[data-cy="treeEditorAddChildModal"] form').trigger('submit.prevent');
+    await flush(wrapper);
+    expect(wrapper.find('[data-cy="treeEditorWriteError"]').text()).toMatch(/title must be at least/i);
+    const store = useTreeStore();
+    expect(store.childrenOf('product', 1).map(n => (n as any).id)).toEqual([10]);
+  });
+
+  it('shows a server authorisation (403) error on delete and leaves the store unchanged', async () => {
+    treeServiceStub.getTeamTree.resolves(populatedTree());
+    (treeServiceStub as any).deleteNode = sinon.stub().rejects({ response: { status: 403 } });
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    await wrapper.find('[data-cy="treeNodeDelete-outcome-10"]').trigger('click');
+    await wrapper.find('[data-cy="deleteConfirm"]').trigger('click');
+    await flush(wrapper);
+    expect(wrapper.find('[data-cy="treeEditorWriteError"]').text()).toMatch(/permission/i);
+    const store = useTreeStore();
+    expect(store.findNode('outcome', 10)).not.toBeNull();
+  });
+
+  it('clears the selection and focus when the deleted node was selected / focused', async () => {
+    treeServiceStub.getTeamTree.resolves(populatedTree());
+    (treeServiceStub as any).deleteNode = sinon.stub().resolves(undefined);
+    const wrapper = mountFull(treeServiceStub);
+    await flush(wrapper);
+    const store = useTreeStore();
+    store.selectNode('product', 1);
+    store.focusProduct(1);
+    await wrapper.find('[data-cy="treeNodeDelete-product-1"]').trigger('click');
+    await wrapper.find('[data-cy="deleteConfirm"]').trigger('click');
+    await flush(wrapper);
+    expect(store.selectedNodeId).toBeNull();
+    expect(store.focusedProductId).toBeNull();
+  });
+
   it('zoom-in / zoom-out toolbar buttons change the zoom level', async () => {
     treeServiceStub.getTeamTree.resolves(populatedTree());
     const wrapper = mountFull(treeServiceStub);

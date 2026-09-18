@@ -6,6 +6,7 @@ import { OpportunityStatus } from '@/shared/model/enumerations/opportunity-statu
 import { TeamRole } from '@/shared/model/enumerations/team-role.model';
 
 import type { IOpportunityTreeNode, ISolutionTreeNode, ITeamTree } from './tree.model';
+import { validChildTypes } from './tree.model';
 import { useTreeStore } from './tree.store';
 
 const sampleTree = (): ITeamTree => ({
@@ -225,5 +226,172 @@ describe('tree.store', () => {
     store.reset();
     expect(store.tree).toBeNull();
     expect(store.loaded).toBe(false);
+  });
+
+  describe('validChildTypes', () => {
+    it('offers only outcome under product', () => {
+      expect(validChildTypes('product')).toEqual(['outcome']);
+    });
+    it('offers only opportunity under outcome', () => {
+      expect(validChildTypes('outcome')).toEqual(['opportunity']);
+    });
+    it('offers opportunity or solution under opportunity', () => {
+      expect(validChildTypes('opportunity').sort()).toEqual(['opportunity', 'solution'].sort());
+    });
+    it('offers nothing under solution', () => {
+      expect(validChildTypes('solution')).toEqual([]);
+    });
+  });
+
+  describe('addProduct', () => {
+    it('POSTs a product and appends it to the tree without a reload', async () => {
+      const store = useTreeStore();
+      store.teamId = 10;
+      store.setTree(sampleTree());
+      const created = { id: 555, name: 'New product', outcomes: [] };
+      const svc = { createProduct: vi.fn().mockResolvedValue(created) } as any;
+      const result = await store.addProduct({ name: 'New product', description: 'd', vision: 'v' }, svc);
+      expect(result).toEqual(created);
+      expect(svc.createProduct).toHaveBeenCalledWith(10, { name: 'New product', description: 'd', vision: 'v' });
+      expect(store.products.map(p => p.id)).toEqual([100, 555]);
+      expect(store.writeError).toBeNull();
+    });
+    it('records a 403 forbidden write error and does not mutate the tree', async () => {
+      const store = useTreeStore();
+      store.teamId = 10;
+      store.setTree(sampleTree());
+      const svc = { createProduct: vi.fn().mockRejectedValue({ response: { status: 403 } }) } as any;
+      const result = await store.addProduct({ name: 'x' }, svc);
+      expect(result).toBeNull();
+      expect(store.writeError).toBe('forbidden');
+      expect(store.writeErrorMessage).toMatch(/permission/i);
+      expect(store.products.map(p => p.id)).toEqual([100]);
+    });
+    it('records a 400 validation write error', async () => {
+      const store = useTreeStore();
+      store.teamId = 10;
+      store.setTree(sampleTree());
+      const svc = {
+        createProduct: vi.fn().mockRejectedValue({ response: { status: 400, data: { title: 'name is required' } } }),
+      } as any;
+      const result = await store.addProduct({ name: '' }, svc);
+      expect(result).toBeNull();
+      expect(store.writeError).toBe('validation');
+      expect(store.writeErrorMessage).toMatch(/name is required/i);
+      expect(store.products.map(p => p.id)).toEqual([100]);
+    });
+  });
+
+  describe('addChild', () => {
+    it('adds an outcome under a product', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = { createOutcome: vi.fn().mockResolvedValue({ id: 210, title: 'O new', opportunities: [] }) } as any;
+      const created = await store.addChild('product', 100, 'outcome', { title: 'O new' }, svc);
+      expect(created?.id).toBe(210);
+      expect(svc.createOutcome).toHaveBeenCalledWith(100, { title: 'O new' });
+      expect(store.childrenOf('product', 100).map(n => (n as any).id)).toEqual([200, 210]);
+    });
+    it('adds an opportunity under an outcome, appending last', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = {
+        createOpportunityUnderOutcome: vi.fn().mockResolvedValue({ id: 310, title: 'Opp new', children: [], solutions: [] }),
+      } as any;
+      const created = await store.addChild('outcome', 200, 'opportunity', { title: 'Opp new' }, svc);
+      expect(created?.id).toBe(310);
+      expect(svc.createOpportunityUnderOutcome).toHaveBeenCalledWith(200, { title: 'Opp new' });
+      expect(store.childrenOf('outcome', 200).map(n => (n as any).id)).toEqual([300, 310]);
+    });
+    it('adds a nested opportunity under another opportunity, three levels deep', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      // Level 3: parent is 301 (already nested under 300, which is under outcome 200).
+      const svc = {
+        createOpportunityUnderOpportunity: vi.fn().mockResolvedValue({ id: 320, title: 'Opp L3', children: [], solutions: [] }),
+      } as any;
+      const created = await store.addChild('opportunity', 301, 'opportunity', { title: 'Opp L3' }, svc);
+      expect(created?.id).toBe(320);
+      // The service must be given the enclosing outcome id (200) alongside the parent id (301).
+      expect(svc.createOpportunityUnderOpportunity).toHaveBeenCalledWith(301, 200, { title: 'Opp L3' });
+      expect(store.childrenOf('opportunity', 301).map(n => (n as any).id)).toContain(320);
+    });
+    it('adds a solution under an opportunity', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = { createSolution: vi.fn().mockResolvedValue({ id: 410, title: 'Sol new' } as ISolutionTreeNode) } as any;
+      const created = await store.addChild('opportunity', 300, 'solution', { title: 'Sol new' }, svc);
+      expect(created?.id).toBe(410);
+      const sols = (store.findNode('opportunity', 300) as IOpportunityTreeNode).solutions.map(s => s.id);
+      expect(sols).toEqual([400, 410]);
+    });
+    it('rejects an invalid child type combination', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = { createSolution: vi.fn() } as any;
+      const result = await store.addChild('outcome', 200, 'solution', { title: 'nope' }, svc);
+      expect(result).toBeNull();
+      expect(store.writeError).toBe('validation');
+      expect(svc.createSolution).not.toHaveBeenCalled();
+    });
+    it('records a 403 forbidden error on addChild', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = { createOutcome: vi.fn().mockRejectedValue({ response: { status: 403 } }) } as any;
+      const result = await store.addChild('product', 100, 'outcome', { title: 'x' }, svc);
+      expect(result).toBeNull();
+      expect(store.writeError).toBe('forbidden');
+      expect(store.childrenOf('product', 100).map(n => (n as any).id)).toEqual([200]);
+    });
+  });
+
+  describe('deleteNode', () => {
+    it('deletes the node via the API and removes it and its descendants from the store', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = { deleteNode: vi.fn().mockResolvedValue(undefined) } as any;
+      const ok = await store.deleteNode('opportunity', 300, svc);
+      expect(ok).toBe(true);
+      expect(svc.deleteNode).toHaveBeenCalledWith('opportunity', 300);
+      expect(store.findNode('opportunity', 300)).toBeNull();
+      expect(store.findNode('opportunity', 301)).toBeNull();
+      expect(store.findNode('solution', 400)).toBeNull();
+      expect(store.findNode('solution', 401)).toBeNull();
+    });
+    it('clears selection when the deleted node was selected', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      store.selectNode('opportunity', 300);
+      const svc = { deleteNode: vi.fn().mockResolvedValue(undefined) } as any;
+      await store.deleteNode('opportunity', 300, svc);
+      expect(store.selectedNodeType).toBeNull();
+      expect(store.selectedNodeId).toBeNull();
+    });
+    it('clears selection when the deleted node contained the selected node', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      store.selectNode('solution', 401);
+      const svc = { deleteNode: vi.fn().mockResolvedValue(undefined) } as any;
+      await store.deleteNode('outcome', 200, svc);
+      expect(store.selectedNodeType).toBeNull();
+      expect(store.selectedNodeId).toBeNull();
+    });
+    it('clears the focused product when the deleted node was the focused product', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      store.focusProduct(100);
+      const svc = { deleteNode: vi.fn().mockResolvedValue(undefined) } as any;
+      await store.deleteNode('product', 100, svc);
+      expect(store.focusedProductId).toBeNull();
+    });
+    it('leaves the store unchanged on a 403', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = { deleteNode: vi.fn().mockRejectedValue({ response: { status: 403 } }) } as any;
+      const ok = await store.deleteNode('opportunity', 300, svc);
+      expect(ok).toBe(false);
+      expect(store.writeError).toBe('forbidden');
+      expect(store.findNode('opportunity', 300)).not.toBeNull();
+    });
   });
 });

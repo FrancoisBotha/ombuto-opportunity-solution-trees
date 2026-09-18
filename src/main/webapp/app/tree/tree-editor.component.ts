@@ -2,14 +2,28 @@ import { computed, defineComponent, inject, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import type { TreeNodeType } from './tree.model';
+import { validChildTypes } from './tree.model';
 import { layoutTree, type LayoutEdge, type LayoutNode } from './tree-layout';
 import TreeNodeCard from './tree-node-card.vue';
-import TreeService from './tree.service';
+import TreeService, { type CreateChildInput, type CreateProductInput } from './tree.service';
 import { useTreeStore } from './tree.store';
 
 const CANVAS_PADDING = 40;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.5;
+
+interface AddChildContext {
+  parentType: TreeNodeType;
+  parentId: number;
+  childType: TreeNodeType;
+}
+
+interface DeleteContext {
+  type: TreeNodeType;
+  id: number;
+  label: string;
+  descendantCount: number;
+}
 
 export default defineComponent({
   name: 'TreeEditor',
@@ -34,6 +48,8 @@ export default defineComponent({
     const canEdit = computed(() => treeStore.canEdit);
     const products = computed(() => treeStore.products);
     const focusedProductId = computed(() => treeStore.focusedProductId);
+    const writeError = computed(() => treeStore.writeError);
+    const writeErrorMessage = computed(() => treeStore.writeErrorMessage);
 
     const layout = computed(() =>
       layoutTree(tree.value, {
@@ -92,8 +108,8 @@ export default defineComponent({
       treeStore.selectNode(type, id);
     };
     const onCanvasClick = (event: MouseEvent) => {
-      // Only clear selection when the empty canvas itself was clicked, not a node.
       if ((event.target as HTMLElement).closest('.tree-node-card')) return;
+      if ((event.target as HTMLElement).closest('.tree-editor-modal')) return;
       treeStore.clearSelection();
     };
 
@@ -119,6 +135,98 @@ export default defineComponent({
       load();
     });
 
+    // --- Add product modal state ---
+    const showAddProductModal = ref(false);
+    const productForm = ref<CreateProductInput>({ name: '', description: '', vision: '' });
+    const isSavingProduct = ref(false);
+
+    const openAddProductModal = () => {
+      if (!canEdit.value) return;
+      treeStore.clearWriteError();
+      productForm.value = { name: '', description: '', vision: '' };
+      showAddProductModal.value = true;
+    };
+    const closeAddProductModal = () => {
+      showAddProductModal.value = false;
+    };
+    const submitAddProduct = async () => {
+      if (!productForm.value.name || productForm.value.name.trim().length < 2) {
+        treeStore.writeError = 'validation';
+        treeStore.writeErrorMessage = 'Please enter a product name (at least 2 characters).';
+        return;
+      }
+      isSavingProduct.value = true;
+      try {
+        const created = await treeStore.addProduct({ ...productForm.value }, treeService());
+        if (created) closeAddProductModal();
+      } finally {
+        isSavingProduct.value = false;
+      }
+    };
+
+    // --- Add child modal state ---
+    const addChildContext = ref<AddChildContext | null>(null);
+    const childForm = ref<CreateChildInput>({ title: '', description: '' });
+    const isSavingChild = ref(false);
+
+    const openAddChildModal = (parentType: TreeNodeType, parentId: number, childType: TreeNodeType) => {
+      if (!canEdit.value) return;
+      const allowed = validChildTypes(parentType);
+      if (!allowed.includes(childType)) return;
+      treeStore.clearWriteError();
+      addChildContext.value = { parentType, parentId, childType };
+      childForm.value = { title: '', description: '' };
+    };
+    const closeAddChildModal = () => {
+      addChildContext.value = null;
+    };
+    const submitAddChild = async () => {
+      const ctx = addChildContext.value;
+      if (!ctx) return;
+      if (!childForm.value.title || childForm.value.title.trim().length < 2) {
+        treeStore.writeError = 'validation';
+        treeStore.writeErrorMessage = 'Please enter a title (at least 2 characters).';
+        return;
+      }
+      isSavingChild.value = true;
+      try {
+        const created = await treeStore.addChild(ctx.parentType, ctx.parentId, ctx.childType, { ...childForm.value }, treeService());
+        if (created) closeAddChildModal();
+      } finally {
+        isSavingChild.value = false;
+      }
+    };
+
+    // --- Delete confirmation modal state ---
+    const deleteContext = ref<DeleteContext | null>(null);
+    const isDeleting = ref(false);
+
+    const openDeleteModal = (type: TreeNodeType, id: number) => {
+      if (!canEdit.value) return;
+      const node = treeStore.findNode(type, id);
+      if (!node) return;
+      const label = type === 'product' ? (node as any).name : (node as any).title;
+      const descendantCount = treeStore.descendantCountOf(type, id);
+      treeStore.clearWriteError();
+      deleteContext.value = { type, id, label, descendantCount };
+    };
+    const closeDeleteModal = () => {
+      deleteContext.value = null;
+    };
+    const confirmDelete = async () => {
+      const ctx = deleteContext.value;
+      if (!ctx) return;
+      isDeleting.value = true;
+      try {
+        const ok = await treeStore.deleteNode(ctx.type, ctx.id, treeService());
+        if (ok) closeDeleteModal();
+      } finally {
+        isDeleting.value = false;
+      }
+    };
+
+    const dismissWriteError = () => treeStore.clearWriteError();
+
     return {
       teamId,
       isLoading,
@@ -129,6 +237,8 @@ export default defineComponent({
       canEdit,
       products,
       focusedProductId,
+      writeError,
+      writeErrorMessage,
       nodes,
       edges,
       canvasWidth,
@@ -151,6 +261,28 @@ export default defineComponent({
       clearFocus,
       load,
       canvasPadding: CANVAS_PADDING,
+      validChildTypes,
+      // add product
+      showAddProductModal,
+      productForm,
+      isSavingProduct,
+      openAddProductModal,
+      closeAddProductModal,
+      submitAddProduct,
+      // add child
+      addChildContext,
+      childForm,
+      isSavingChild,
+      openAddChildModal,
+      closeAddChildModal,
+      submitAddChild,
+      // delete
+      deleteContext,
+      isDeleting,
+      openDeleteModal,
+      closeDeleteModal,
+      confirmDelete,
+      dismissWriteError,
     };
   },
 });
