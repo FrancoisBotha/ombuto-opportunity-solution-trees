@@ -13,7 +13,7 @@ export default defineComponent({
   name: 'TeamDetail',
   components: { TeamMembers, TeamProducts },
   setup() {
-    const teamsService = inject('teamsService', () => new TeamsService(), true);
+    const teamsService = inject('teamsService', () => new TeamsService());
     const alertService = inject('alertService', () => useAlertService(), true);
     const teamsStore = useTeamsStore();
     const route = useRoute();

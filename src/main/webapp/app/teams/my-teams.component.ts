@@ -9,7 +9,7 @@ import { useTeamsStore } from './teams.store';
 export default defineComponent({
   name: 'MyTeams',
   setup() {
-    const teamsService = inject('teamsService', () => new TeamsService(), true);
+    const teamsService = inject('teamsService', () => new TeamsService());
     const alertService = inject('alertService', () => useAlertService(), true);
     const teamsStore = useTeamsStore();
 

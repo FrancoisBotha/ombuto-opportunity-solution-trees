@@ -221,6 +221,13 @@ for custom behaviour go in separate classes/specs so regeneration does not clobb
   not a function`). Node's built-in Web Storage global shadows happy-dom's. Run Vitest with
   `NODE_OPTIONS=--no-experimental-webstorage` (verified fix), or use Node 24 LTS. In PowerShell:
   `$env:NODE_OPTIONS='--no-experimental-webstorage'; npx vitest run <file>`.
+- **Vue service injection: `inject('xService', () => new XService())` — no third argument.**
+  Components call it as `xService().method()`. Adding `true` (treat default as factory) makes the
+  default an *instance*, so `xService()` throws `TypeError` in the real app — which the component's
+  `catch` reports as a misleading "Server not reachable" toast with no request ever sent. Unit
+  specs cannot catch this because they `provide` a function stub and never use the default; only
+  a Playwright run does. It broke every Teams and Trees page once (fixed 2026-09-19). `alertService`
+  is the exception: it is injected with `true` and used as an object.
 - **Keep `.ombutocode/` in the `ignores` of `eslint.config.ts`.** Without it `eslint .` crawls
   Ombuto Code's own sources and bundled `dist`, and `npm run lint` / `npm test` effectively hang
   (20+ minutes). A JHipster regeneration may rewrite that file — re-check the ignore afterwards.

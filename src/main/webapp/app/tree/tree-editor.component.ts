@@ -30,7 +30,7 @@ export default defineComponent({
   components: { TreeNodeCard },
   setup() {
     const route = useRoute();
-    const treeService = inject('treeService', () => new TreeService(), true);
+    const treeService = inject('treeService', () => new TreeService());
     const treeStore = useTreeStore();
 
     const teamId = computed(() => {

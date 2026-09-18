@@ -8,7 +8,7 @@ import { useTeamsStore } from '@/teams/teams.store';
 export default defineComponent({
   name: 'Trees',
   setup() {
-    const teamsService = inject('teamsService', () => new TeamsService(), true);
+    const teamsService = inject('teamsService', () => new TeamsService());
     const alertService = inject('alertService', () => useAlertService(), true);
     const teamsStore = useTeamsStore();
 

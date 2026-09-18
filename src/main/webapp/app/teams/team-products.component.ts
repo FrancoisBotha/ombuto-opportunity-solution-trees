@@ -15,7 +15,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const teamsService = inject('teamsService', () => new TeamsService(), true);
+    const teamsService = inject('teamsService', () => new TeamsService());
     const alertService = inject('alertService', () => useAlertService(), true);
     const teamsStore = useTeamsStore();
 
