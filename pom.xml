@@ -8,7 +8,15 @@
     <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Opportunity Solution Tree</name>
-    <description>Description for Opportunity Solution Tree</description>
+    <description>Collaborative Opportunity Solution Trees for continuous product discovery</description>
+    <url>https://github.com/FrancoisBotha/ombuto-opportunity-solution-trees</url>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>

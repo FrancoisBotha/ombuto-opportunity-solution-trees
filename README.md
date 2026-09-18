@@ -1,370 +1,198 @@
-# opportunitySolutionTree
+# Ombuto Opportunity Solution Tree
 
-This application was generated using JHipster 9.0.0, you can find documentation and help at [https://www.jhipster.tech/documentation-archive/v9.0.0](https://www.jhipster.tech/documentation-archive/v9.0.0).
+A collaborative web application for product teams that practise **continuous discovery**. Each team
+keeps one living [Opportunity Solution Tree](https://www.producttalk.org/opportunity-solution-trees/):
+its products at the top, the outcomes each product is chasing, the customer opportunities behind
+those outcomes, the solutions being considered, and the assumptions and experiments that test them.
 
-## Project Structure
+It replaces trees drawn in whiteboard tools — which have no structure, go stale within weeks, and
+are invisible outside the team that drew them — with a structured, shared, always-current model that
+links to the tickets and pages where the work actually happens.
 
-Node is required for generation and recommended for development. `package.json` is always generated for a better development experience with prettier, commit hooks, scripts and so on.
+> **Status: early development.** Teams and scoped access (Epic 1) are implemented and the tree
+> editor (Epic 2) is in progress. See the [roadmap](#roadmap). Not yet ready for production use.
 
-In the project root, JHipster generates configuration files for tools like git, prettier, eslint, husky, and others that are well known and you can find references in the web.
+## Who it is for
 
-`/src/*` structure follows default Java structure.
+- **Product trios** — product manager, designer and tech lead — who interview customers most weeks
+  and need somewhere to record what they learned, turn it into opportunities, and track which
+  solutions and assumptions they are testing.
+- **Heads of product** and similar leaders, who get a read-only overview across every team's tree.
 
-- `.yo-rc.json` - Yeoman configuration file
-  JHipster configuration is stored in this file at `generator-jhipster` key. You may find `generator-jhipster-*` for specific blueprints configuration.
-- `.yo-resolve` (optional) - Yeoman conflict resolver
-  Allows to use a specific action when conflicts are found skipping prompts for files that matches a pattern. Each line should match `[pattern] [action]` with pattern been a [Minimatch](https://github.com/isaacs/minimatch#minimatch) pattern and action been one of skip (default if omitted) or force. Lines starting with `#` are considered comments and are ignored.
-- `.jhipster/*.json` - JHipster entity configuration files
+## Features
 
-- `npmw` - wrapper to use locally installed npm.
-  JHipster installs Node and npm locally using the build tool by default. This wrapper makes sure npm is installed locally and uses it avoiding some differences different versions can cause. By using `./npmw` instead of the traditional `npm` you can configure a Node-less environment to develop or test your application.
-- `/src/main/docker` - Docker configurations for the application and services that the application depends on
+| Capability                                                                                                       | State       |
+| ---------------------------------------------------------------------------------------------------------------- | ----------- |
+| **Teams and products** — many teams, one tree per team, a user can belong to several                             | Implemented |
+| **Team-scoped access** — owner, editor and viewer roles; you only ever see the trees of teams you belong to      | Implemented |
+| **SSO sign-in** — OAuth2 / OpenID Connect through Keycloak, with company identity providers brokered through it  | Implemented |
+| **Tree editor** — build the tree visually from products down to experiments, with a status on every node         | In progress |
+| **Tree rearranging** — drag nodes and subtrees to restructure                                                    | Planned     |
+| **Assumptions and experiments** — record what each solution depends on and how it is being tested                | Planned     |
+| **Real-time collaboration** — several people in the same tree at once, seeing each other's changes as they occur | Planned     |
+| **Threaded comments** on nodes                                                                                   | Planned     |
+| **Interviews as evidence** — log customer interviews and link them to the opportunities they support             | Planned     |
+| **Jira and Confluence links** — paste a URL onto a node and it becomes a named, typed link                       | Planned     |
+| **Leadership overview** — read-only view across all teams                                                        | Planned     |
+| **MCP server** — read-only access for LLM agent tools, limited to what the calling user may see                  | Planned     |
 
-## Development
+## Tech stack
 
-### OAuth 2.0 / OpenID Connect
+|               |                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| **Backend**   | Java 21, Spring Boot 4 (Spring MVC, Spring Security, Spring Data JPA), Hibernate, MapStruct       |
+| **Frontend**  | Vue 3, TypeScript, Pinia, Vue Router, BootstrapVueNext, Vite                                      |
+| **Real-time** | STOMP over WebSocket (Spring's simple broker)                                                     |
+| **Database**  | PostgreSQL in production, H2 on disk for development, Liquibase migrations                        |
+| **Auth**      | OAuth2 / OIDC with Keycloak                                                                       |
+| **Tests**     | JUnit 5, ArchUnit, Cucumber and Testcontainers on the backend; Vitest and Playwright on the front |
+| **Scaffold**  | [JHipster 9](https://www.jhipster.tech/) monolith, generated from [`ombuto.jdl`](ombuto.jdl)      |
 
-Congratulations! You've selected an excellent way to secure your JHipster application. If you're not sure what OAuth and OpenID Connect (OIDC) are, please see [What the Heck is OAuth?](https://developer.okta.com/blog/2017/06/21/what-the-heck-is-oauth)
+The full design is in [`docs/Architecture/Architecture.md`](docs/Architecture/Architecture.md).
 
-To log in to your app, you'll need to have [Keycloak](https://keycloak.org) up and running. The JHipster Team has created a Docker container for you that has the default users and roles. Start Keycloak using the following command.
+## Getting started
 
-```bash
-docker compose -f src/main/docker/keycloak.yml up
-```
+### Prerequisites
 
-The security settings in `src/main/resources/config/application.yml` are configured for this image.
+- **Java 21** or newer
+- **Node.js 24.14** or newer
+- **Docker** — Keycloak and PostgreSQL run as containers
 
-```yaml
-spring:
-  ...
-  security:
-    oauth2:
-      client:
-        provider:
-          oidc:
-            issuer-uri: http://localhost:9080/realms/jhipster
-        registration:
-          oidc:
-            client-id: web_app
-            client-secret: web_app
-            scope: openid,profile,email
-```
-
-Some of Keycloak configuration is now done in build time and the other part before running the app, here is the [list](https://www.keycloak.org/server/all-config) of all build and configuration options.
-
-Before moving to production, please make sure to follow this [guide](https://www.keycloak.org/server/configuration) for better security and performance.
-
-Also, you should never use `start-dev` nor `KC_DB=dev-file` in production.
-
-When using Kubernetes, importing should be done using init-containers (with a volume when using `db=dev-file`).
-
-### Okta
-
-If you'd like to use Okta instead of Keycloak, it's pretty quick.
-
-First, you'll need to create a free developer account at <https://developer.okta.com/signup/>. After doing so, you'll get your own Okta domain, that has a name like `https://dev-123456.okta.com`.
-
-Modify `src/main/resources/config/application.yml` to use your Okta settings.
-
-```yaml
-spring:
-  ...
-  security:
-    oauth2:
-      client:
-        provider:
-          oidc:
-            issuer-uri: https://{yourOktaDomain}/oauth2/default
-        registration:
-          oidc:
-            client-id: {clientId}
-            client-secret: {clientSecret}
-security:
-```
-
-Create an OIDC App in Okta to get a `{clientId}` and `{clientSecret}`. To do this, log in to your Okta Developer account and navigate to **Applications** > **Add Application**. Click **Web** and click the **Next** button. Give the app a name you’ll remember, specify `http://localhost:8080` as a Base URI, and `http://localhost:8080/login/oauth2/code/oidc` as a Login Redirect URI. Click **Done**, then Edit and add `http://localhost:8080` as a Logout redirect URI. Copy and paste the client ID and secret into your `application.yml` file.
-
-Create a `ROLE_ADMIN` and `ROLE_USER` group and add users into them. Modify e2e tests to use this account when running integration tests.
-You'll need to change credentials in `src/test/javascript/e2e/account/account.spec.ts` and `src/test/javascript/e2e/admin/administration.spec.ts`.
-
-Navigate to **API** > **Authorization Servers**, click the **Authorization Servers** tab and edit the default one. Click the **Claims** tab and **Add Claim**. Name it "groups", and include it in the ID Token. Set the value type to "Groups" and set the filter to be a Regex of `.*`.
-
-After making these changes, you should be good to go! If you have any issues, please post them to [Stack Overflow](https://stackoverflow.com/questions/tagged/jhipster). Make sure to tag your question with "jhipster" and "okta".
-
-### Auth0
-
-If you'd like to use [Auth0](https://auth0.com/) instead of Keycloak, follow the configuration steps below:
-
-- Create a free developer account at [Sign Up - Auth0](https://auth0.com/signup). After successful sign-up, your account will be associated with a unique domain like `dev-xxx.us.auth0.com`
-- Create a new application of type `Regular Web Applications`. Switch to the `Settings` tab, and configure your application settings like:
-  - Allowed Callback URLs: `http://localhost:8080/login/oauth2/code/oidc`
-  - Allowed Logout URLs: `http://localhost:8080/`
-- Navigate to **User Management** > **Roles** and create new roles named `ROLE_ADMIN`, and `ROLE_USER`.
-- Navigate to **User Management** > **Users** and create a new user account. Click on the **Role** tab to assign roles to the newly created user account.
-- Navigate to **Auth Pipeline** > **Rules** and create a new Rule. Choose `Empty rule` template. Provide a meaningful name like `JHipster claims` and replace `Script` content with the following and Save.
-
-```javascript
-function (user, context, callback) {
-  user.preferred_username = user.email;
-  const roles = (context.authorization || {}).roles;
-
-  function prepareCustomClaimKey(claim) {
-    return `https://www.jhipster.tech/${claim}`;
-  }
-
-  const rolesClaim = prepareCustomClaimKey('roles');
-
-  if (context.idToken) {
-    context.idToken[rolesClaim] = roles;
-  }
-
-  if (context.accessToken) {
-    context.accessToken[rolesClaim] = roles;
-  }
-
-  callback(null, user, context);
-}
-```
-
-- In your `JHipster` application, modify `src/main/resources/config/application.yml` to use your Auth0 application settings:
-
-```yaml
-spring:
-  ...
-  security:
-    oauth2:
-      client:
-        provider:
-          oidc:
-            # make sure to include the ending slash!
-            issuer-uri: https://{your-auth0-domain}/
-        registration:
-          oidc:
-            client-id: {clientId}
-            client-secret: {clientSecret}
-            scope: openid,profile,email
-jhipster:
-  ...
-  security:
-    oauth2:
-      audience:
-        - https://{your-auth0-domain}/api/v2/
-```
-
-The build system will install automatically the recommended version of Node and npm.
-
-We provide a wrapper to launch npm.
-You will only need to run this command when dependencies change in [package.json](package.json).
+### Run it locally
 
 ```bash
-./npmw install
+npm install          # frontend dependencies
+./mvnw               # backend on http://localhost:8080
+npm start            # frontend dev server on http://localhost:9000  (second terminal)
 ```
 
-We use npm scripts and Vite as our build system.
+`./mvnw` starts the Keycloak and PostgreSQL containers from `src/main/docker/services.yml` for you
+(Spring Boot's Docker Compose support), creates the H2 development database under `target/h2db/`,
+and loads sample data. On Windows use `mvnw.cmd` from PowerShell, or `./mvnw` from Git Bash.
 
-Run the following commands in two separate terminals to create a blissful development experience where your browser
-auto-refreshes when files change on your hard drive.
+Open **http://localhost:9000** and sign in with one of the development accounts:
 
-```bash
-./npmw run backend:start
-./npmw run start
-```
+| User    | Password | Roles                     |
+| ------- | -------- | ------------------------- |
+| `admin` | `admin`  | `ROLE_ADMIN`, `ROLE_USER` |
+| `user`  | `user`   | `ROLE_USER`               |
 
-Npm is also used to manage CSS and JavaScript dependencies used in this application. You can upgrade dependencies by
-specifying a newer version in [package.json](package.json). You can also run `./npmw update` and `./npmw install` to manage dependencies.
-Add the `help` flag on any command to see how you can use it. For example, `./npmw help update`.
+The Keycloak admin console is at http://localhost:9080 (`admin` / `admin`). To sign users in through
+a company identity provider, see
+[`docs/Architecture/keycloak-idp-brokering.md`](docs/Architecture/keycloak-idp-brokering.md).
 
-The `./npmw run` command will list all the scripts available to run for this project.
+> A user can only be added to a team after they have signed in once — that first login is what
+> creates their record in the application.
 
-### PWA Support
+### Troubleshooting
 
-JHipster ships with PWA (Progressive Web App) support, and it's turned off by default. One of the main components of a PWA is a service worker.
-
-The service worker initialization code is commented out by default. To enable it, uncomment the following code in `src/main/webapp/index.html`:
-
-```html
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js').then(function () {
-      console.log('Service Worker Registered');
-    });
-  }
-</script>
-```
-
-Note: [Workbox](https://developer.chrome.com/docs/workbox) powers JHipster's service worker. It dynamically generates the `service-worker.js` file.
-
-### Managing dependencies
-
-For example, to add [Leaflet](https://leafletjs.com/) library as a runtime dependency of your application, you would run the following command:
-
-```bash
-./npmw install --save --save-exact leaflet
-```
-
-To benefit from TypeScript type definitions from [DefinitelyTyped](https://definitelytyped.org/) repository in development, you would run the following command:
-
-```bash
-./npmw install --save-dev --save-exact @types/leaflet
-```
-
-Then you would import the JS and CSS files specified in library's installation instructions so that [Vite][] knows about them:
-Note: There are still a few other things remaining to do for Leaflet that we won't detail here.
-
-For further instructions on how to develop with JHipster, have a look at [Using JHipster in development](https://www.jhipster.tech/development/).
-
-## Building for production
-
-### Packaging as jar
-
-To build the final jar and optimize the opportunitySolutionTree application for production, run:
-
-```bash
-./mvnw -Pprod clean verify
-```
-
-This will concatenate and minify the client CSS and JavaScript files. It will also modify `index.html` so it references these new files.
-To ensure everything worked, run:
-
-```bash
-java -jar target/*.jar
-```
-
-Then navigate to [http://localhost:8080](http://localhost:8080) in your browser.
-
-Refer to [Using JHipster in production][] for more details.
-
-### Packaging as war
-
-To package your application as a war in order to deploy it to an application server, run:
-
-```bash
-./mvnw -Pprod,war clean verify
-```
-
-### JHipster Control Center
-
-JHipster Control Center can help you manage and control your application(s). You can start a local control center server (accessible on http://localhost:7419) with:
-
-```bash
-docker compose -f src/main/docker/jhipster-control-center.yml up
-```
+- **`Bind for 127.0.0.1:9080 failed: port is already allocated`** — another Keycloak container is
+  holding the port. `docker ps -a --filter name=keycloak`, then remove any that is not
+  `opportunitysolutiontree-keycloak-1`.
+- **Liquibase checksum errors on startup** — the development database predates a schema change.
+  Stop the app and delete `target/h2db/db`.
+- **Frontend tests fail with `localStorage.clear is not a function`** — Node 25 or newer; run them
+  with `NODE_OPTIONS=--no-experimental-webstorage`.
 
 ## Testing
 
-### Spring Boot tests
+```bash
+npm run backend:unit:test -- -Pprod   # all backend tests against PostgreSQL (needs Docker)
+npm test                              # lint + all frontend unit tests
+npm run e2e                           # Playwright end-to-end tests (needs the app running)
+```
 
-To launch your application's tests, run:
+How to run a single test, what each test layer covers, and the known pitfalls are all in
+[`docs/Test Strategy/test-strategy.md`](docs/Test%20Strategy/test-strategy.md).
+
+## Building for production
 
 ```bash
-./mvnw verify
+./mvnw -Pprod clean verify                     # executable jar in target/
+java -jar target/*.jar
+
+npm run java:docker                            # or a Docker image, built with Jib
+docker compose -f src/main/docker/app.yml up   # app + PostgreSQL + Keycloak
 ```
 
-### Client tests
+Production needs a PostgreSQL database and an OIDC provider; configure them through the standard
+Spring properties (`SPRING_DATASOURCE_URL`, `SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI`,
+and so on). The [JHipster production guide](https://www.jhipster.tech/production/) covers the rest.
 
-Unit tests are run by Vitest. They're located near components and can be run with:
+## Project layout
 
-```bash
-./npmw test
+```
+ombuto.jdl                  Data model — the single source of truth for entities
+.jhipster/                  Entity configuration generated from the JDL
+src/main/java/              Spring Boot application (com.opportunity.tree)
+src/main/webapp/app/        Vue application
+  entities/                   generated CRUD screens
+  teams/, tree/               hand-written product features
+src/main/resources/config/  Spring configuration and Liquibase changelogs
+src/main/docker/            Compose files for Keycloak, PostgreSQL, the app, monitoring
+src/test/java/              JUnit, ArchUnit and Cucumber tests
+src/test/javascript/        Playwright end-to-end tests
+docs/                       PRD, architecture, epics, test strategy, use cases
+scripts/                    Repository maintenance scripts
+.ombutocode/                Ombuto Code workbench (see below)
 ```
 
-## Others
+## How this project is developed
 
-### Code quality using Sonar
+The application is planned and built with **Ombuto Code**, an agent-driven engineering workbench
+vendored under [`.ombutocode/`](.ombutocode/). Work flows from the
+[PRD](docs/Product%20Requirements%20Document/PRD.md) to [epics](docs/Epics/) to small tickets, which
+coding agents implement, test and evaluate before a human reviews them.
+[`GettingStarted.md`](GettingStarted.md) explains the workbench.
 
-Sonar is used to analyse code quality. You can start a local Sonar server (accessible on http://localhost:9001) with:
+Two rules matter to anyone contributing, human or agent:
 
-```bash
-docker compose -f src/main/docker/sonar.yml up -d
-```
+1. **Follow the engineering guide** —
+   [`.ombutocode/OMBUTOCODE_ENGINEERING_GUIDE.md`](.ombutocode/OMBUTOCODE_ENGINEERING_GUIDE.md)
+   defines the ticket lifecycle and scope rules.
+2. **The data model changes only through the JDL.** Edit [`ombuto.jdl`](ombuto.jdl), then run
+   `npx jhipster jdl ombuto.jdl`, so the entity, API, UI, migration and generated tests stay in
+   step. Never hand-edit a generated entity to change the model.
 
-Note: we have turned off forced authentication redirect for UI in [src/main/docker/sonar.yml](src/main/docker/sonar.yml) for out of the box experience while trying out SonarQube, for real use cases turn it back on.
+## Roadmap
 
-You can run a Sonar analysis with using the [sonar-scanner](https://docs.sonarqube.org/display/SCAN/Analyzing+with+SonarQube+Scanner) or by using the maven plugin.
+| Epic | Scope                                                                          | State       |
+| ---- | ------------------------------------------------------------------------------ | ----------- |
+| 1    | [Teams & Scoped Access](docs/Epics/epic_01_TEAMS_AND_SCOPED_ACCESS.md)         | In review   |
+| 2    | [Tree Editor Core](docs/Epics/epic_02_TREE_EDITOR_CORE.md)                     | In progress |
+| 3    | [Tree Rearranging](docs/Epics/epic_03_TREE_REARRANGING.md)                     | Planned     |
+| 4    | [Assumptions & Experiments](docs/Epics/epic_04_ASSUMPTIONS_AND_EXPERIMENTS.md) | Planned     |
+| 5    | [Real-Time Collaboration](docs/Epics/epic_05_REALTIME_COLLABORATION.md)        | Planned     |
+| 6    | [Threaded Comments](docs/Epics/epic_06_THREADED_COMMENTS.md)                   | Planned     |
+| 7    | [Interviews as Evidence](docs/Epics/epic_07_INTERVIEWS_AS_EVIDENCE.md)         | Planned     |
+| 8    | [Jira & Confluence Links](docs/Epics/epic_08_JIRA_AND_CONFLUENCE_LINKS.md)     | Planned     |
+| 9    | [Leadership Overview](docs/Epics/epic_09_LEADERSHIP_OVERVIEW.md)               | Planned     |
+| 10   | [MCP Server](docs/Epics/epic_10_MCP_SERVER.md)                                 | Planned     |
 
-Then, run a Sonar analysis:
+## Documentation
 
-```bash
-./mvnw -Pprod clean verify sonar:sonar -Dsonar.login=admin -Dsonar.password=admin
-```
+- [Product Requirements](docs/Product%20Requirements%20Document/PRD.md) — what it is and who it is for
+- [Architecture](docs/Architecture/Architecture.md) — design, stack and deployment
+- [Endpoint inventory](docs/Architecture/endpoint-inventory.md) — every REST endpoint and how it is protected
+- [Test strategy](docs/Test%20Strategy/test-strategy.md) — how to run and write tests
+- [Functional](docs/Functional%20Requirements/FunctionalRequirements.md) and
+  [non-functional](docs/Non-Functional%20Requirements/NonFunctionalRequirements.md) requirements
+- [JHipster 9 documentation](https://www.jhipster.tech/documentation-archive/v9.0.0) — for everything the scaffold provides
 
-If you need to re-run the Sonar phase, please be sure to specify at least the `initialize` phase since Sonar properties are loaded from the sonar-project.properties file.
+## Licence
 
-```bash
-./mvnw initialize sonar:sonar -Dsonar.login=admin -Dsonar.password=admin
-```
+Copyright 2026 Francois Botha. Licensed under the [Apache License, Version 2.0](LICENSE).
 
-Additionally, Instead of passing `sonar.password` and `sonar.login` as CLI arguments, these parameters can be configured from [sonar-project.properties](sonar-project.properties) as shown below:
+This project stands on a great deal of other people's work.
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) lists every library distributed with the
+application and the licence it is used under, including the few that need particular attention
+(Font Awesome's CC BY 4.0 icons, and Liquibase 5, which is source-available rather than open source).
 
-```bash
-sonar.login=admin
-sonar.password=admin
-```
+## Acknowledgements
 
-For more information, refer to the [Code quality page][].
+The Opportunity Solution Tree is a product discovery technique created by **Teresa Torres**,
+described in _Continuous Discovery Habits_ and at [producttalk.org](https://www.producttalk.org/).
+This project is an independent implementation and is not affiliated with, or endorsed by, Teresa
+Torres or Product Talk.
 
-### Docker Compose support
-
-JHipster generates a number of Docker Compose configuration files in the [src/main/docker/](src/main/docker/) folder to launch required third party services.
-
-For example, to start required services in Docker containers, run:
-
-```bash
-docker compose -f src/main/docker/services.yml up -d
-```
-
-To stop and remove the containers, run:
-
-```bash
-docker compose -f src/main/docker/services.yml down
-```
-
-[Spring Docker Compose Integration](https://docs.spring.io/spring-boot/reference/features/dev-services.html) is enabled by default. It's possible to disable it in `application.yml`:
-
-```yaml
-spring:
-  ...
-  docker:
-    compose:
-      enabled: false
-```
-
-You can also fully dockerize your application and all the services that it depends on.
-To achieve this, first build a Docker image of your app by running:
-
-```bash
-npm run java:docker
-```
-
-Or build an arm64 Docker image when using an arm64 processor OS, i.e., Apple Silicon chips (M\*), running:
-
-```bash
-npm run java:docker:arm64
-```
-
-Then run:
-
-```bash
-docker compose -f src/main/docker/app.yml up -d
-```
-
-For more information refer to [Docker and Docker-Compose](https://www.jhipster.tech/documentation-archive/v9.0.0/docker-compose/), this page also contains information on the Docker Compose sub-generator (`jhipster docker-compose`), which is able to generate Docker configurations for one or several JHipster applications.
-
-## Continuous Integration (optional)
-
-To configure CI for your project, run the ci-cd sub-generator (`jhipster ci-cd`), this will let you generate configuration files for a number of Continuous Integration systems. Consult the [Setting up Continuous Integration](https://www.jhipster.tech/documentation-archive/v9.0.0/setting-up-ci/) page for more information.
-
-## References
-
-- [JHipster Homepage and latest documentation](https://www.jhipster.tech/)
-- [JHipster 9.0.0 archive](https://www.jhipster.tech/documentation-archive/v9.0.0)
-- [Using JHipster in development](https://www.jhipster.tech/documentation-archive/v9.0.0/development/)
-- [Using Docker and Docker-Compose](https://www.jhipster.tech/documentation-archive/v9.0.0/docker-compose)
-- [Using JHipster in production](https://www.jhipster.tech/documentation-archive/v9.0.0/production/)
-- [Running tests page](https://www.jhipster.tech/documentation-archive/v9.0.0/running-tests/)
-- [Code quality page](https://www.jhipster.tech/documentation-archive/v9.0.0/code-quality/)
-- [Setting up Continuous Integration](https://www.jhipster.tech/documentation-archive/v9.0.0/setting-up-ci/)
-- [Node.js](https://nodejs.org/)
-- [NPM](https://www.npmjs.com/)
-- [Leaflet](https://leafletjs.com/)
-- [DefinitelyTyped](https://definitelytyped.org/)
+The application scaffold was generated by [JHipster](https://www.jhipster.tech/).
