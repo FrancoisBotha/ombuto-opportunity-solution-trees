@@ -90,7 +90,7 @@ npx vitest run src/main/webapp/app/account/account.service.spec.ts
 
 On Node 25+ prefix with `NODE_OPTIONS=--no-experimental-webstorage` (see section 9).
 Do **not** use `npm test -- <file>` for a single spec: `npm test` first lints the whole repo
-(`pretest`), which currently hangs (section 9).
+(`pretest`) and then runs every spec — slow and noisy for one file.
 
 **Playwright spec** (requires the running stack — see section 8)
 
@@ -106,11 +106,8 @@ npm run backend:unit:test -- -Pprod
 #   = ./mvnw -ntp -Dskip.installnodenpm -Dskip.npm verify --batch-mode -Pprod  (logging silenced)
 #   This is the same path JHipster's own `ci:backend:test` takes (default_environment = prod).
 
-# Frontend: repo-wide ESLint, then all Vitest specs with coverage (~25 s total)
-npx eslint . --ignore-pattern ".ombutocode/"
-npx vitest --run --coverage
-#   These two lines are what `npm test` does (pretest = lint, test = vitest), minus the
-#   `.ombutocode/` crawl that makes the stock `npm test` / `npm run lint` hang — see section 9.
+# Frontend: repo-wide ESLint (pretest), then all Vitest specs with coverage (~25 s total)
+npm test
 ```
 
 Both must pass for the regression closeout. There is no single command that runs both; run them
@@ -139,7 +136,7 @@ Optional, heavier:
 
 | Check | Scoped to files | Whole repo |
 |---|---|---|
-| ESLint (`eslint.config.ts`) | `npx eslint <files>` | `npx eslint . --ignore-pattern ".ombutocode/"` (add `--fix` to auto-fix). Not `npm run lint` — it hangs, section 9 |
+| ESLint (`eslint.config.ts`) | `npx eslint <files>` | `npm run lint` (`lint:fix` to auto-fix) |
 | Prettier (`.prettierrc`, `.prettierignore`) — covers `.java`, `.ts`, `.vue`, `.json`, `.yml`, `.md`, `.scss`, `.html` | `npx prettier --check <files>` / `--write <files>` | `npm run prettier:check` / `npm run prettier:format` |
 | Java compile (type check) | not file-scopable | `./mvnw -ntp --batch-mode -Dskip.installnodenpm -Dskip.npm test-compile` |
 | Checkstyle nohttp (`checkstyle.xml`) | not file-scopable | `npm run backend:nohttp:test` (= `./mvnw -ntp checkstyle:check`) |
@@ -153,7 +150,7 @@ husky's pre-commit hook runs `lint-staged` → `prettier --write` on staged file
 
 - **Backend — JaCoCo**, produced automatically by `verify`. Reports: `target/site/jacoco/index.html`
   (unit) and `target/site/jacoco-it/index.html` (integration). No minimum threshold is enforced.
-- **Frontend — Vitest v8 coverage**, produced by `npx vitest --run --coverage`. Report:
+- **Frontend — Vitest v8 coverage**, produced by `npm test`. Report:
   `target/vite-coverage/`. `vitest.config.ts` lists targets of statements 85 %, lines 85 %,
   branches 75 %, but they are **not enforced**: they sit directly under `coverage` rather than
   `coverage.thresholds`, which Vitest 4 ignores. Baseline 2026-09-18: 73.7 % statements, 73.9 %
@@ -212,7 +209,7 @@ for custom behaviour go in separate classes/specs so regeneration does not clobb
   H2 (`testdev`) is the per-ticket database. Cucumber scenarios are only in scope for a ticket
   whose acceptance criteria name a `.feature` file.
 - **The full backend `verify`.** Several minutes. Run only the ticket's own classes (section 3).
-- **The full frontend run** (repo-wide ESLint + every Vitest spec, section 4). Regression closeout only.
+- **`npm test` as a whole** (repo-wide ESLint + every Vitest spec). Regression closeout only.
 - **Real OAuth2/Keycloak login flows, WebSocket end-to-end delivery across browsers, Docker image
   builds (`jib`), Sonar analysis, production webapp build (`npm run build`).**
 - **Re-testing generated framework plumbing** (JHipster account/admin/health modules) that the
@@ -224,11 +221,9 @@ for custom behaviour go in separate classes/specs so regeneration does not clobb
   not a function`). Node's built-in Web Storage global shadows happy-dom's. Run Vitest with
   `NODE_OPTIONS=--no-experimental-webstorage` (verified fix), or use Node 24 LTS. In PowerShell:
   `$env:NODE_OPTIONS='--no-experimental-webstorage'; npx vitest run <file>`.
-- **`npm run lint` and `npm test` hang.** `eslint .` crawls `.ombutocode/` (Ombuto Code's own
-  sources plus a 3.7 MB bundled `dist`), which `eslint.config.ts` does not ignore; it ran 20+
-  minutes without finishing. With `--ignore-pattern ".ombutocode/"` the whole repo lints in ~9 s.
-  Use the explicit commands in sections 4 and 5 until `.ombutocode/` is added to the `ignores` in
-  `eslint.config.ts` (one-line fix, needs its own ticket); then remove this entry.
+- **Keep `.ombutocode/` in the `ignores` of `eslint.config.ts`.** Without it `eslint .` crawls
+  Ombuto Code's own sources and bundled `dist`, and `npm run lint` / `npm test` effectively hang
+  (20+ minutes). A JHipster regeneration may rewrite that file — re-check the ignore afterwards.
 - **CRLF vs Prettier on Windows.** `.editorconfig`/Prettier expect LF, but with
   `core.autocrlf=true` regenerated files are checked out as CRLF, so `prettier --check` reports
   them as unformatted and `git status` lists ~170 files as modified although `git diff` is empty.
@@ -286,8 +281,8 @@ for custom behaviour go in separate classes/specs so regeneration does not clobb
 
 ### Build phase — MUST NOT run (too slow, or owned by a later phase)
 
-- Full test suite:    `npm run backend:unit:test -- -Pprod`, `npx vitest --run --coverage` (or `npm test`)
-- Repo-wide lint:     `npx eslint .` / `npm run lint`, `npm run prettier:check`, `npm run backend:nohttp:test`, `npm run backend:doc:test`
+- Full test suite:    `npm run backend:unit:test -- -Pprod`, `npm test`
+- Repo-wide lint:     `npm run lint`, `npm run prettier:check`, `npm run backend:nohttp:test`, `npm run backend:doc:test`
 - Integration / E2E:  `npm run e2e` (Playwright), anything with `-Pprod` (Testcontainers), `CucumberTest`
 - Production build / packaging: `npm run build`, `npm run java:jar:prod`, `npm run java:docker`
 
@@ -308,8 +303,8 @@ for custom behaviour go in separate classes/specs so regeneration does not clobb
 - **Test agent only:** other `*IT` classes touching the changed area, `TechnicalStructureTest`,
   Checkstyle/Javadoc checks. `CucumberTest` (`-Pprod`, Docker) and Playwright specs only when the
   ticket's acceptance criteria explicitly call for them and the environment is running.
-- **Regression closeout ticket only:** `npm run backend:unit:test -- -Pprod` and the two frontend
-  commands from section 4, in full. Without Docker, fall back to the no-Docker command in section 4 and record
+- **Regression closeout ticket only:** `npm run backend:unit:test -- -Pprod` and `npm test`, in
+  full. Without Docker, fall back to the no-Docker command in section 4 and record
   Cucumber as skipped with the reason. `npm run e2e` when Keycloak + backend + Vite are up —
   otherwise record it as skipped.
 

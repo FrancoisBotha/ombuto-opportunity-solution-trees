@@ -16,6 +16,8 @@ export default defineConfig(
   },
   { ignores: ['src/main/docker/'] },
   { ignores: ['target/classes/static/', 'target/'] },
+  // Ombuto Code tooling, not application source; its bundled dist makes `eslint .` hang.
+  { ignores: ['.ombutocode/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended.map(config =>
     config.name === 'typescript-eslint/base' ? config : { ...config, files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'] },
