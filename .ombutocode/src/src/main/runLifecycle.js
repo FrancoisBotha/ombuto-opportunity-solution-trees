@@ -440,7 +440,26 @@ function resolveEvalOutcomeAfterRun({
     epicRefReferenced = structured.epicReferencePass === true;
   }
 
-  if (epicRefRequired && !epicRefReferenced) {
+  // Name the acceptance criteria the evaluator failed, so the reasons shown on
+  // the ticket say what is actually wrong rather than only "FAIL". Kept apart
+  // from `reasons` so they describe a failure without ever causing one: the
+  // pass/fail gates below still look at `reasons` alone.
+  const criterionFailures = [];
+  if (structured.hasAcceptanceCriteriaChecks) {
+    for (const check of structured.criteriaChecks) {
+      if (check.result !== 'FAIL') continue;
+      const criterion = String(check.criterion || 'unknown criterion');
+      criterionFailures.push(`Acceptance criterion failed: ${criterion.length > 200 ? `${criterion.slice(0, 200)}…` : criterion}`);
+    }
+  }
+  const describeFailure = (list) => [...criterionFailures, ...list];
+
+  // A check that is present and says FAIL is a verdict, not a formatting
+  // problem. Only report the line as missing when it really is.
+  const epicCheckFailed = epicRefRequired && structured.hasFeatureReferenceCheck && structured.epicReferencePass === false;
+  if (epicCheckFailed) {
+    reasons.push(`EPIC_REFERENCE_CHECK: FAIL — the evaluator judged that the implementation does not match ${epicRef}. See the epic reference evidence for details.`);
+  } else if (epicRefRequired && !epicRefReferenced) {
     reasons.push(`Evaluator output is missing explicit epic spec verification for ${epicRef}. The eval agent must include an EPIC_REFERENCE_CHECK: PASS or FAIL line.`);
   }
 
@@ -453,13 +472,13 @@ function resolveEvalOutcomeAfterRun({
     return {
       nextStatus: 'todo',
       verdict: 'fail',
-      reasons,
+      reasons: describeFailure(reasons),
       evalSummary: buildEvalSummary({
         verdict: 'fail',
         structured,
         timestamp: finishedAt,
         rawOutput: combinedOutput,
-        reasons
+        reasons: describeFailure(reasons)
       })
     };
   }
@@ -490,19 +509,19 @@ function resolveEvalOutcomeAfterRun({
   }
 
   if (verdict === 'fail') {
-    if (reasons.length === 0) {
+    if (reasons.length === 0 && criterionFailures.length === 0) {
       reasons.push('Evaluator returned FAIL verdict.');
     }
     return {
       nextStatus: 'todo',
       verdict: 'fail',
-      reasons,
+      reasons: describeFailure(reasons),
       evalSummary: buildEvalSummary({
         verdict: 'fail',
         structured,
         timestamp: finishedAt,
         rawOutput: combinedOutput,
-        reasons
+        reasons: describeFailure(reasons)
       })
     };
   }
@@ -528,13 +547,13 @@ function resolveEvalOutcomeAfterRun({
   return {
     nextStatus: 'todo',
     verdict: 'fail',
-    reasons,
+    reasons: describeFailure(reasons),
     evalSummary: buildEvalSummary({
         verdict: 'fail',
         structured,
         timestamp: finishedAt,
         rawOutput: combinedOutput,
-        reasons
+        reasons: describeFailure(reasons)
       })
   };
 }
