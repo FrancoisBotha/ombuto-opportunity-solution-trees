@@ -1,0 +1,56 @@
+<template>
+  <div class="table-responsive">
+    <h2 id="logs-page-heading" data-cy="logsPageHeading">Logs</h2>
+
+    <div v-if="loggers">
+      <p>There are {{ loggers.length }} loggers.</p>
+
+      <span>Filter</span> <input type="text" v-model="filtered" class="form-control" />
+
+      <table class="table table-sm table-striped table-bordered" aria-describedby="Logs">
+        <thead>
+          <tr title="click to order">
+            <th @click="changeOrder('name')" scope="col">
+              <span>Name</span>
+              <jhi-sort-indicator :current-order="orderProp" :reverse="reverse" :field-name="'name'"></jhi-sort-indicator>
+            </th>
+            <th @click="changeOrder('level')" scope="col">
+              <span>Level</span>
+              <jhi-sort-indicator :current-order="orderProp" :reverse="reverse" :field-name="'level'"></jhi-sort-indicator>
+            </th>
+          </tr>
+        </thead>
+
+        <tr v-for="logger in filteredLoggers" :key="logger.name">
+          <td>
+            <small>{{ logger.name }}</small>
+          </td>
+          <td>
+            <BButtonGroup role="group" aria-label="Log level" size="sm" class="flex-nowrap">
+              <BButton @click="updateLevel(logger.name, 'TRACE')" :variant="logger.level === 'TRACE' ? 'primary' : 'light'" size="sm">
+                TRACE
+              </BButton>
+              <BButton @click="updateLevel(logger.name, 'DEBUG')" :variant="logger.level === 'DEBUG' ? 'success' : 'light'" size="sm">
+                DEBUG
+              </BButton>
+              <BButton @click="updateLevel(logger.name, 'INFO')" :variant="logger.level === 'INFO' ? 'info' : 'light'" size="sm">
+                INFO
+              </BButton>
+              <BButton @click="updateLevel(logger.name, 'WARN')" :variant="logger.level === 'WARN' ? 'warning' : 'light'" size="sm">
+                WARN
+              </BButton>
+              <BButton @click="updateLevel(logger.name, 'ERROR')" :variant="logger.level === 'ERROR' ? 'danger' : 'light'" size="sm">
+                ERROR
+              </BButton>
+              <BButton @click="updateLevel(logger.name, 'OFF')" :variant="logger.level === 'OFF' ? 'secondary' : 'light'" size="sm">
+                OFF
+              </BButton>
+            </BButtonGroup>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" src="./logs.component.ts"></script>
