@@ -46,7 +46,8 @@ resource → service → JPA repository, with MapStruct DTOs at the boundary. Th
 hand-written pieces sit on top of the generated code:
 
 - **Team access.** A `TeamAccessService` resolves the current user's
-  `TeamMember` rows and answers "can this user read or edit this product?" Every
+  `TeamMember` rows and answers "can this user read or edit this team's tree?"
+  (a product, and every node beneath it, resolves to its team). Every
   service method that touches a tree goes through it, and list queries are
   filtered by the user's team ids. Viewers are read-only. A global
   `ROLE_OVERVIEW` authority, assigned in Keycloak, grants read access across all
@@ -54,7 +55,7 @@ hand-written pieces sit on top of the generated code:
 - **Tree collaboration.** All writes go through the REST API, which validates,
   authorises and persists them. After commit, the service publishes a small
   change event (`nodeType`, `id`, `action`, DTO, `user`) to
-  `/topic/products/{productId}/tree`. Clients never write over the socket.
+  `/topic/teams/{teamId}/tree`. Clients never write over the socket.
   Subscriptions are checked against `TeamAccessService` in a STOMP channel
   interceptor, so a user can only listen to trees they are allowed to see.
   Comments use the same mechanism.
@@ -62,8 +63,9 @@ hand-written pieces sit on top of the generated code:
   interviews) call the same services, so they are scoped the same way. Callers
   present a Keycloak bearer token.
 
-**Frontend** loads a product's whole tree in one request into a Pinia store,
-renders it in the tree editor, and subscribes to that product's topic. An
+**Frontend** loads a team's whole tree (all of the team's products as top-level
+branches) in one request into a Pinia store, renders it in the tree editor with
+an optional focus on one product, and subscribes to that team's topic. An
 incoming event patches the store. The user's own edits are applied when the REST
 call returns, and their echoed event is ignored. On reconnect, the client
 reloads the tree rather than replaying missed events.
@@ -99,6 +101,12 @@ winning value immediately.
   and authorisation, and there is one thing to deploy.
 - One deployment per organisation, no tenant layer: `Team` is the top-level
   scope.
+- One tree per team, with products as top-level branches, not one tree per
+  product: members working on different products share one canvas and one
+  real-time topic. No schema change — `Product → Team` and `Outcome → Product`
+  already express it; only the tree load and the topic are team-scoped.
+  Considered a separate `Tree` entity and rejected it as an extra level nobody
+  asked for.
 
 ## 5. Security & Data
 

@@ -4,9 +4,11 @@
 
 Ombuto OST is a web application for product development organisations that
 practise continuous discovery as described by Teresa Torres. Each team maintains
-an Opportunity Solution Tree per product: a desired outcome at the top, the
-customer opportunities beneath it, the solutions being considered, and the
-assumptions and experiments that test them. Teams edit the same tree in real
+one Opportunity Solution Tree covering all of its products: each product is a
+top-level branch, with its desired outcomes beneath it, then the customer
+opportunities, the solutions being considered, and the assumptions and
+experiments that test them. Different members can work on different products in
+the same tree at the same time. Teams edit the same tree in real
 time, and outcomes and opportunities are visible to everyone who should see
 them. It replaces trees drawn in whiteboard tools, which have no structure, go
 stale, and are invisible outside the team that drew them. Tree nodes link to
@@ -29,14 +31,15 @@ them.
 
 ## 3. Must-Have Features
 
-- Tree editor — build and rearrange the tree visually, from Outcome through
-  nested Opportunities and Solutions to Assumptions and Experiments, with a
-  status on each node.
+- Tree editor — build and rearrange the tree visually, from the team's Products
+  through Outcomes, nested Opportunities and Solutions to Assumptions and
+  Experiments, with a status on each node. The canvas can be focused on a single
+  product.
 - Real-time collaboration — several people edit the same tree at once and see
   each other's changes immediately, with threaded comments on nodes.
-- Teams and products — many teams, each with many products, and one tree per
-  product. A user can belong to several teams, with an owner, editor or viewer
-  role in each.
+- Teams and products — many teams, each with one tree that holds all of the
+  team's products as top-level branches. A user can belong to several teams,
+  with an owner, editor or viewer role in each.
 - Team-scoped access — users see only the trees of teams they belong to.
 - Interviews as evidence — log customer interviews and link them to the
   opportunities they support.
