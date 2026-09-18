@@ -44,3 +44,22 @@ export interface IAddTeamMemberRequest {
 export interface IChangeTeamMemberRoleRequest {
   role: TeamRole;
 }
+
+export interface ITeamProduct {
+  id: number;
+  name: string;
+  description?: string | null;
+  archived: boolean;
+  createdDate?: string | null;
+  teamId: number;
+}
+
+export interface ICreateTeamProductRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface IUpdateTeamProductRequest {
+  name: string;
+  description?: string | null;
+}

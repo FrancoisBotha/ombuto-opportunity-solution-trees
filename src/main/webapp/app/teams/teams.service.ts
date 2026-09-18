@@ -3,14 +3,37 @@ import axios from 'axios';
 import type {
   IAddTeamMemberRequest,
   IChangeTeamMemberRoleRequest,
+  ICreateTeamProductRequest,
   ICreateTeamRequest,
   IMyTeam,
   ITeamMember,
+  ITeamProduct,
+  IUpdateTeamProductRequest,
   IUpdateTeamRequest,
   IUserSearchResult,
 } from './my-team.model';
 
 const baseApiUrl = 'api/team-management';
+const productsApiUrl = 'api/products';
+const teamsApiUrl = 'api/teams';
+
+interface IServerProductDTO {
+  id: number;
+  name: string;
+  description?: string | null;
+  archived: boolean;
+  createdDate?: string | null;
+  team?: { id: number } | null;
+}
+
+const toTeamProduct = (dto: IServerProductDTO): ITeamProduct => ({
+  id: dto.id,
+  name: dto.name,
+  description: dto.description ?? null,
+  archived: !!dto.archived,
+  createdDate: dto.createdDate ?? null,
+  teamId: dto.team?.id ?? 0,
+});
 
 export default class TeamsService {
   listMyTeams(): Promise<IMyTeam[]> {
@@ -49,5 +72,41 @@ export default class TeamsService {
     return axios
       .get<IUserSearchResult[]>(`${baseApiUrl}/teams/${teamId}/user-search`, { params: { q: query, limit } })
       .then(res => res.data);
+  }
+
+  listTeamProducts(teamId: number): Promise<ITeamProduct[]> {
+    return axios.get<IServerProductDTO[]>(`${teamsApiUrl}/${teamId}/products`).then(res => res.data.map(toTeamProduct));
+  }
+
+  createTeamProduct(teamId: number, request: ICreateTeamProductRequest): Promise<ITeamProduct> {
+    const body = {
+      name: request.name,
+      description: request.description ?? null,
+      archived: false,
+      createdDate: new Date().toISOString(),
+      team: { id: teamId },
+    };
+    return axios.post<IServerProductDTO>(productsApiUrl, body).then(res => toTeamProduct(res.data));
+  }
+
+  updateTeamProduct(product: ITeamProduct, request: IUpdateTeamProductRequest): Promise<ITeamProduct> {
+    const body = {
+      id: product.id,
+      name: request.name,
+      description: request.description ?? null,
+      archived: product.archived,
+      createdDate: product.createdDate ?? new Date().toISOString(),
+      team: { id: product.teamId },
+    };
+    return axios.put<IServerProductDTO>(`${productsApiUrl}/${product.id}`, body).then(res => toTeamProduct(res.data));
+  }
+
+  setProductArchived(productId: number, archived: boolean): Promise<ITeamProduct> {
+    const body = { id: productId, archived };
+    return axios
+      .patch<IServerProductDTO>(`${productsApiUrl}/${productId}`, body, {
+        headers: { 'Content-Type': 'application/merge-patch+json' },
+      })
+      .then(res => toTeamProduct(res.data));
   }
 }

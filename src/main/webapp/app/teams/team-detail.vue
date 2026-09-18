@@ -50,6 +50,8 @@
 
       <hr class="my-4" />
       <team-members :team-id="teamId" />
+      <hr class="my-4" />
+      <team-products :team-id="teamId" />
     </div>
   </div>
 </template>
