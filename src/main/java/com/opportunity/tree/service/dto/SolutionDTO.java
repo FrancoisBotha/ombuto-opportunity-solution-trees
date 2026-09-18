@@ -31,10 +31,8 @@ public class SolutionDTO implements Serializable {
     @Max(value = 5)
     private Integer effort;
 
-    @NotNull
     private Integer sortOrder;
 
-    @NotNull
     private Instant createdDate;
 
     private Instant lastModifiedDate;

@@ -28,7 +28,6 @@ import tech.jhipster.web.util.ResponseUtil;
  */
 @RestController
 @RequestMapping("/api/outcomes")
-@PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
 public class OutcomeResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(OutcomeResource.class);
@@ -92,9 +91,9 @@ public class OutcomeResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        if (!outcomeRepository.existsById(id)) {
-            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
-        }
+        // Existence is checked in the service AFTER authorisation so that
+        // non-members receive the same 403 whether or not the id exists
+        // (NFR-002: never reveal existence to non-members).
 
         outcomeDTO = outcomeService.update(outcomeDTO);
         return ResponseEntity.ok()
@@ -126,9 +125,9 @@ public class OutcomeResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        if (!outcomeRepository.existsById(id)) {
-            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
-        }
+        // Existence is checked in the service AFTER authorisation so that
+        // non-members receive the same 403 whether or not the id exists
+        // (NFR-002: never reveal existence to non-members).
 
         Optional<OutcomeDTO> result = outcomeService.partialUpdate(outcomeDTO);
 
@@ -145,6 +144,7 @@ public class OutcomeResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of Outcomes in body.
      */
     @GetMapping("")
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<List<OutcomeDTO>> getAllOutcomes(OutcomeCriteria criteria) {
         LOG.debug("REST request to get Outcomes by criteria: {}", criteria);
 
@@ -159,6 +159,7 @@ public class OutcomeResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the count in body.
      */
     @GetMapping("/count")
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<Long> countOutcomes(OutcomeCriteria criteria) {
         LOG.debug("REST request to count Outcomes by criteria: {}", criteria);
         return ResponseEntity.ok().body(outcomeQueryService.countByCriteria(criteria));
@@ -171,6 +172,7 @@ public class OutcomeResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the outcomeDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<OutcomeDTO> getOutcome(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Outcome : {}", id);
         Optional<OutcomeDTO> outcomeDTO = outcomeService.findOne(id);
@@ -184,6 +186,7 @@ public class OutcomeResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<Void> deleteOutcome(@PathVariable("id") Long id) {
         LOG.debug("REST request to delete Outcome : {}", id);
         outcomeService.delete(id);

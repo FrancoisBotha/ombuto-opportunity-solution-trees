@@ -29,20 +29,16 @@ public class OpportunityDTO implements Serializable {
     @NotNull
     private OpportunityStatus status;
 
-    @NotNull
     @Min(value = 1)
     @Max(value = 5)
     private Integer valuerating;
 
-    @NotNull
     @Min(value = 1)
     @Max(value = 5)
     private Integer complexity;
 
-    @NotNull
     private Integer sortOrder;
 
-    @NotNull
     private Instant createdDate;
 
     private Instant lastModifiedDate;

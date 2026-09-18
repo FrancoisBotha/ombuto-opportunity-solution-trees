@@ -13,9 +13,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Outcome;
 import com.opportunity.tree.domain.Product;
+import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.OutcomeStatus;
+import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.OutcomeRepository;
+import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.service.OutcomeService;
 import com.opportunity.tree.service.dto.OutcomeDTO;
@@ -103,6 +106,11 @@ class OutcomeResourceIT {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private TeamMemberRepository teamMemberRepository;
+
+    private TeamMember insertedMembership;
+
     @Mock
     private OutcomeRepository outcomeRepositoryMock;
 
@@ -189,6 +197,24 @@ class OutcomeResourceIT {
     @BeforeEach
     void initTest() {
         outcome = createEntity(em);
+        // The mock user ("user" — the @WithMockUser default) must be an OWNER of the
+        // outcome's team so the team-scoped access checks in OutcomeServiceImpl let
+        // the generated CRUD calls through. Without this seed every write would 403.
+        User user = userRepository
+            .findOneByLogin("user")
+            .orElseGet(() -> {
+                User u = UserResourceIT.createEntity();
+                u.setLogin("user");
+                em.persist(u);
+                em.flush();
+                return u;
+            });
+        TeamMember membership = new TeamMember().role(TeamRole.OWNER).joinedDate(Instant.now());
+        membership.setTeam(outcome.getProduct().getTeam());
+        membership.setUser(user);
+        em.persist(membership);
+        em.flush();
+        insertedMembership = membership;
     }
 
     @AfterEach
@@ -196,6 +222,10 @@ class OutcomeResourceIT {
         if (insertedOutcome != null) {
             outcomeRepository.delete(insertedOutcome);
             insertedOutcome = null;
+        }
+        if (insertedMembership != null) {
+            teamMemberRepository.delete(insertedMembership);
+            insertedMembership = null;
         }
         userRepository.deleteAll();
     }
@@ -280,36 +310,47 @@ class OutcomeResourceIT {
 
     @Test
     @Transactional
-    void checkSortOrderIsRequired() throws Exception {
-        long databaseSizeBeforeTest = getRepositoryCount();
-        // set the field null
-        outcome.setSortOrder(null);
+    void createOutcomeIgnoresClientSuppliedServerSetFields() throws Exception {
+        // An existing sibling, so append-last is observable
+        Outcome sibling = outcomeRepository.saveAndFlush(createEntity(em).sortOrder(7));
 
-        // Create the Outcome, which fails.
+        // sortOrder, createdDate and lastModifiedDate are server-set (TREE-002)
+        outcome.sortOrder(99).createdDate(DEFAULT_CREATED_DATE).lastModifiedDate(DEFAULT_LAST_MODIFIED_DATE);
         OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
 
-        restOutcomeMockMvc
-            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(outcomeDTO)))
-            .andExpect(status().isBadRequest());
+        var returnedOutcomeDTO = om.readValue(
+            restOutcomeMockMvc
+                .perform(
+                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(outcomeDTO))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            OutcomeDTO.class
+        );
 
-        assertSameRepositoryCount(databaseSizeBeforeTest);
+        Outcome persisted = outcomeRepository.findById(returnedOutcomeDTO.getId()).orElseThrow();
+        assertThat(persisted.getSortOrder()).isEqualTo(sibling.getSortOrder() + 1);
+        assertThat(persisted.getCreatedDate()).isAfter(DEFAULT_CREATED_DATE);
+        assertThat(persisted.getLastModifiedDate()).isEqualTo(persisted.getCreatedDate());
     }
 
     @Test
     @Transactional
-    void checkCreatedDateIsRequired() throws Exception {
-        long databaseSizeBeforeTest = getRepositoryCount();
-        // set the field null
-        outcome.setCreatedDate(null);
-
-        // Create the Outcome, which fails.
+    void createOutcomeWithoutServerSetFields() throws Exception {
+        long databaseSizeBeforeCreate = getRepositoryCount();
+        outcome.sortOrder(null).createdDate(null).lastModifiedDate(null);
         OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
 
         restOutcomeMockMvc
             .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(outcomeDTO)))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.sortOrder").isNumber())
+            .andExpect(jsonPath("$.createdDate").isNotEmpty())
+            .andExpect(jsonPath("$.lastModifiedDate").isNotEmpty());
 
-        assertSameRepositoryCount(databaseSizeBeforeTest);
+        assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
     }
 
     @Test
@@ -1056,6 +1097,7 @@ class OutcomeResourceIT {
 
         // Validate the Outcome in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
+        expectServerSetFields(updatedOutcome);
         assertPersistedOutcomeToMatchAllProperties(updatedOutcome);
     }
 
@@ -1068,7 +1110,8 @@ class OutcomeResourceIT {
         // Create the Outcome
         OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
 
-        // If the entity doesn't have an ID, it will throw BadRequestAlertException
+        // A non-existent id must return the same 403 as an id the caller cannot
+        // edit, so existence is never revealed (NFR-002).
         restOutcomeMockMvc
             .perform(
                 put(ENTITY_API_URL_ID, outcomeDTO.getId())
@@ -1076,7 +1119,7 @@ class OutcomeResourceIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(om.writeValueAsBytes(outcomeDTO))
             )
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isForbidden());
 
         // Validate the Outcome in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -1154,6 +1197,7 @@ class OutcomeResourceIT {
         // Validate the Outcome in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
+        expectServerSetFields(partialUpdatedOutcome);
         assertOutcomeUpdatableFieldsEquals(createUpdateProxyForBean(partialUpdatedOutcome, outcome), getPersistedOutcome(outcome));
     }
 
@@ -1194,6 +1238,7 @@ class OutcomeResourceIT {
         // Validate the Outcome in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
+        expectServerSetFields(partialUpdatedOutcome);
         assertOutcomeUpdatableFieldsEquals(partialUpdatedOutcome, getPersistedOutcome(partialUpdatedOutcome));
     }
 
@@ -1206,7 +1251,8 @@ class OutcomeResourceIT {
         // Create the Outcome
         OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
 
-        // If the entity doesn't have an ID, it will throw BadRequestAlertException
+        // A non-existent id must return the same 403 as an id the caller cannot
+        // edit, so existence is never revealed (NFR-002).
         restOutcomeMockMvc
             .perform(
                 patch(ENTITY_API_URL_ID, outcomeDTO.getId())
@@ -1214,7 +1260,7 @@ class OutcomeResourceIT {
                     .contentType("application/merge-patch+json")
                     .content(om.writeValueAsBytes(outcomeDTO))
             )
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isForbidden());
 
         // Validate the Outcome in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -1278,6 +1324,16 @@ class OutcomeResourceIT {
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
+    }
+
+    /**
+     * sortOrder and createdDate are server-owned and lastModifiedDate is stamped by the
+     * server on every update (TREE-002), whatever the client sent.
+     */
+    private void expectServerSetFields(Outcome expected) {
+        Outcome persisted = getPersistedOutcome(expected);
+        assertThat(persisted.getLastModifiedDate()).isAfter(DEFAULT_LAST_MODIFIED_DATE);
+        expected.sortOrder(DEFAULT_SORT_ORDER).createdDate(DEFAULT_CREATED_DATE).lastModifiedDate(persisted.getLastModifiedDate());
     }
 
     protected long getRepositoryCount() {

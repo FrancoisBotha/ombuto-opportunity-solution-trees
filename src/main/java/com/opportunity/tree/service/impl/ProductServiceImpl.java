@@ -2,12 +2,14 @@ package com.opportunity.tree.service.impl;
 
 import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.repository.ProductRepository;
+import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.ProductService;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.mapper.ProductMapper;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -54,11 +56,16 @@ public class ProductServiceImpl implements ProductService {
     public ProductDTO save(ProductDTO productDTO) {
         LOG.debug("Request to save Product : {}", productDTO);
         Long targetTeamId = teamIdOf(productDTO);
+        if (targetTeamId == null) {
+            throw new NodeWriteRuleException("A product must have a team", "product", "parentmissing");
+        }
         teamAccessService.requireEditTeam(targetTeamId);
         Product product = productMapper.toEntity(productDTO);
+        product.setId(null);
         if (product.getArchived() == null) {
             product.setArchived(Boolean.FALSE);
         }
+        product.setCreatedDate(Instant.now());
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }
@@ -77,6 +84,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         Product product = productMapper.toEntity(productDTO);
+        product.setCreatedDate(existing.getCreatedDate());
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }
@@ -96,7 +104,9 @@ public class ProductServiceImpl implements ProductService {
         return productRepository
             .findById(productDTO.getId())
             .map(existingProduct -> {
+                Instant preservedCreatedDate = existingProduct.getCreatedDate();
                 productMapper.partialUpdate(existingProduct, productDTO);
+                existingProduct.setCreatedDate(preservedCreatedDate);
                 return existingProduct;
             })
             .map(productRepository::save)

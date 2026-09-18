@@ -40,4 +40,7 @@ public interface OutcomeRepository extends JpaRepository<Outcome, Long>, JpaSpec
 
     @Query("select outcome from Outcome outcome left join fetch outcome.product left join fetch outcome.owner where outcome.id =:id")
     Optional<Outcome> findOneWithToOneRelationships(@Param("id") Long id);
+
+    @Query("select coalesce(max(o.sortOrder), -1) from Outcome o where o.product.id = :productId")
+    Integer findMaxSortOrderByProductId(@Param("productId") Long productId);
 }

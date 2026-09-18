@@ -33,7 +33,6 @@ import tech.jhipster.web.util.ResponseUtil;
  */
 @RestController
 @RequestMapping("/api/solutions")
-@PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
 public class SolutionResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(SolutionResource.class);
@@ -101,9 +100,9 @@ public class SolutionResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        if (!solutionRepository.existsById(id)) {
-            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
-        }
+        // Existence is checked in the service AFTER authorisation so that
+        // non-members receive the same 403 whether or not the id exists
+        // (NFR-002: never reveal existence to non-members).
 
         solutionDTO = solutionService.update(solutionDTO);
         return ResponseEntity.ok()
@@ -135,9 +134,9 @@ public class SolutionResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        if (!solutionRepository.existsById(id)) {
-            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
-        }
+        // Existence is checked in the service AFTER authorisation so that
+        // non-members receive the same 403 whether or not the id exists
+        // (NFR-002: never reveal existence to non-members).
 
         Optional<SolutionDTO> result = solutionService.partialUpdate(solutionDTO);
 
@@ -155,6 +154,7 @@ public class SolutionResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of Solutions in body.
      */
     @GetMapping("")
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<List<SolutionDTO>> getAllSolutions(
         SolutionCriteria criteria,
         @org.springdoc.core.annotations.ParameterObject Pageable pageable
@@ -173,6 +173,7 @@ public class SolutionResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the count in body.
      */
     @GetMapping("/count")
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<Long> countSolutions(SolutionCriteria criteria) {
         LOG.debug("REST request to count Solutions by criteria: {}", criteria);
         return ResponseEntity.ok().body(solutionQueryService.countByCriteria(criteria));
@@ -185,6 +186,7 @@ public class SolutionResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the solutionDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<SolutionDTO> getSolution(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Solution : {}", id);
         Optional<SolutionDTO> solutionDTO = solutionService.findOne(id);
@@ -198,6 +200,7 @@ public class SolutionResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<Void> deleteSolution(@PathVariable("id") Long id) {
         LOG.debug("REST request to delete Solution : {}", id);
         solutionService.delete(id);

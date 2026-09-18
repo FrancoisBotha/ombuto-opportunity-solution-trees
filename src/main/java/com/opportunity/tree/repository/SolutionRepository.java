@@ -47,4 +47,7 @@ public interface SolutionRepository
         "select solution from Solution solution left join fetch solution.opportunity left join fetch solution.owner where solution.id =:id"
     )
     Optional<Solution> findOneWithToOneRelationships(@Param("id") Long id);
+
+    @Query("select coalesce(max(s.sortOrder), -1) from Solution s where s.opportunity.id = :opportunityId")
+    Integer findMaxSortOrderByOpportunityId(@Param("opportunityId") Long opportunityId);
 }
