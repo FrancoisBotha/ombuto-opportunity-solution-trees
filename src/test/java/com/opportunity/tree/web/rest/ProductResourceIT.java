@@ -13,7 +13,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.domain.Team;
+import com.opportunity.tree.domain.TeamMember;
+import com.opportunity.tree.domain.User;
+import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.ProductRepository;
+import com.opportunity.tree.repository.TeamMemberRepository;
+import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.service.ProductService;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.mapper.ProductMapper;
@@ -73,6 +78,16 @@ class ProductResourceIT {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TeamMemberRepository teamMemberRepository;
+
+    private TeamMember insertedMembership;
+
+    private User insertedUser;
 
     @Mock
     private ProductRepository productRepositoryMock;
@@ -148,6 +163,24 @@ class ProductResourceIT {
     @BeforeEach
     void initTest() {
         product = createEntity(em);
+        // The mock user ("user" — the @WithMockUser default) must be an OWNER of the
+        // product's team so the team-scoped access checks in ProductServiceImpl let
+        // the generated CRUD calls through. Without this seed every write would 403.
+        insertedUser = userRepository
+            .findOneByLogin("user")
+            .orElseGet(() -> {
+                User u = UserResourceIT.createEntity();
+                u.setLogin("user");
+                em.persist(u);
+                em.flush();
+                return u;
+            });
+        TeamMember membership = new TeamMember().role(TeamRole.OWNER).joinedDate(Instant.now());
+        membership.setTeam(product.getTeam());
+        membership.setUser(insertedUser);
+        em.persist(membership);
+        em.flush();
+        insertedMembership = membership;
     }
 
     @AfterEach
@@ -155,6 +188,14 @@ class ProductResourceIT {
         if (insertedProduct != null) {
             productRepository.delete(insertedProduct);
             insertedProduct = null;
+        }
+        if (insertedMembership != null) {
+            teamMemberRepository.delete(insertedMembership);
+            insertedMembership = null;
+        }
+        if (insertedUser != null) {
+            userRepository.delete(insertedUser);
+            insertedUser = null;
         }
     }
 
@@ -358,7 +399,8 @@ class ProductResourceIT {
         // Create the Product
         ProductDTO productDTO = productMapper.toDto(product);
 
-        // If the entity doesn't have an ID, it will throw BadRequestAlertException
+        // A non-existent id must return the same 403 as an id the caller cannot
+        // edit, so existence is never revealed (NFR-002).
         restProductMockMvc
             .perform(
                 put(ENTITY_API_URL_ID, productDTO.getId())
@@ -366,7 +408,7 @@ class ProductResourceIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(om.writeValueAsBytes(productDTO))
             )
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isForbidden());
 
         // Validate the Product in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -485,7 +527,8 @@ class ProductResourceIT {
         // Create the Product
         ProductDTO productDTO = productMapper.toDto(product);
 
-        // If the entity doesn't have an ID, it will throw BadRequestAlertException
+        // A non-existent id must return the same 403 as an id the caller cannot
+        // edit, so existence is never revealed (NFR-002).
         restProductMockMvc
             .perform(
                 patch(ENTITY_API_URL_ID, productDTO.getId())
@@ -493,7 +536,7 @@ class ProductResourceIT {
                     .contentType("application/merge-patch+json")
                     .content(om.writeValueAsBytes(productDTO))
             )
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isForbidden());
 
         // Validate the Product in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);

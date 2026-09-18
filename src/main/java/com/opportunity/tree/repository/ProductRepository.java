@@ -1,6 +1,7 @@
 package com.opportunity.tree.repository;
 
 import com.opportunity.tree.domain.Product;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -39,4 +40,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query("select product from Product product left join fetch product.team where product.id =:id")
     Optional<Product> findOneWithToOneRelationships(@Param("id") Long id);
+
+    @Query("select product from Product product left join fetch product.team where product.team.id = :teamId")
+    List<Product> findAllByTeamId(@Param("teamId") Long teamId);
+
+    @Query("select product from Product product left join fetch product.team where product.team.id in :teamIds")
+    List<Product> findAllByTeamIdIn(@Param("teamIds") Collection<Long> teamIds);
 }

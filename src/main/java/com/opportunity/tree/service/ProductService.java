@@ -42,6 +42,20 @@ public interface ProductService {
     List<ProductDTO> findAll();
 
     /**
+     * Get all products visible to the current user (i.e. belonging to a team
+     * the current user is a member of, in any role). Includes archived
+     * products; the DTO carries the {@code archived} flag.
+     */
+    List<ProductDTO> findAllForCurrentUser();
+
+    /**
+     * Get all products for the given team. The current user must be a member
+     * of the team (any role); otherwise a {@code TeamAccessDeniedException}
+     * is thrown. Includes archived products.
+     */
+    List<ProductDTO> findAllByTeam(Long teamId);
+
+    /**
      * Get all the products with eager load of many-to-many relationships.
      *
      * @param pageable the pagination information.

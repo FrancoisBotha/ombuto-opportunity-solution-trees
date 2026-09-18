@@ -1,6 +1,5 @@
 package com.opportunity.tree.web.rest;
 
-import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.service.ProductService;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.web.rest.errors.BadRequestAlertException;
@@ -35,11 +34,8 @@ public class ProductResource {
 
     private final ProductService productService;
 
-    private final ProductRepository productRepository;
-
-    public ProductResource(ProductService productService, ProductRepository productRepository) {
+    public ProductResource(ProductService productService) {
         this.productService = productService;
-        this.productRepository = productRepository;
     }
 
     /**
@@ -84,10 +80,9 @@ public class ProductResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        if (!productRepository.existsById(id)) {
-            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
-        }
-
+        // Existence is checked in the service AFTER authorisation so that
+        // non-members receive the same 403 whether or not the id exists
+        // (NFR-002: never reveal existence to non-members).
         productDTO = productService.update(productDTO);
         return ResponseEntity.ok()
             .headers(HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, productDTO.getId().toString()))
@@ -118,10 +113,9 @@ public class ProductResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        if (!productRepository.existsById(id)) {
-            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
-        }
-
+        // Existence is checked in the service AFTER authorisation so that
+        // non-members receive the same 403 whether or not the id exists
+        // (NFR-002: never reveal existence to non-members).
         Optional<ProductDTO> result = productService.partialUpdate(productDTO);
 
         return ResponseUtil.wrapOrNotFound(
@@ -138,8 +132,8 @@ public class ProductResource {
      */
     @GetMapping("")
     public List<ProductDTO> getAllProducts(@RequestParam(name = "eagerload", required = false, defaultValue = "true") boolean eagerload) {
-        LOG.debug("REST request to get all Products");
-        return productService.findAll();
+        LOG.debug("REST request to get all Products for current user");
+        return productService.findAllForCurrentUser();
     }
 
     /**
