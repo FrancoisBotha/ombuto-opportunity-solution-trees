@@ -104,11 +104,14 @@
         <section v-if="isExpanded(tool.id)" class="models-section">
           <header class="models-header">
             <h4>Models</h4>
+            <p v-if="(tool.models || []).length > 1" class="models-hint">
+              Order is priority: the scheduler uses the first enabled model that has capacity.
+            </p>
           </header>
 
           <div v-if="(tool.models || []).length > 0" class="model-list">
             <article
-              v-for="model in tool.models"
+              v-for="(model, modelIndex) in tool.models"
               :key="model.id"
               class="model-row"
               :class="{ disabled: !model.enabled }"
@@ -148,6 +151,22 @@
                   <div><span>Enabled</span><strong>{{ model.enabled ? 'Yes' : 'No' }}</strong></div>
                 </div>
                 <div class="card-actions">
+                  <button
+                    type="button"
+                    class="btn-secondary btn-move"
+                    title="Move up (higher priority)"
+                    :aria-label="`Move ${model.name} up`"
+                    :disabled="modelIndex === 0"
+                    @click="moveModel(tool.id, model, 'up')"
+                  >&uarr;</button>
+                  <button
+                    type="button"
+                    class="btn-secondary btn-move"
+                    title="Move down (lower priority)"
+                    :aria-label="`Move ${model.name} down`"
+                    :disabled="modelIndex === tool.models.length - 1"
+                    @click="moveModel(tool.id, model, 'down')"
+                  >&darr;</button>
                   <button type="button" class="btn-secondary" @click="startModelEdit(tool.id, model)">Edit</button>
                   <button type="button" class="btn-secondary" @click="toggleModelEnabled(tool.id, model)">
                     {{ model.enabled ? 'Disable' : 'Enable' }}
@@ -397,6 +416,10 @@ export default {
       toolsStore.toggleModelEnabled(toolId, model.id);
     }
 
+    function moveModel(toolId, model, direction) {
+      toolsStore.moveModel(toolId, model.id, direction);
+    }
+
     function removeModel(tool, model) {
       const confirmed = window.confirm(`Delete model "${model.name}" from ${tool.name}?`);
       if (!confirmed) return;
@@ -431,6 +454,7 @@ export default {
       submitModelEdit,
       cancelModelEdit,
       toggleModelEnabled,
+      moveModel,
       removeModel,
 
     };
@@ -606,6 +630,23 @@ export default {
 .models-header h4 {
   font-size: 0.95rem;
   color: #172b4d;
+}
+
+.models-hint {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: #5e6c84;
+}
+
+.btn-move {
+  min-width: 2rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.btn-move:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .model-list {

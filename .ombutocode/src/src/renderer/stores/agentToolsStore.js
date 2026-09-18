@@ -312,6 +312,20 @@ export const useAgentToolsStore = defineStore('agent-tools', () => {
     return true;
   }
 
+  // Model order is dispatch priority: the scheduler tries a tool's enabled
+  // models in the order they appear in codingagents.yml.
+  function moveModel(toolId, modelId, direction) {
+    const tool = _tools.value.find((entry) => entry.id === toolId);
+    if (!tool) return false;
+    const index = tool.models.findIndex((model) => model.id === modelId);
+    const target = index + (direction === 'up' ? -1 : 1);
+    if (index === -1 || target < 0 || target >= tool.models.length) return false;
+    const nextModels = [...tool.models];
+    [nextModels[index], nextModels[target]] = [nextModels[target], nextModels[index]];
+    updateTool(toolId, { models: nextModels });
+    return true;
+  }
+
   function toggleModelEnabled(toolId, modelId) {
     const tool = _tools.value.find((entry) => entry.id === toolId);
     const model = tool?.models?.find((entry) => entry.id === modelId);
@@ -332,6 +346,7 @@ export const useAgentToolsStore = defineStore('agent-tools', () => {
     addModel,
     updateModel,
     deleteModel,
+    moveModel,
     toggleModelEnabled
   };
 });
