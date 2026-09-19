@@ -1,17 +1,20 @@
 <template>
-  <div class="ost-tab" data-cy="ostTab-chat">
-    <!-- STUB (step 6): filled in by step 11. -->
-    <p class="ost-tab__stub">{{ node ? node.title : '' }}</p>
+  <div v-if="node" class="ost-tab" data-cy="ostTab-chat">
+    <ChatThread :node-key="node.id" variant="panel" />
   </div>
 </template>
 
 <script setup lang="ts">
-/** Detail-panel "chat" tab. Owned by step 11. */
+/** Detail-panel Chat tab: the node's thread (shared ChatThread). Not offered on products. */
 import { computed } from 'vue';
 
+import ChatThread from '../../chat/ChatThread.vue';
 import { useOstTreeStore } from '../../stores/ost-tree.store';
 
 const props = defineProps<{ nodeKey: string }>();
 const tree = useOstTreeStore();
-const node = computed(() => tree.byId(props.nodeKey));
+const node = computed(() => {
+  const n = tree.byId(props.nodeKey);
+  return n && n.type !== 'product' ? n : undefined;
+});
 </script>

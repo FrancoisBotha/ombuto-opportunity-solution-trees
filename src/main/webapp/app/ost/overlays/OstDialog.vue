@@ -6,12 +6,15 @@
       role="dialog"
       aria-modal="true"
       :aria-labelledby="titleId"
+      :class="{ 'ost-dialog--flush': flush }"
       :style="{ width: width }"
       :data-cy="dataCy"
       tabindex="-1"
       @keydown="onKeydown"
     >
-      <h2 :id="titleId" class="ost-dialog__title">{{ title }}</h2>
+      <slot name="header" :title-id="titleId">
+        <h2 :id="titleId" class="ost-dialog__title">{{ title }}</h2>
+      </slot>
       <div class="ost-dialog__body">
         <slot></slot>
       </div>
@@ -25,13 +28,16 @@
 <script setup lang="ts">
 /**
  * Modal shell for every OST overlay: focus moves in and is trapped, Escape and backdrop click
- * close it, and focus returns to whatever had it before the dialog opened.
+ * close it, and focus returns to whatever had it before the dialog opened. `flush` drops the
+ * padding and lets the body fill (the chat modal); the `header` slot replaces the title
+ * (it receives `titleId`, which must label the dialog).
  */
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
-withDefaults(defineProps<{ title: string; width?: string; dataCy?: string }>(), {
+withDefaults(defineProps<{ title: string; width?: string; dataCy?: string; flush?: boolean }>(), {
   width: '340px',
   dataCy: 'ostDialog',
+  flush: false,
 });
 const emit = defineEmits<{ close: [] }>();
 
@@ -118,6 +124,20 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-neutral-800);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
+}
+
+.ost-dialog--flush {
+  max-height: 82vh;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.ost-dialog--flush .ost-dialog__body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  color: var(--color-text);
 }
 
 .ost-dialog:focus {

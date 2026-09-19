@@ -86,6 +86,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
   const patchTracks = new Map<string, NodeTrack>();
   /** Newest move seq per node key, while that move is in flight. */
   const moveSeqs = new Map<string, number>();
+  /** Bumped by every history-writing write per node key; a history read that raced one re-reads. */
+  const historyGen = new Map<string, number>();
 
   // ---- getters -----------------------------------------------------------------------------------
   const index = computed(() => new Map(nodes.value.map(n => [n.id, n])));
@@ -148,10 +150,11 @@ export const useOstTreeStore = defineStore('ostTree', () => {
   const memberByLogin = (login: string | null | undefined) => (login ? team.value?.members.find(m => m.login === login) : undefined);
 
   // ---- helpers -----------------------------------------------------------------------------------
-  const fail = (err: unknown, fallback?: string) => {
-    error.value = describeError(err, fallback);
+  const fail = (err: unknown, fallback?: string, type?: NodeType) => {
+    error.value = describeError(err, fallback, type);
   };
   const invalidateHistory = (key: string) => {
+    historyGen.set(key, (historyGen.get(key) ?? 0) + 1);
     if (history.value[key]) {
       const next = { ...history.value };
       delete next[key];
@@ -195,6 +198,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     history.value = {};
     patchTracks.clear();
     moveSeqs.clear();
+    historyGen.clear();
   }
 
   // ---- actions: read -------------------------------------------------------------------------
@@ -280,7 +284,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       return true;
     } catch (err) {
       if (live()) rollbackPatch(key, ownTrack, seq, fields);
-      fail(err);
+      fail(err, undefined, node.type);
       return false;
     } finally {
       if (live() && --ownTrack.inflight === 0) patchTracks.delete(key);
@@ -650,11 +654,21 @@ export const useOstTreeStore = defineStore('ostTree', () => {
   }
 
   // ---- actions: history ------------------------------------------------------------------------
+  /**
+   * Reads a node's history (newest first) into the cache. When a write of this node lands while
+   * the read is in flight, the read may predate it, so it is repeated (a few times at most).
+   */
   async function loadHistory(key: string): Promise<HistoryEntryDTO[]> {
     const parsed = parseKey(key);
     if (!parsed || parsed.type === 'product') return [];
     try {
-      const list = await api().listHistory(parsed.type, parsed.id);
+      let list: HistoryEntryDTO[] = [];
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const gen = historyGen.get(key) ?? 0;
+        list = await api().listHistory(parsed.type, parsed.id);
+        if ((historyGen.get(key) ?? 0) === gen) break;
+      }
+      if (!byId(key)) return list;
       history.value = { ...history.value, [key]: list };
       return list;
     } catch (err) {
