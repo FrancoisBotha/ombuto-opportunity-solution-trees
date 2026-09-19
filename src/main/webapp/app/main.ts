@@ -11,15 +11,22 @@ import { initFortAwesome } from '@/shared/config/config';
 import { initBootstrapVue } from '@/shared/config/config-bootstrap-vue';
 import JhiItemCount from '@/shared/jhi-item-count.vue';
 import JhiSortIndicator from '@/shared/sort/jhi-sort-indicator.vue';
+import { initTheme } from '@/shared/config/store/theme-store';
 import { useStore } from '@/store';
 
 import App from './app.vue';
 import router from './router';
 
+// The palette first: every stylesheet below reads its custom properties.
+import '../content/css/theme.css';
 import '../content/scss/global.scss';
 import '../content/scss/va-navbar.scss';
 import '../content/scss/va-sidemenu.scss';
 import '../content/scss/vendor.scss';
+
+// Before anything renders: put the remembered theme (default dark) on <html>. index.html runs the
+// same read inline so the splash is already themed; this re-applies it once the bundle is in.
+initTheme();
 
 const pinia = createPinia();
 
