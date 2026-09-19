@@ -268,7 +268,7 @@ const priorityDots = computed(() =>
   font-size: 10px;
   letter-spacing: 0.08em;
   opacity: 0.7;
-  white-space: nowrap;
+  min-width: 0; /* wraps like the prototype ("20% / confidence") so the thread chip never overflows */
 }
 
 .ost-node__money {

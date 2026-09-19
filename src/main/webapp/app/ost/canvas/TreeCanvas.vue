@@ -28,10 +28,10 @@
           :match="matchesQuery(tree.byId(id)!, ui.query)"
           :dimmed="isDimmed(tree.byId(id)!, ui.query, ui.hiddenTypes)"
           :drop-target="ui.dropTargetId === id"
-          :child-count="childCounts.get(id) ?? 0"
+          :child-count="kidCounts.get(id) ?? 0"
           :collapsed="!!ui.collapsed[id]"
           :can-add="tree.canEdit && ALLOWED[tree.byId(id)!.type].length > 0"
-          :evidence="tree.byId(id)!.type === 'solution' ? evidenceStrength(id, tree.nodes) : null"
+          :evidence="evidence.get(id) ?? null"
           @add="emit('add', id)"
           @toggle="ui.toggleCollapse(id)"
           @chat="ui.openChat(id)"
@@ -67,7 +67,6 @@ import { computed, markRaw, nextTick, ref, watch } from 'vue';
 
 import { type EdgeTypesObject, type NodeMouseEvent, VueFlow, useVueFlow } from '@vue-flow/core';
 
-import { evidenceStrength } from '../domain/derive';
 import { ALLOWED } from '../domain/rules';
 import { useOstTreeStore } from '../stores/ost-tree.store';
 import { useOstUiStore } from '../stores/ost-ui.store';
@@ -76,7 +75,7 @@ import CanvasLegend from './CanvasLegend.vue';
 import CanvasMinimap from './CanvasMinimap.vue';
 import OstEdge from './OstEdge.vue';
 import OstNode from './OstNode.vue';
-import { isDimmed, laidOutNodes, matchesQuery, toFlowEdges, toFlowNodes } from './canvas-model';
+import { childCounts, evidenceBySolution, isDimmed, laidOutNodes, matchesQuery, toFlowEdges, toFlowNodes } from './canvas-model';
 import { ZOOM_MAX, ZOOM_MIN, useViewport, wheelZoom } from './useViewport';
 
 const emit = defineEmits<{ select: [key: string]; add: [key: string]; zoom: [zoom: number] }>();
@@ -95,12 +94,9 @@ const zoom = view.zoom;
 const visible = computed(() => laidOutNodes(tree.nodes, tree.placed));
 const flowNodes = computed(() => toFlowNodes(visible.value, tree.placed));
 const flowEdges = computed(() => toFlowEdges(visible.value, tree.placed));
-/** Direct children per node (the collapse chip's +n). */
-const childCounts = computed(() => {
-  const counts = new Map<string, number>();
-  for (const n of tree.nodes) if (n.parent) counts.set(n.parent, (counts.get(n.parent) ?? 0) + 1);
-  return counts;
-});
+// One pass each over the nodes, shared by every node body (no per-node scans).
+const kidCounts = computed(() => childCounts(tree.nodes));
+const evidence = computed(() => evidenceBySolution(tree.nodes));
 
 watch(zoom, z => emit('zoom', z), { immediate: true });
 
