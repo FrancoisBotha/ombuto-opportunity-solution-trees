@@ -105,11 +105,22 @@ public class TeamManagementService {
         if (login == null) {
             return List.of();
         }
+        // One projection statement (teams + counts), never a lazy Team load per membership: a team
+        // deleted while this runs must not turn the whole list into a 500.
         return teamMemberRepository
-            .findAllByUserLogin(login)
+            .findMyTeamRows(login)
             .stream()
-            .filter(m -> m.getTeam() != null)
-            .map(m -> toMyTeamDTO(m.getTeam(), m.getRole()))
+            .map(row ->
+                new MyTeamDTO(
+                    (Long) row[0],
+                    (String) row[1],
+                    (String) row[2],
+                    (Instant) row[3],
+                    (TeamRole) row[4],
+                    ((Number) row[5]).longValue(),
+                    ((Number) row[6]).longValue()
+                )
+            )
             .collect(Collectors.toList());
     }
 

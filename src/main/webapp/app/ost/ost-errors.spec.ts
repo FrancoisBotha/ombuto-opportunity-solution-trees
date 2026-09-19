@@ -25,6 +25,7 @@ describe('OST error messages', () => {
     expect(describeError(apiError(409, 'error.dataintegrity'))).toBe(
       'Something else still refers to this, so the change could not be made.',
     );
+    expect(describeError(apiError(409, 'error.duplicate'))).toBe('That already exists, so the change could not be made.');
   });
 
   it('no longer knows the retired nodetypeinvalid key', () => {

@@ -49,6 +49,8 @@ export interface OstUiState {
   confirmId: string | null;
   /** Asks the canvas to centre a node (panel breadcrumb / child list); seq makes repeats observable. */
   centreRequest: { key: string; seq: number } | null;
+  /** Set when the node detail page was opened from the canvas (its back button then says so). */
+  detailFromCanvas: boolean;
 }
 
 const initialState = (): OstUiState => ({
@@ -69,6 +71,7 @@ const initialState = (): OstUiState => ({
   chatId: null,
   confirmId: null,
   centreRequest: null,
+  detailFromCanvas: false,
 });
 
 /** View state of the OST screens. Never holds tree data (see ost-tree.store.ts). */
@@ -81,10 +84,17 @@ export const useOstUiStore = defineStore('ostUi', {
     },
 
     // ---- selection / panel ------------------------------------------------------------------
-    select(key: string | null) {
+    /**
+     * Selects a node. By default a selection also opens the canvas's detail panel; `openPanel: false`
+     * only moves the selection (the node detail page, the chat chip) and leaves the panel as it was.
+     */
+    select(key: string | null, { openPanel = true }: { openPanel?: boolean } = {}) {
       this.selectedId = key;
-      if (key) this.rightOpen = true;
+      if (key && openPanel) this.rightOpen = true;
       this.addMenuId = null;
+    },
+    setDetailFromCanvas(fromCanvas: boolean) {
+      this.detailFromCanvas = fromCanvas;
     },
     requestCentre(key: string) {
       this.centreRequest = { key, seq: (this.centreRequest?.seq ?? 0) + 1 };

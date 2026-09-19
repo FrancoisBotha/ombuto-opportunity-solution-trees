@@ -24,7 +24,8 @@ const ui = useOstUiStore();
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 170;
+  /* above dialogs (1050), which sit above the app chrome (OstDialog.vue) */
+  z-index: 1060;
   max-width: 380px;
   display: flex;
   align-items: center;

@@ -273,6 +273,32 @@ test.describe('OST tree canvas — render & navigate', () => {
     await expect(page.locator('.ost-node.is-match')).toHaveCount(0);
   });
 
+  test('keyboard: Enter in the search box jumps to a match that is not rendered (collapsed), selecting and centring it', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    await page.getByTestId(`ost-collapse-${k.op1}`).click();
+    await expect(node(page, k.ev2)).toHaveCount(0); // not rendered, so Tab cannot reach it
+    await expect(page.getByTestId('ost-legend-hint')).toContainText('search + Enter jumps to a node');
+
+    const search = page.getByTestId('ost-search');
+    await search.fill('test result');
+    await search.press('Enter');
+    await expect(node(page, k.ev2)).toHaveClass(/\bis-selected\b/);
+    await expect(page).toHaveURL(new RegExp(`node=${k.ev2}`));
+    await expect(page.getByTestId(`ost-collapse-${k.op1}`)).toHaveText('–');
+    await expect(page.getByTestId('ost-search-status')).toHaveText('Match 1 of 1: Test result');
+    await expect(search).toBeFocused();
+    await settle(page);
+    const canvas = centre(await box(page.getByTestId('ost-canvas')));
+    await expect
+      .poll(async () => {
+        const c = centre(await box(node(page, k.ev2)));
+        return Math.max(Math.abs(c.x - canvas.x), Math.abs(c.y - canvas.y));
+      })
+      .toBeLessThan(40);
+    await search.fill('');
+  });
+
   test('type filter chips dim that type without moving anything', async () => {
     const page = user.page;
     await openCanvas(page);

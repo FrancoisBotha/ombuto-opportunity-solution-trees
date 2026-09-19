@@ -109,10 +109,15 @@ defineExpose({ focusAndSelect });
   overflow-wrap: anywhere;
 }
 
+/*
+ * The field's left padding + border (7px) and its vertical ones (3px) sit outside the text column,
+ * so the typed title lines up with the kicker and breadcrumb exactly like the read-only heading; the
+ * right edge stays inside the heading (nothing sticks out on a narrow page).
+ */
 .ost-nd-title__input {
   display: block;
-  width: 100%;
-  margin: 0;
+  width: calc(100% + 7px);
+  margin: -3px 0 -3px -7px;
   padding: 2px 6px;
   font: inherit;
   line-height: inherit;

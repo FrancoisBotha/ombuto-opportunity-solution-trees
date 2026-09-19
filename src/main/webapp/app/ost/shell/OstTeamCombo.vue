@@ -13,7 +13,7 @@
       @keydown.esc="onTriggerEscape"
     >
       <span class="ost-team-combo__label" data-cy="ostTeamComboLabel">{{ label }}</span>
-      <PhCaretDown :size="12" weight="bold" class="ost-team-combo__caret" aria-hidden="true" />
+      <PhCaretDown :size="12" class="ost-team-combo__caret" aria-hidden="true" />
     </button>
     <div
       v-if="open"
@@ -43,7 +43,7 @@
           <span class="ost-team-combo__name">{{ team.name }}</span>
           <span class="ost-team-combo__meta">{{ meta(team) }}</span>
         </span>
-        <PhCheck v-if="team.id === currentId" :size="13" weight="bold" class="ost-team-combo__check" aria-hidden="true" />
+        <PhCheck v-if="team.id === currentId" :size="13" class="ost-team-combo__check" aria-hidden="true" />
       </button>
     </div>
   </div>

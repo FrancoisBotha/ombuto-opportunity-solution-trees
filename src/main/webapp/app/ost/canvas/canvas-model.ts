@@ -144,6 +144,20 @@ export function matchesQuery(node: Pick<OstNode, 'title' | 'note'>, query: strin
   return !!q && `${node.title} ${node.note ?? ''}`.toLowerCase().includes(q);
 }
 
+/**
+ * Keys of the nodes a search matches, in tree order, skipping types filtered out by the chips and
+ * nodes outside the canvas scope — the targets of the search box's keyboard jump (Enter / Shift+Enter).
+ */
+export function searchMatches(
+  nodes: readonly OstNode[],
+  query: string,
+  hiddenTypes: Partial<Record<NodeType, boolean>>,
+  inScope: (node: OstNode) => boolean = () => true,
+): string[] {
+  if (!query.trim()) return [];
+  return nodes.filter(n => !hiddenTypes[n.type] && matchesQuery(n, query) && inScope(n)).map(n => n.id);
+}
+
 /** Dimmed = a search is active and this is not a match, or its type is filtered out. */
 export function isDimmed(node: OstNode, query: string, hiddenTypes: Partial<Record<NodeType, boolean>>): boolean {
   return (!!query.trim() && !matchesQuery(node, query)) || !!hiddenTypes[node.type];

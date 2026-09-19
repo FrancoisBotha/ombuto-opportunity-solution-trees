@@ -65,6 +65,46 @@ class ExceptionTranslatorIT {
     }
 
     @Test
+    void uniqueViolationsAreAConflictWithTheirOwnGenericMessage() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/unique-violation").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value(ExceptionTranslator.ERR_DUPLICATE))
+            .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DUPLICATE_DETAIL))
+            .andExpect(content().string(not(containsString("ux_team_member"))))
+            .andExpect(content().string(not(containsString("insert into"))))
+            .andExpect(content().string(not(containsString("referenced"))));
+    }
+
+    @Test
+    void otherDatabaseErrorsNeverReturnTheirSqlAsDetail() throws Exception {
+        for (String path : new String[] { "jdbc-error", "sql-exception" }) {
+            mockMvc
+                .perform(get("/api/exception-translator-test/" + path).with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DATA_ACCESS_DETAIL))
+                .andExpect(content().string(not(containsString("secret"))))
+                .andExpect(content().string(not(containsString("select"))));
+        }
+    }
+
+    @Test
+    void errorResponsesNeverPutJavaToStringInTheDetail() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/bad-request-alert").with(csrf()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("error.cycle"))
+            .andExpect(jsonPath("$.detail").value("A node cannot move under its own descendant"))
+            .andExpect(content().string(not(containsString("ProblemDetailWithCause"))))
+            .andExpect(content().string(not(containsString("BAD_REQUEST"))));
+        mockMvc
+            .perform(get("/api/exception-translator-test/response-status-without-reason").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(content().string(not(containsString("409 CONFLICT"))))
+            .andExpect(content().string(not(containsString("ProblemDetail"))));
+    }
+
+    @Test
     void lockFailuresAreAConflictWithoutSql() throws Exception {
         for (String path : new String[] { "cannot-acquire-lock", "jpa-pessimistic-lock" }) {
             mockMvc

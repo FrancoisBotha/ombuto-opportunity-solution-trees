@@ -48,8 +48,9 @@
           <div v-if="item.comment.mine && canEdit" class="ost-chat__own">
             <button
               type="button"
-              class="ost-chat__own-btn"
+              class="ost-chat__own-btn ost-tap"
               :aria-label="`Edit your message: ${item.comment.body.slice(0, 40)}`"
+              :disabled="busy"
               :data-cy="`ost-chat-edit-${item.comment.id}`"
               @click="startEdit(item.comment)"
             >
@@ -57,7 +58,7 @@
             </button>
             <button
               type="button"
-              class="ost-chat__own-btn"
+              class="ost-chat__own-btn ost-tap"
               :aria-label="`Delete your message: ${item.comment.body.slice(0, 40)}`"
               :disabled="busy"
               :data-cy="`ost-chat-delete-${item.comment.id}`"
@@ -71,19 +72,19 @@
       <button
         v-if="!atBottom && items.length"
         type="button"
-        class="ost-chat__jump"
+        class="ost-chat__jump ost-tap"
         title="Jump to latest"
         aria-label="Jump to the latest message"
         data-cy="ost-chat-jump"
         @click="jumpToLatest"
       >
-        <PhCaretDown :size="14" weight="bold" aria-hidden="true" />
+        <PhCaretDown :size="14" aria-hidden="true" />
       </button>
     </div>
 
     <div v-if="error" class="ost-chat__error" role="alert" data-cy="ost-chat-error">
       <span>{{ error }}</span>
-      <button type="button" class="ost-chat__error-close" aria-label="Dismiss" @click="error = null">
+      <button type="button" class="ost-chat__error-close ost-tap" aria-label="Dismiss" @click="error = null">
         <PhX :size="11" aria-hidden="true" />
       </button>
     </div>
@@ -91,7 +92,7 @@
     <footer class="ost-chat__composer">
       <div v-if="editingId !== null" class="ost-chat__editing" data-cy="ost-chat-editing">
         <span class="ost-chat__editing-pill">Editing message</span>
-        <button type="button" class="ost-chat__own-btn" data-cy="ost-chat-edit-cancel" @click="cancelEdit(true)">Cancel</button>
+        <button type="button" class="ost-chat__own-btn ost-tap" data-cy="ost-chat-edit-cancel" @click="cancelEdit(true)">Cancel</button>
       </div>
       <div class="ost-chat__row">
         <textarea
@@ -276,7 +277,8 @@ async function focusInput() {
 }
 
 function startEdit(comment: CommentDTO) {
-  if (!canEdit.value || !comment.mine) return;
+  // Not while a send / save / delete is in flight: its completion would clear the new edit's draft.
+  if (!canEdit.value || !comment.mine || busy.value) return;
   editingId.value = comment.id;
   draft.value = comment.body;
   error.value = null;
@@ -309,15 +311,21 @@ async function send() {
         return;
       }
       if (await tree.editComment(props.nodeKey, id, text)) {
-        editingId.value = null;
-        draft.value = '';
+        // Leave the composer alone if the user moved on (cancelled, or typed more) meanwhile.
+        if (editingId.value === id) {
+          editingId.value = null;
+          if (draft.value.trim() === text) draft.value = '';
+        }
       } else {
         takeError('The message could not be edited.');
       }
     } else {
       atBottom.value = true;
-      if (await tree.addComment(props.nodeKey, text)) draft.value = '';
-      else takeError('The message could not be sent.');
+      // Clear the composer only if it still holds what was sent (the user may have typed on) and
+      // has not switched to editing a message meanwhile.
+      if (await tree.addComment(props.nodeKey, text)) {
+        if (editingId.value === null && draft.value.trim() === text) draft.value = '';
+      } else takeError('The message could not be sent.');
     }
   } finally {
     busy.value = false;

@@ -11,7 +11,7 @@
         </div>
         <button
           type="button"
-          class="ost-chat-modal__close"
+          class="ost-chat-modal__close ost-tap"
           title="Close"
           aria-label="Close chat"
           data-cy="ost-chat-modal-close"

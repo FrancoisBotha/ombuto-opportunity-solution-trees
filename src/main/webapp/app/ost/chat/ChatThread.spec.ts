@@ -107,6 +107,22 @@ describe('ChatThread', () => {
       expect(tree.error).toBeNull();
       expect(tree.byId('opportunity-1')?.commentCount).toBe(5);
     });
+
+    it('text typed while a message is sending survives the send; Edit is disabled meanwhile', async () => {
+      const { wrapper, service } = await mountThread();
+      let finish!: (dto: any) => void;
+      service.addComment.returns(new Promise(resolve => (finish = resolve)));
+      await input(wrapper).setValue('First');
+      await input(wrapper).trigger('keydown', { key: 'Enter' });
+      expect(wrapper.get('[data-cy="ost-chat-edit-3"]').attributes('disabled')).toBeDefined();
+      await wrapper.get('[data-cy="ost-chat-edit-3"]').trigger('click');
+      expect(wrapper.find('[data-cy="ost-chat-editing"]').exists()).toBe(false);
+      await input(wrapper).setValue('First, and more');
+      finish(comment(6, 'user', new Date().toISOString(), { body: 'First' }));
+      await flushPromises();
+      expect((input(wrapper).element as HTMLTextAreaElement).value).toBe('First, and more');
+      expect(wrapper.get('[data-cy="ost-chat-edit-3"]').attributes('disabled')).toBeUndefined();
+    });
   });
 
   describe('edit and delete own', () => {
@@ -140,6 +156,21 @@ describe('ChatThread', () => {
       expect(reachedParent).toBe(false);
       expect(service.updateComment.called).toBe(false);
       expect((input(wrapper).element as HTMLTextAreaElement).value).toBe('');
+      expect(wrapper.find('[data-cy="ost-chat-editing"]').exists()).toBe(false);
+    });
+
+    it('an edit cancelled while it saves leaves the composer to what the user did next', async () => {
+      const { wrapper, service } = await mountThread();
+      let finish!: (dto: any) => void;
+      service.updateComment.returns(new Promise(resolve => (finish = resolve)));
+      await wrapper.get('[data-cy="ost-chat-edit-3"]').trigger('click');
+      await input(wrapper).setValue('Mine, fixed');
+      await input(wrapper).trigger('keydown', { key: 'Enter' });
+      await wrapper.get('[data-cy="ost-chat-edit-cancel"]').trigger('click');
+      await input(wrapper).setValue('A new message');
+      finish({ ...THREAD[2], body: 'Mine, fixed', editedDate: new Date().toISOString() });
+      await flushPromises();
+      expect((input(wrapper).element as HTMLTextAreaElement).value).toBe('A new message');
       expect(wrapper.find('[data-cy="ost-chat-editing"]').exists()).toBe(false);
     });
 

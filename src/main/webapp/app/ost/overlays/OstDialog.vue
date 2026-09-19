@@ -100,10 +100,14 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/*
+ * Above the app chrome — navbar 1030 (va-navbar.scss), sidebar 1020 (va-sidemenu.scss) — so the
+ * modal dims and blocks everything and centres on the whole viewport. Toasts sit above at 1060.
+ */
 .ost-dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 160;
+  z-index: 1050;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -28,6 +28,7 @@ const MESSAGES: Record<string, string> = {
   historynotsupported: 'Products have no history.',
   // 409s (see ExceptionTranslator)
   dataintegrity: 'Something else still refers to this, so the change could not be made.',
+  duplicate: 'That already exists, so the change could not be made.',
   concurrencyFailure: 'Someone else changed this tree at the same moment — please try again.',
 };
 

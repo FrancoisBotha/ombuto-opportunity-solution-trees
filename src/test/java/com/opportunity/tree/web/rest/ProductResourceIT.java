@@ -417,8 +417,8 @@ class ProductResourceIT {
 
         // Validate the Product in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        // createdDate is server-owned: the client-supplied value is ignored (TREE-002)
-        updatedProduct.createdDate(DEFAULT_CREATED_DATE);
+        // createdDate and sortOrder are server-owned: the client-supplied values are ignored (TREE-002, OST-13a)
+        updatedProduct.createdDate(DEFAULT_CREATED_DATE).sortOrder(DEFAULT_SORT_ORDER);
         assertPersistedProductToMatchAllProperties(updatedProduct);
     }
 
@@ -517,8 +517,8 @@ class ProductResourceIT {
         // Validate the Product in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        // createdDate is server-owned: the client-supplied value is ignored (TREE-002)
-        partialUpdatedProduct.createdDate(DEFAULT_CREATED_DATE);
+        // createdDate and sortOrder are server-owned: the client-supplied values are ignored (TREE-002, OST-13a)
+        partialUpdatedProduct.createdDate(DEFAULT_CREATED_DATE).sortOrder(DEFAULT_SORT_ORDER);
         assertProductUpdatableFieldsEquals(createUpdateProxyForBean(partialUpdatedProduct, product), getPersistedProduct(product));
     }
 
@@ -554,8 +554,8 @@ class ProductResourceIT {
         // Validate the Product in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        // createdDate is server-owned: the client-supplied value is ignored (TREE-002)
-        partialUpdatedProduct.createdDate(DEFAULT_CREATED_DATE);
+        // createdDate and sortOrder are server-owned: the client-supplied values are ignored (TREE-002, OST-13a)
+        partialUpdatedProduct.createdDate(DEFAULT_CREATED_DATE).sortOrder(DEFAULT_SORT_ORDER);
         assertProductUpdatableFieldsEquals(partialUpdatedProduct, getPersistedProduct(partialUpdatedProduct));
     }
 

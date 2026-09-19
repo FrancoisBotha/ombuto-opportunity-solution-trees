@@ -42,7 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Create appends the product under the team's {@link TreeStructureLock}, so concurrent creates
  * get distinct sort orders. Changing a product's team (allowed when the caller can edit both
  * teams, TEAMS-003) locks both teams, lower id first, re-checks the product is still in its old
- * team and appends it after the new team's products.
+ * team and appends it after the new team's products. sortOrder is server-owned on PUT and PATCH:
+ * any other edit keeps the product's current position, read under its team's lock.
  */
 @Service
 @Transactional
@@ -120,13 +121,15 @@ public class ProductServiceImpl implements ProductService {
             teamAccessService.requireEditTeam(targetTeamId);
         }
 
+        // sortOrder is server-owned (products are reordered through the tree move endpoint): a team
+        // change appends the product to the new team, otherwise the current value is kept — read
+        // under the team's lock, so a PUT never writes back a position a concurrent reorder changed.
+        int sortOrder = teamChanges
+            ? lockTeamChange(existing.getId(), existingTeamId, targetTeamId)
+            : lockedSortOrder(existing, existingTeamId);
         Product product = productMapper.toEntity(productDTO);
         product.setCreatedDate(existing.getCreatedDate());
-        if (teamChanges) {
-            product.setSortOrder(lockTeamChange(existing.getId(), existingTeamId, targetTeamId));
-        } else if (product.getSortOrder() == null) {
-            product.setSortOrder(existing.getSortOrder());
-        }
+        product.setSortOrder(sortOrder);
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }
@@ -140,12 +143,13 @@ public class ProductServiceImpl implements ProductService {
         Long targetTeamId = teamIdOf(productDTO);
         Long existingTeamId = existing.getTeam() != null ? existing.getTeam().getId() : null;
         boolean teamChanges = targetTeamId != null && !Objects.equals(existingTeamId, targetTeamId);
-        Integer movedSortOrder = null;
         if (teamChanges) {
             teamAccessService.requireEditTeam(targetTeamId);
-            movedSortOrder = lockTeamChange(existing.getId(), existingTeamId, targetTeamId);
         }
-        Integer appendAt = movedSortOrder;
+        // sortOrder is server-owned, as in update(): appended on a team change, else kept (read under the lock).
+        int sortOrder = teamChanges
+            ? lockTeamChange(existing.getId(), existingTeamId, targetTeamId)
+            : lockedSortOrder(existing, existingTeamId);
 
         return productRepository
             .findById(productDTO.getId())
@@ -162,9 +166,9 @@ public class ProductServiceImpl implements ProductService {
                     productDTO.setTeam(requestedTeam);
                 }
                 existingProduct.setCreatedDate(preservedCreatedDate);
-                if (appendAt != null) {
+                existingProduct.setSortOrder(sortOrder);
+                if (teamChanges) {
                     existingProduct.setTeam(teamRepository.getReferenceById(targetTeamId));
-                    existingProduct.setSortOrder(appendAt);
                 }
                 return existingProduct;
             })
@@ -241,6 +245,19 @@ public class ProductServiceImpl implements ProductService {
         structureLock.lockTeams(fromTeamId, toTeamId);
         structureLock.requireNode(TreeNodeType.PRODUCT, productId, fromTeamId);
         return productRepository.findMaxSortOrderByTeamId(toTeamId) + 1;
+    }
+
+    /**
+     * A product staying in its team keeps its sortOrder: lock the team, re-check the product is still
+     * there and return its committed sortOrder (not the value loaded before the wait).
+     */
+    private int lockedSortOrder(Product existing, Long teamId) {
+        if (teamId == null) {
+            return existing.getSortOrder();
+        }
+        structureLock.lockTeam(teamId);
+        structureLock.requireNode(TreeNodeType.PRODUCT, existing.getId(), teamId);
+        return productRepository.findSortOrderById(existing.getId());
     }
 
     private static Long teamIdOf(ProductDTO dto) {

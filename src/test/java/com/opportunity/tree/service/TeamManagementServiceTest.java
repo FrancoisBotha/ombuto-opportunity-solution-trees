@@ -137,15 +137,9 @@ class TeamManagementServiceTest {
     @Test
     void listMyTeams_returnsOnlyCallersTeamsWithRoleAndCounts() {
         authenticate(LOGIN);
-        Team a = team(TEAM_ID, "A", null);
-        Team b = team(OTHER_TEAM_ID, "B", null);
-        when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(
-            List.of(member(a, creator, TeamRole.OWNER), member(b, creator, TeamRole.VIEWER))
+        when(teamMemberRepository.findMyTeamRows(LOGIN)).thenReturn(
+            List.of(myTeamRow(TEAM_ID, "A", TeamRole.OWNER, 3L, 5L), myTeamRow(OTHER_TEAM_ID, "B", TeamRole.VIEWER, 2L, 1L))
         );
-        when(teamMemberRepository.countByTeamId(TEAM_ID)).thenReturn(3L);
-        when(teamMemberRepository.countByTeamId(OTHER_TEAM_ID)).thenReturn(2L);
-        when(productRepository.countByTeamId(TEAM_ID)).thenReturn(5L);
-        when(productRepository.countByTeamId(OTHER_TEAM_ID)).thenReturn(1L);
 
         List<MyTeamDTO> results = service.listMyTeams();
 
@@ -376,10 +370,8 @@ class TeamManagementServiceTest {
     @Test
     void sameUserCanBeOwnerInOneTeamAndViewerInAnother_throughMyTeams() {
         authenticate(LOGIN);
-        Team a = team(TEAM_ID, "A", null);
-        Team b = team(OTHER_TEAM_ID, "B", null);
-        when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(
-            List.of(member(a, creator, TeamRole.OWNER), member(b, creator, TeamRole.VIEWER))
+        when(teamMemberRepository.findMyTeamRows(LOGIN)).thenReturn(
+            List.of(myTeamRow(TEAM_ID, "A", TeamRole.OWNER, 1L, 0L), myTeamRow(OTHER_TEAM_ID, "B", TeamRole.VIEWER, 1L, 0L))
         );
 
         List<MyTeamDTO> teams = service.listMyTeams();
@@ -396,6 +388,10 @@ class TeamManagementServiceTest {
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
+
+    private static Object[] myTeamRow(Long id, String name, TeamRole role, long members, long products) {
+        return new Object[] { id, name, null, Instant.parse("2026-01-01T00:00:00Z"), role, members, products };
+    }
 
     private void authenticate(String login) {
         SecurityContext ctx = SecurityContextHolder.createEmptyContext();

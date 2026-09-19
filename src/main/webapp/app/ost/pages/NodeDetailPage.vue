@@ -2,9 +2,17 @@
   <div ref="pageEl" class="ost-page ost-nd" data-cy="ostNodeDetailPage">
     <article v-if="node" class="ost-nd__inner" data-cy="ost-node-detail" :data-node-key="node.id" :data-type="node.type">
       <div class="ost-nd__bar">
-        <router-link class="ost-btn ost-btn--ghost ost-nd__bar-btn" :to="canvasRoute" data-cy="ost-node-detail-open-canvas">
-          <PhArrowLeft :size="13" aria-hidden="true" />
-          Open on canvas
+        <router-link
+          class="ost-btn ost-btn--ghost ost-nd__bar-btn"
+          :to="canvasRoute"
+          data-cy="ost-node-detail-open-canvas"
+          :data-from-canvas="ui.detailFromCanvas ? 'true' : 'false'"
+        >
+          <template v-if="ui.detailFromCanvas">← Back to canvas</template>
+          <template v-else>
+            Open on canvas
+            <PhArrowUpRight :size="13" aria-hidden="true" />
+          </template>
         </router-link>
         <button
           v-if="!readonly"
@@ -48,30 +56,15 @@
 
       <div v-if="shownError" class="ost-nd__error" role="alert" data-cy="ost-node-detail-error">
         <span>{{ shownError }}</span>
-        <button type="button" class="ost-nd__error-close" aria-label="Dismiss" @click="errors.report(null)">
+        <button type="button" class="ost-nd__error-close ost-tap" aria-label="Dismiss" @click="errors.report(null)">
           <PhX :size="11" aria-hidden="true" />
         </button>
       </div>
 
       <div class="ost-nd__grid" :class="{ 'is-single': !hasChat }">
         <div class="ost-nd__main">
-          <section v-if="hasSignals" :key="`signals:${node.id}`" class="ost-nd__signals" aria-label="Status and signals">
-            <StatusChips
-              v-if="statuses.length"
-              :status="node.status"
-              :options="statuses"
-              :readonly="readonly"
-              @change="save({ status: $event })"
-            />
-            <template v-if="node.type === 'assumption'">
-              <ConfidenceField :value="node.conf" :readonly="readonly" @change="save({ conf: $event })" />
-              <OwnerSelect :value="node.owner" :members="tree.team?.members ?? []" :readonly="readonly" @change="save({ owner: $event })" />
-            </template>
-            <EvidenceStrengthBar v-if="node.type === 'solution'" :node-key="node.id" />
-            <template v-if="node.type === 'opportunity'">
-              <ValueScale :value="node.value" :readonly="readonly" @change="save({ value: $event })" />
-              <PrioritySlider :value="node.priority" :readonly="readonly" @change="save({ priority: $event })" />
-            </template>
+          <section v-if="hasSignals" class="ost-nd__signals" aria-label="Status and signals">
+            <NodeFields :key="`signals:${node.id}`" :node-key="node.id" :readonly="readonly" variant="page" />
           </section>
 
           <div class="ost-nd__notes" data-cy="ost-node-detail-notes">
@@ -109,7 +102,7 @@
     <div v-else-if="deleting" class="ost-nd__leaving" aria-live="polite">Deleted. Leaving this page…</div>
 
     <div v-else class="ost-state" data-cy="ost-node-detail-missing">
-      <div class="ost-state__title">Node not found</div>
+      <h1 class="ost-state__title">Node not found</h1>
       <p class="ost-state__text">It may have been deleted, or it belongs to another team.</p>
       <router-link
         class="ost-btn ost-btn--primary"
@@ -132,26 +125,24 @@
  *
  * The node on the page is also the selected node (ui.selectedId), so "Open on canvas" and the
  * browser's back button land on it, and panel-style errors (panel-action.ts) are shown here.
+ * Selecting it never opens the canvas's detail panel (the panel keeps whatever state it had).
+ * The bar's canvas link reads "← Back to canvas" when the page was opened from the canvas
+ * (prototype), otherwise "Open on canvas" ↗.
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router';
 
-import { PhArrowLeft, PhTrash, PhX } from '@phosphor-icons/vue';
+import { PhArrowUpRight, PhTrash, PhX } from '@phosphor-icons/vue';
 
 import ChatThread from '../chat/ChatThread.vue';
 import { statusTone } from '../domain/derive';
 import type { NodePatch } from '../domain/mapping';
-import { STATUS, TYPE_BOX } from '../domain/rules';
+import { TYPE_BOX } from '../domain/rules';
 import NodeDetailChildren from '../node-detail/NodeDetailChildren.vue';
 import NodeDetailTitle from '../node-detail/NodeDetailTitle.vue';
 import { metricTags } from '../node-detail/node-detail-format';
-import ConfidenceField from '../panel/fields/ConfidenceField.vue';
-import EvidenceStrengthBar from '../panel/fields/EvidenceStrengthBar.vue';
+import NodeFields from '../panel/fields/NodeFields.vue';
 import NotesField from '../panel/fields/NotesField.vue';
-import OwnerSelect from '../panel/fields/OwnerSelect.vue';
-import PrioritySlider from '../panel/fields/PrioritySlider.vue';
-import StatusChips from '../panel/fields/StatusChips.vue';
-import ValueScale from '../panel/fields/ValueScale.vue';
 import { providePanelErrors, usePanelAction } from '../panel/panel-action';
 import LinksTab from '../panel/tabs/LinksTab.vue';
 import OpenQuestionsTab from '../panel/tabs/OpenQuestionsTab.vue';
@@ -175,7 +166,6 @@ const readonly = computed(() => !tree.canEdit);
 const typeLabel = computed(() => (node.value ? TYPE_BOX[node.value.type].label : ''));
 const crumbs = computed(() => (node.value ? tree.ancestors(node.value.id) : []));
 const tags = computed(() => (node.value ? metricTags(node.value, tree.nodes) : []));
-const statuses = computed(() => (node.value ? STATUS[node.value.type] : []));
 const hasSignals = computed(() => !!node.value && ['opportunity', 'solution', 'assumption'].includes(node.value.type));
 /** Every node except a product has a thread (FR-M1). */
 const hasChat = computed(() => !!node.value && node.value.type !== 'product');
@@ -192,7 +182,7 @@ watch(
   nodeKey,
   key => {
     errors.report(null);
-    if (tree.byId(key) && ui.selectedId !== key) ui.select(key);
+    if (tree.byId(key) && ui.selectedId !== key) ui.select(key, { openPanel: false });
   },
   { immediate: true },
 );
@@ -207,7 +197,11 @@ function commitFocused() {
   if (active instanceof HTMLElement && pageEl.value?.contains(active)) active.blur();
 }
 onBeforeRouteUpdate(commitFocused);
-onBeforeRouteLeave(commitFocused);
+onBeforeRouteLeave(to => {
+  commitFocused();
+  // Another node's page keeps the way back to the canvas; anywhere else forgets it.
+  if (to.name !== 'OstNodeDetail') ui.setDetailFromCanvas(false);
+});
 
 // ---- edits --------------------------------------------------------------------------------------
 function save(patch: NodePatch) {
@@ -348,7 +342,6 @@ watch(
   align-items: center;
   flex: none;
   max-width: 45%;
-  padding-top: 18px;
 }
 
 .ost-root .ost-nd__status {
@@ -431,16 +424,6 @@ watch(
   gap: 24px;
 }
 
-.ost-nd__signals {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
-  gap: 18px 24px;
-}
-
-.ost-nd__signals > * {
-  min-width: 0;
-}
-
 /* Notes: the prototype's page sizes (11px label, 14px text, 110px tall). */
 .ost-nd__notes :deep(.ost-field__label) {
   font-size: 11px;
@@ -480,7 +463,6 @@ watch(
     min-width: 0;
     max-width: none;
     justify-content: flex-start;
-    padding-top: 0;
   }
 
   .ost-nd__grid {
@@ -526,18 +508,5 @@ watch(
     flex: 1 0 auto;
     padding: 0 6px;
   }
-}
-</style>
-
-<style>
-/* Section labels shared by the page and its node-detail/* parts (scoped under .ost-root). */
-.ost-root .ost-nd-section {
-  margin: 0 0 10px;
-  font-family: var(--font-heading);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  opacity: 0.6;
 }
 </style>

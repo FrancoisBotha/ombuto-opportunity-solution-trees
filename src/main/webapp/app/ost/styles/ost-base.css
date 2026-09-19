@@ -125,6 +125,15 @@
   color: var(--color-accent-300);
 }
 
+/* Quick-add (+ Type) buttons under a node's children: panel Detail tab and node detail page. */
+.ost-root .ost-btn--quick {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* ---- status badges: three voices only ------------------------------------------------------ */
 .ost-root .ost-badge {
   display: inline-flex;
@@ -235,6 +244,17 @@
   margin-top: 7px;
 }
 
+/* ---- section labels (node detail page and its node-detail/* parts) ------------------------------- */
+.ost-root .ost-nd-section {
+  margin: 0 0 10px;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
 /* ---- state messages (loading / empty / forbidden / not found) -------------------------------- */
 .ost-root .ost-state {
   max-width: 460px;
@@ -258,6 +278,23 @@
   font-size: 13px;
   line-height: 1.45;
   color: var(--color-neutral-300);
+}
+
+/* ---- touch targets (NFR-5) -----------------------------------------------------------------
+ * On a coarse pointer (touch) every small OST control is at least 44 x 44px. min-* beats the
+ * components' own width / height, so the fine-pointer (desktop) look is unchanged.
+ */
+@media (pointer: coarse) {
+  .ost-root .ost-tap,
+  .ost-root .ost-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .ost-root .ost-tap {
+    display: inline-grid;
+    place-items: center;
+  }
 }
 
 /* ---- visually hidden (screen-reader only) ---------------------------------------------------- */

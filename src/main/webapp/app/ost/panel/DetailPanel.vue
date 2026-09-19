@@ -17,7 +17,7 @@
         <button
           ref="hideButton"
           type="button"
-          class="ost-panel__hide"
+          class="ost-panel__hide ost-tap"
           title="Hide panel"
           aria-label="Hide panel"
           data-cy="ost-panel-hide"
@@ -45,7 +45,7 @@
     <div class="ost-panel__body">
       <div v-if="shownError" class="ost-panel__error" role="alert" data-cy="ost-panel-error">
         <span>{{ shownError }}</span>
-        <button type="button" class="ost-panel__error-close" aria-label="Dismiss" @click="errors.report(null)">
+        <button type="button" class="ost-panel__error-close ost-tap" aria-label="Dismiss" @click="errors.report(null)">
           <PhX :size="11" aria-hidden="true" />
         </button>
       </div>
@@ -70,8 +70,15 @@
   </aside>
 
   <div v-else-if="node" class="ost-panel-reopen">
-    <button ref="reopenButton" type="button" class="ost-panel-reopen__btn" title="Show details" data-cy="ost-panel-reopen" @click="reopen">
-      <PhCaretLeft :size="13" weight="bold" aria-hidden="true" />
+    <button
+      ref="reopenButton"
+      type="button"
+      class="ost-panel-reopen__btn ost-tap"
+      title="Show details"
+      data-cy="ost-panel-reopen"
+      @click="reopen"
+    >
+      <PhCaretLeft :size="13" aria-hidden="true" />
       Details
     </button>
   </div>

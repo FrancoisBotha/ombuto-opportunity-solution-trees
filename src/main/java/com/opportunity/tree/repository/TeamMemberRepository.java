@@ -20,6 +20,21 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
 
     List<TeamMember> findAllByUserLogin(String login);
 
+    /**
+     * The "my teams" list of the user with {@code login} in ONE statement: rows of [teamId (Long),
+     * name (String), description (String), createdDate (Instant), role (TeamRole), memberCount (Long),
+     * productCount (Long)]. Reading the teams in the same statement as the memberships means a team
+     * deleted concurrently simply drops out, instead of failing a later lazy Team load with an
+     * ObjectNotFoundException (HTTP 500).
+     */
+    @Query(
+        "select t.id, t.name, t.description, t.createdDate, m.role," +
+            " (select count(m2) from TeamMember m2 where m2.team.id = t.id)," +
+            " (select count(p) from Product p where p.team.id = t.id)" +
+            " from TeamMember m join m.team t where m.user.login = :login order by t.id"
+    )
+    List<Object[]> findMyTeamRows(@Param("login") String login);
+
     List<TeamMember> findAllByTeamId(Long teamId);
 
     Optional<TeamMember> findOneByTeamIdAndUserId(Long teamId, String userId);

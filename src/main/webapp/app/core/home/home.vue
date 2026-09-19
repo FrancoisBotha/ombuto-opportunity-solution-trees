@@ -6,17 +6,17 @@
         <h1 v-if="authenticated && username">Welcome back, {{ username }}</h1>
         <h1 v-else>Opportunity Solution Tree</h1>
         <p class="home-lead">
-          Connect the outcome you are chasing to the customer opportunities behind it, the solutions you could build, and the experiments
-          that tell you which ones are worth it.
+          Connect the outcome you are chasing to the customer opportunities behind it, the solutions you could build, and the assumptions
+          and evidence that tell you which ones are worth it.
         </p>
         <div class="home-actions">
-          <router-link v-if="authenticated" to="/outcome" class="btn home-btn-primary" data-cy="homeOutcomes">
-            <font-awesome-icon icon="bullseye" />
-            <span>Go to outcomes</span>
+          <router-link v-if="authenticated" to="/trees" class="btn home-btn-primary" data-cy="homeTrees">
+            <font-awesome-icon icon="sitemap" />
+            <span>Open your trees</span>
           </router-link>
-          <router-link v-if="authenticated" to="/opportunity" class="btn home-btn-ghost">
-            <font-awesome-icon icon="lightbulb" />
-            <span>Browse opportunities</span>
+          <router-link v-if="authenticated" to="/teams" class="btn home-btn-ghost" data-cy="homeTeams">
+            <font-awesome-icon icon="users" />
+            <span>Your teams</span>
           </router-link>
           <button v-if="!authenticated" type="button" class="btn home-btn-primary" @click="login()" data-cy="homeLogin">
             <font-awesome-icon icon="sign-in-alt" />
@@ -55,10 +55,21 @@
       </div>
     </section>
 
-    <section v-if="authenticated" class="home-links">
+    <section v-if="authenticated" class="home-links" data-cy="homeJumpBackIn">
       <h2 class="home-section-title">Jump back in</h2>
       <div class="home-link-grid">
-        <router-link v-for="link in links" :key="link.path" :to="link.path" class="home-link-card">
+        <router-link v-for="link in userLinks" :key="link.path" :to="link.path" class="home-link-card">
+          <font-awesome-icon :icon="link.icon" class="home-link-icon" />
+          <span class="home-link-label">{{ link.label }}</span>
+          <span class="home-link-text">{{ link.text }}</span>
+        </router-link>
+      </div>
+    </section>
+
+    <section v-if="authenticated && isAdmin" class="home-links" data-cy="homeStaticData">
+      <h2 class="home-section-title">Static data <span class="home-section-note">Administrators</span></h2>
+      <div class="home-link-grid">
+        <router-link v-for="link in adminLinks" :key="link.path" :to="link.path" class="home-link-card">
           <font-awesome-icon :icon="link.icon" class="home-link-icon" />
           <span class="home-link-label">{{ link.label }}</span>
           <span class="home-link-text">{{ link.text }}</span>
@@ -245,6 +256,13 @@ $home-border: #e6e4ec;
   font-size: 1.1rem;
   font-weight: 600;
   color: $home-ink;
+}
+
+.home-section-note {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: $home-muted;
 }
 
 .home-link-grid {

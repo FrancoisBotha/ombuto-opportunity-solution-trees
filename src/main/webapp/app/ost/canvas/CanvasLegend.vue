@@ -21,10 +21,14 @@ const ITEMS = (['outcome', 'opportunity', 'solution', 'assumption', 'evidence'] 
   label: TYPE_BOX[type].label,
 }));
 
+/**
+ * Only the nodes in view are rendered (and so reachable with Tab); the search box's Enter is the
+ * keyboard way to every other node, so the hint names it for editors and viewers alike.
+ */
 const hint = computed(() =>
   props.canEdit
-    ? 'Drag a node onto another to re-parent · double-click a title to rename'
-    : 'View only · drag the canvas to pan, scroll to zoom',
+    ? 'Drag a node onto another to re-parent · double-click a title to rename · search + Enter jumps to a node'
+    : 'View only · drag the canvas to pan, scroll to zoom · search + Enter jumps to a node',
 );
 </script>
 

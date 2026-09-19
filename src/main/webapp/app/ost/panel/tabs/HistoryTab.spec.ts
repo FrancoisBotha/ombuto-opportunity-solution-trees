@@ -89,6 +89,21 @@ describe('HistoryTab', () => {
     expect(service.listHistory.callCount).toBe(2);
   });
 
+  it('reloads for the new node when the tab is reused, even while the previous read is in flight', async () => {
+    const ctx = await setupStores();
+    let release!: () => void;
+    ctx.service.listHistory.withArgs('opportunity', 1).returns(new Promise(r => (release = () => r(NEWEST_FIRST))) as any);
+    ctx.service.listHistory.withArgs('solution', 1).resolves([entry(7, 'Node created as solution', at(8, 0), { eventType: 'CREATED' })]);
+    const wrapper = await mountWith(HistoryTab, ctx.pinia, { nodeKey: 'opportunity-1' });
+    await wrapper.setProps({ nodeKey: 'solution-1' });
+    await flushPromises();
+    expect(ctx.service.listHistory.calledWith('solution', 1)).toBe(true);
+    expect(wrapper.findAll('[data-event]').map(r => r.attributes('data-cy'))).toEqual(['ost-history-7']);
+    release();
+    await flushPromises();
+    expect(wrapper.findAll('[data-event]').map(r => r.attributes('data-cy'))).toEqual(['ost-history-7']);
+  });
+
   it('a history read that raced a write is repeated', async () => {
     const ctx = await setupStores();
     let release!: () => void;

@@ -68,6 +68,14 @@ describe('DetailTab', () => {
       expect(await present('evidence-1')).toEqual([]);
     });
 
+    it('the typed fields are the shared NodeFields (panel layout), absent for types without any', async () => {
+      const opp = await mountTab('opportunity-1');
+      expect(opp.wrapper.get('[data-cy="ost-node-fields"]').classes()).toContain('ost-node-fields--panel');
+      opp.wrapper.unmount();
+      const outcome = await mountTab('outcome-1');
+      expect(outcome.wrapper.find('[data-cy="ost-node-fields"]').exists()).toBe(false);
+    });
+
     it('every type has notes and a child list', async () => {
       const { wrapper } = await mountTab('evidence-1');
       expect(wrapper.find('[data-cy="ost-notes"]').exists()).toBe(true);
@@ -85,6 +93,22 @@ describe('DetailTab', () => {
       await wrapper.get('[data-cy="ost-confidence-80"]').trigger('click');
       await flushPromises();
       expect(service.patchNode.calledOnceWith('assumption', 2, { confidence: 80 })).toBe(true);
+    });
+
+    it('announces the highest step not above a value that is not a multiple of 20 as pressed', async () => {
+      const { wrapper, tree } = await mountTab('assumption-2');
+      const pressed = () =>
+        wrapper
+          .findAll('[data-cy^="ost-confidence-"]')
+          .filter(s => s.attributes('aria-pressed') === 'true')
+          .map(s => s.attributes('data-cy'));
+      expect(pressed()).toEqual(['ost-confidence-60']);
+      tree.byId('assumption-2')!.conf = 50;
+      await flushPromises();
+      expect(pressed()).toEqual(['ost-confidence-40']);
+      tree.byId('assumption-2')!.conf = 10;
+      await flushPromises();
+      expect(pressed()).toEqual([]);
     });
   });
 

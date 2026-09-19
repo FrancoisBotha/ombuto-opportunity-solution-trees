@@ -579,6 +579,64 @@ class TeamScopedProductAccessIT {
     }
 
     // ---------------------------------------------------------------
+    // Server-owned fields (OST-13a, C14)
+    // ---------------------------------------------------------------
+
+    @Test
+    @Transactional
+    void putAndPatchWithAnUnchangedTeamKeepTheServerSortOrder() throws Exception {
+        ProductDTO dto = toDto(product);
+        dto.setName("Renamed by PUT");
+        dto.setSortOrder(99);
+        mvc
+            .perform(
+                put("/api/products/{id}", dto.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(dto))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sortOrder").value(0));
+        mvc
+            .perform(
+                patch("/api/products/{id}", product.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content("{\"id\": " + product.getId() + ", \"name\": \"Renamed by PATCH\", \"sortOrder\": 42}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sortOrder").value(0));
+        em.flush();
+        em.clear();
+        Product reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getName()).isEqualTo("Renamed by PATCH");
+        assertThat(reloaded.getSortOrder()).isZero();
+    }
+
+    @Test
+    @Transactional
+    void patchWithTheSameTeamIdAndAnotherTeamNameDoesNotRenameTheTeam() throws Exception {
+        String originalName = team.getName();
+        mvc
+            .perform(
+                patch("/api/products/{id}", product.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content("{\"id\": " + product.getId() + ", \"team\": {\"id\": " + team.getId() + ", \"name\": \"Hijacked\"}}")
+            )
+            .andExpect(status().isOk());
+        em.flush();
+        em.clear();
+        assertThat(em.find(Team.class, team.getId()).getName()).isEqualTo(originalName);
+        Product reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(reloaded.getSortOrder()).isZero();
+    }
+
+    // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
 

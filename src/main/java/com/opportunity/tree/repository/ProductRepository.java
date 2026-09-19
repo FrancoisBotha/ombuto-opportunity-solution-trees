@@ -49,4 +49,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query("select coalesce(max(p.sortOrder), -1) from Product p where p.team.id = :teamId")
     Integer findMaxSortOrderByTeamId(@Param("teamId") Long teamId);
+
+    /** The committed sortOrder of one product (a scalar query, so it bypasses the persistence context). */
+    @Query("select p.sortOrder from Product p where p.id = :id")
+    Integer findSortOrderById(@Param("id") Long id);
 }
