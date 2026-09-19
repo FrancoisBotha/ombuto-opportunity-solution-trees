@@ -442,6 +442,14 @@ describe('OST tree store', () => {
       expect(tree.team?.currentUserRole).toBe('VIEWER');
       expect(tree.team?.members).toHaveLength(1);
       expect(tree.team?.name).toBe('Team Jupiter');
+      expect(tree.error).toBe('Your role changed to viewer — changes are no longer possible.');
+    });
+
+    it('a re-read that shows no role change keeps the permission message', async () => {
+      service.patchNode.rejects(apiError(403));
+      service.getTree.resolves(treeDto(TREE));
+      expect(await tree.patchNode('solution-1', { note: 'typed' })).toBe(false);
+      expect(tree.canEdit).toBe(true);
       expect(tree.error).toBe('You do not have permission to change this tree.');
     });
 

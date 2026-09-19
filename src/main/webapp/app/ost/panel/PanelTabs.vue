@@ -6,7 +6,7 @@
       :key="tab.id"
       type="button"
       role="tab"
-      class="ost-tabs__tab"
+      class="ost-tabs__tab ost-hit"
       :class="{ 'is-active': tab.id === active }"
       :aria-selected="tab.id === active"
       :aria-controls="tab.id === active ? tabPanelDomId(tab.id) : undefined"

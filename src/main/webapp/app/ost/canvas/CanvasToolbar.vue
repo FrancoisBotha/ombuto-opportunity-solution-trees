@@ -15,10 +15,11 @@
         data-cy="ost-search"
         @input="ui.setQuery(($event.target as HTMLInputElement).value)"
         @keydown.esc="ui.setQuery('')"
-        @keydown.enter.prevent="jump($event.shiftKey ? -1 : 1)"
+        @keydown.enter="onEnter"
       />
-      <span :id="jumpHintId" class="ost-sr-only">Enter selects the next match on the canvas, Shift+Enter the previous one.</span>
     </label>
+    <!-- Outside the label: a description (aria-describedby), not part of the field's name. -->
+    <span :id="jumpHintId" class="ost-sr-only">Enter selects the next match on the canvas, Shift+Enter the previous one.</span>
     <span class="ost-sr-only" role="status" data-cy="ost-search-status">{{ jumpStatus }}</span>
 
     <div class="ost-toolbar__chips" role="group" aria-label="Show node types">
@@ -26,7 +27,7 @@
         v-for="chip in chips"
         :key="chip.type"
         type="button"
-        class="ost-toolbar__chip"
+        class="ost-toolbar__chip ost-hit"
         :class="{ 'is-on': chip.on }"
         :aria-pressed="chip.on"
         :data-cy="`ost-filter-${chip.type}`"
@@ -109,6 +110,13 @@ watch(
   },
 );
 
+/** Enter / Shift+Enter jump — but not the Enter that confirms an IME composition. */
+function onEnter(event: KeyboardEvent) {
+  if (event.isComposing) return;
+  event.preventDefault();
+  jump(event.shiftKey ? -1 : 1);
+}
+
 function jump(step: 1 | -1) {
   const inScope = new Set(tree.roots.map(r => r.id));
   const rootOf = (key: string) => tree.ancestors(key)[0]?.id ?? key;
@@ -118,8 +126,10 @@ function jump(step: 1 | -1) {
     jumpStatus.value = ui.query.trim() ? 'No matching nodes on the canvas' : '';
     return;
   }
-  // Continue from the current match, or from the selected node when it is one of them.
-  const from = cursor.value >= 0 ? cursor.value : matches.indexOf(ui.selectedId ?? '');
+  // Continue from the selected node when it is a match (the user may have clicked another match
+  // since the last jump), else from the last match jumped to.
+  const selected = matches.indexOf(ui.selectedId ?? '');
+  const from = selected >= 0 ? selected : cursor.value;
   const next = from < 0 ? (step > 0 ? 0 : matches.length - 1) : (from + step + matches.length) % matches.length;
   cursor.value = next;
   const key = matches[next];

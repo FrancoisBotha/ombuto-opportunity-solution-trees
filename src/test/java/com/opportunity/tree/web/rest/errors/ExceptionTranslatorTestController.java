@@ -88,6 +88,11 @@ public class ExceptionTranslatorTestController {
         throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT);
     }
 
+    @GetMapping("/response-status-with-reason")
+    public void responseStatusWithReason() {
+        throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT, "The team was changed meanwhile");
+    }
+
     @GetMapping("/cannot-acquire-lock")
     public void cannotAcquireLock() {
         throw new CannotAcquireLockException(RAW_SQL);

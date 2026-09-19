@@ -42,7 +42,7 @@
       v-if="canAdd"
       ref="addButton"
       type="button"
-      class="ost-node__add nodrag nopan"
+      class="ost-node__add ost-hit nodrag nopan"
       :class="{ 'is-open': addMenuOpen }"
       title="Add child"
       :aria-label="`Add a child under ${node.title}`"
@@ -78,7 +78,7 @@
       >
       <button
         type="button"
-        class="ost-node__chat nodrag nopan"
+        class="ost-node__chat ost-hit nodrag nopan"
         :class="{ 'is-empty': !node.commentCount }"
         title="Open thread"
         :aria-label="`Open thread (${node.commentCount} message${node.commentCount === 1 ? '' : 's'})`"
@@ -101,7 +101,7 @@
     <button
       v-if="childCount > 0"
       type="button"
-      class="ost-node__toggle nodrag nopan"
+      class="ost-node__toggle ost-hit nodrag nopan"
       :class="{ 'is-collapsed': collapsed }"
       :title="collapsed ? `Expand (${childCount} hidden)` : 'Collapse'"
       :aria-label="collapsed ? `Expand, ${childCount} hidden` : 'Collapse'"

@@ -69,4 +69,47 @@ describe('CanvasToolbar keyboard jump to a node (C17)', () => {
     expect(w.get('[data-cy="ost-search-status"]').text()).toBe('No matching nodes on the canvas');
     w.unmount();
   });
+
+  it('Enter continues from a match the user selected on the canvas since the last jump', async () => {
+    const { setupStores } = await import('../panel/panel.test-util');
+    const ctx = await setupStores();
+    const w = mount(CanvasToolbar, { props: { zoom: 1 }, attachTo: document.body, global: { plugins: [ctx.pinia] } });
+    const search = w.get('[data-cy="ost-search"]');
+    await search.setValue('in');
+    await search.trigger('keydown', { key: 'Enter' }); // match 1: outcome-1
+    ctx.ui.select('solution-1'); // the user clicks match 3
+    await search.trigger('keydown', { key: 'Enter' });
+    expect(w.emitted('jump')!.at(-1)).toEqual(['outcome-1']); // after match 3 comes match 1 (wraps), not match 2
+    expect(w.get('[data-cy="ost-search-status"]').text()).toBe('Match 1 of 3: ' + ctx.tree.byId('outcome-1')!.title);
+    ctx.ui.select('product-1'); // not a match: continue from the last jump
+    await search.trigger('keydown', { key: 'Enter' });
+    expect(w.emitted('jump')!.at(-1)).toEqual(['opportunity-1']);
+    w.unmount();
+  });
+
+  it('the Enter that ends an IME composition does not jump', async () => {
+    const { setupStores } = await import('../panel/panel.test-util');
+    const ctx = await setupStores();
+    const w = mount(CanvasToolbar, { props: { zoom: 1 }, attachTo: document.body, global: { plugins: [ctx.pinia] } });
+    const search = w.get('[data-cy="ost-search"]');
+    await search.setValue('in');
+    const composing = new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, cancelable: true });
+    search.element.dispatchEvent(composing);
+    expect(w.emitted('jump')).toBeUndefined();
+    expect(composing.defaultPrevented).toBe(false);
+    await search.trigger('keydown', { key: 'Enter' });
+    expect(w.emitted('jump')).toEqual([['outcome-1']]);
+    w.unmount();
+  });
+
+  it('the jump hint describes the search box but is not part of its name', () => {
+    setActivePinia(createPinia());
+    const w = mount(CanvasToolbar, { props: { zoom: 1 }, attachTo: document.body });
+    const search = w.get('[data-cy="ost-search"]');
+    const hint = document.getElementById(search.attributes('aria-describedby')!);
+    expect(hint?.textContent).toContain('Enter selects the next match');
+    expect(search.element.closest('label')!.contains(hint)).toBe(false);
+    expect(search.element.closest('label')!.textContent!.trim()).toBe('Search nodes');
+    w.unmount();
+  });
 });

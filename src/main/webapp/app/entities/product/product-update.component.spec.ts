@@ -87,6 +87,17 @@ describe('Component Tests', () => {
       });
     });
 
+    describe('sort order (server-owned)', () => {
+      it('is read-only with a hint and not required', () => {
+        const wrapper = shallowMount(ProductUpdate, { global: mountOptions });
+        const field = wrapper.get('[data-cy="sortOrder"]');
+        expect(field.attributes('readonly')).toBeDefined();
+        expect(field.attributes('required')).toBeUndefined();
+        expect(wrapper.get('[data-cy="sortOrderHelp"]').text()).toContain('Set by the server');
+        expect((wrapper.vm as any).v$.sortOrder.required).toBeUndefined();
+      });
+    });
+
     describe('save', () => {
       it('Should call update service on save for existing entity', async () => {
         // GIVEN

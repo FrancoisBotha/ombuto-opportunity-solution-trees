@@ -55,6 +55,29 @@ export function toFlowNodes(
   });
 }
 
+/**
+ * Keeps a node rendered while visibility culling is on: Vue Flow's culling (getNodesInside) always
+ * keeps a node whose `dragging` flag is set, so a node with an open rename field or + menu is
+ * flagged, and unflagged when the edit ends — unless it is the node really being dragged. Only
+ * that node stays mounted off-screen; every other node is still culled (C21: turning culling off
+ * for the whole tree cost ~250ms per rename / + menu at 300 nodes).
+ */
+export function pinRendered(
+  find: (id: string) => { dragging: boolean } | undefined,
+  before: ReadonlySet<string>,
+  now: ReadonlySet<string>,
+  dragged: string | null,
+): void {
+  for (const id of before) {
+    const live = now.has(id) || id === dragged ? undefined : find(id);
+    if (live?.dragging) live.dragging = false;
+  }
+  for (const id of now) {
+    const live = find(id);
+    if (live && !live.dragging) live.dragging = true;
+  }
+}
+
 /** layoutTree gives the CENTRE x and the TOP y; Vue Flow wants the top-left corner. */
 export const flowPosition = (p: Placed) => ({ x: p.x - p.w / 2, y: p.y });
 

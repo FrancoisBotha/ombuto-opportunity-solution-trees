@@ -33,7 +33,8 @@
         :readonly="!tree.canEdit"
         :maxlength="titleMax"
         data-cy="ost-panel-title"
-        @focus="titleFocused = true"
+        @focus="onTitleFocus"
+        @input="titleDirty = true"
         @keydown.enter.prevent="blurTarget"
         @keydown.esc.prevent="cancelTitle"
         @blur="commitTitle"
@@ -137,15 +138,23 @@ const reopenButton = ref<HTMLButtonElement | null>(null);
 
 // ---- title: commit on Enter / blur, Escape cancels -----------------------------------------------
 const title = ref(node.value?.title ?? '');
-const titleFocused = ref(false);
+/** The user has typed in the field since it was focused (a focused but untouched field follows the store). */
+const titleDirty = ref(false);
 
 watch(
   () => [node.value?.id, node.value?.title] as const,
   ([id, value], old) => {
-    // A new node always resets the draft; the same node only while the user is not typing.
-    if (id !== old?.[0] || !titleFocused.value) title.value = value ?? '';
+    // A new node always resets the draft; the same node unless the user has typed an edit of their own
+    // (e.g. a canvas rename committed while focus was moving into this field must show up here).
+    if (id !== old?.[0]) titleDirty.value = false;
+    if (!titleDirty.value) title.value = value ?? '';
   },
 );
+
+/** Focus starts from the stored title unless an edit is already typed. */
+function onTitleFocus() {
+  if (!titleDirty.value) title.value = node.value?.title ?? '';
+}
 
 // A new selection starts with a clean error slot.
 watch(
@@ -157,12 +166,13 @@ const blurTarget = (event: Event) => (event.target as HTMLElement).blur();
 
 /** Escape reverts the typed title; focus stays in the field (a later blur has nothing to commit). */
 function cancelTitle(event: KeyboardEvent) {
+  titleDirty.value = false;
   title.value = node.value?.title ?? '';
   (event.target as HTMLInputElement).select();
 }
 
 function commitTitle() {
-  titleFocused.value = false;
+  titleDirty.value = false;
   const current = node.value;
   if (!current || !tree.canEdit) return;
   const next = title.value.trim();

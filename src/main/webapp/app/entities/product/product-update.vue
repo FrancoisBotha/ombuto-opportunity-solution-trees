@@ -74,8 +74,12 @@
               data-cy="sortOrder"
               :class="{ valid: !v$.sortOrder.$invalid, invalid: v$.sortOrder.$invalid }"
               v-model.number="v$.sortOrder.$model"
-              required
+              readonly
+              aria-describedby="product-sortOrder-help"
             />
+            <small id="product-sortOrder-help" class="form-text text-muted" data-cy="sortOrderHelp"
+              >Set by the server: new products go last in their team. Reorder products on the tree canvas.</small
+            >
             <div v-if="v$.sortOrder.$anyDirty && v$.sortOrder.$invalid">
               <small class="form-text text-danger" v-for="error of v$.sortOrder.$errors" :key="error.$uid">{{ error.$message }}</small>
             </div>

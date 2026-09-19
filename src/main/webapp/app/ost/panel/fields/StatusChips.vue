@@ -6,7 +6,7 @@
         v-for="option in options"
         :key="option"
         type="button"
-        class="ost-chip"
+        class="ost-chip ost-hit"
         :class="{ 'is-on': option === status }"
         :aria-pressed="option === status"
         :disabled="readonly"

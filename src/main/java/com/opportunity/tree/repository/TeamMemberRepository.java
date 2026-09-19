@@ -18,6 +18,7 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
     @Query("select teamMember from TeamMember teamMember where teamMember.user.login = ?#{authentication.name}")
     List<TeamMember> findByUserIsCurrentUser();
 
+    // Only DevDataSeederIT uses this since "my teams" became one projection query; kept on purpose.
     List<TeamMember> findAllByUserLogin(String login);
 
     /**

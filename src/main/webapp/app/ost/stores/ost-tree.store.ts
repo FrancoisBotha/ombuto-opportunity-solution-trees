@@ -7,7 +7,7 @@ import { layoutTree } from '../domain/layout';
 import { type NodePatch, fromDto, parseKey, toApiType, toPatchBody } from '../domain/mapping';
 import { ALLOWED, canReparent, defaultLinks } from '../domain/rules';
 import type { NodeType, OstNode } from '../domain/types';
-import { DELETED_ELSEWHERE, type LoadFailure, describeError, httpStatus, loadFailure, messageKey } from '../ost-errors';
+import { DELETED_ELSEWHERE, DEMOTED_TO_VIEWER, type LoadFailure, describeError, httpStatus, loadFailure, messageKey } from '../ost-errors';
 import type { CommentDTO, HistoryEntryDTO, MyTeamDTO, TeamMemberDTO, TeamTreeDTO } from '../ost.model';
 import OstService from '../ost.service';
 
@@ -201,7 +201,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
    * a concurrent delete won; both can mean "someone else deleted it". Then the tree is re-read:
    * a node that is gone is removed here (deselected, panel closed) and the message says so;
    * otherwise the permission / conflict message stands. The re-read's permissions are applied too:
-   * a user demoted to viewer meanwhile loses the edit controls at once.
+   * a user demoted to viewer meanwhile loses the edit controls at once, and is told why.
    */
   async function failOnNodes(err: unknown, keys: (string | null | undefined)[], fallback?: string, type?: NodeType) {
     fail(err, fallback, type);
@@ -217,15 +217,18 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       return; // the team itself is out of reach (access revoked): the permission message stands
     }
     if (seq !== loadSeq.value || teamId.value !== id) return;
+    let demoted = false;
     if (team.value) {
       const meta = toTeamMeta(fresh);
+      demoted = team.value.canEdit && !meta.canEdit;
       team.value = { ...team.value, currentUserRole: meta.currentUserRole, canEdit: meta.canEdit, members: meta.members };
     }
     const alive = new Set((fresh.nodes ?? []).map(n => fromDto(n).id));
     const gone = keys.filter((k): k is string => !!k && !!byId(k) && !alive.has(k));
-    if (!gone.length) return;
     for (const k of gone) if (byId(k)) removeSubtree(k);
-    error.value = DELETED_ELSEWHERE;
+    // Say why the edit controls just went away; otherwise, why the node did.
+    if (demoted) error.value = DEMOTED_TO_VIEWER;
+    else if (gone.length) error.value = DELETED_ELSEWHERE;
   }
 
   // ---- actions: configuration ----------------------------------------------------------------

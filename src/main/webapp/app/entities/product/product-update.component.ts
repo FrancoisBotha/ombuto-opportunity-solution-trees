@@ -69,8 +69,8 @@ export default defineComponent({
       archived: {
         required: validations.required('This field is required.'),
       },
+      // Server-owned (ProductServiceImpl): appended on create, kept on PUT / PATCH — read-only here.
       sortOrder: {
-        required: validations.required('This field is required.'),
         integer: validations.integer('This field should be a number.'),
       },
       createdDate: {

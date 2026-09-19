@@ -38,4 +38,23 @@ describe('touch targets', () => {
     expect(wrapper.get('[data-cy="ost-question-toggle-4"]').classes()).toContain('ost-tap');
     expect(wrapper.get('[data-cy="ost-question-remove-4"]').classes()).toContain('ost-tap');
   });
+
+  it('compact controls get an invisible 44px+ hit area on a coarse pointer (.ost-hit), zoom-aware on the canvas', () => {
+    const rule = /@media \(pointer: coarse\) \{([\s\S]*?)\n\}/.exec(baseCss)?.[1] ?? '';
+    expect(rule).toContain('.ost-root .ost-hit::before');
+    expect(rule).toContain('max(100%, 48px)');
+    expect(rule).toContain('.ost-root .ost-canvas .ost-hit::before');
+    expect(rule).toContain('var(--ost-zoom, 1)');
+    for (const [file, cls] of [
+      ['canvas/OstNode.vue', 'ost-node__add ost-hit'],
+      ['canvas/OstNode.vue', 'ost-node__toggle ost-hit'],
+      ['canvas/OstNode.vue', 'ost-node__chat ost-hit'],
+      ['canvas/CanvasToolbar.vue', 'ost-toolbar__chip ost-hit'],
+      ['panel/fields/StatusChips.vue', 'ost-chip ost-hit'],
+      ['panel/PanelTabs.vue', 'ost-tabs__tab ost-hit'],
+      ['chat/ChatThread.vue', 'ost-chat__send ost-hit'],
+    ]) {
+      expect(readFileSync(`src/main/webapp/app/ost/${file}`, 'utf8'), `${file}: ${cls}`).toContain(`class="${cls}`);
+    }
+  });
 });
