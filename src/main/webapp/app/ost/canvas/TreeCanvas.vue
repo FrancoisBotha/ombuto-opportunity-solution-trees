@@ -130,6 +130,7 @@ import OstEdge from './OstEdge.vue';
 import OstNode from './OstNode.vue';
 import { childCounts, evidenceScores, isDimmed, isDraggable, laidOutNodes, matchesQuery, toFlowEdges, toFlowNodes } from './canvas-model';
 import { attachTargets, canAttach, clientToFlow, dropTargetAt, insideRect, legalParents } from './edit-rules';
+import { focusIsLost, restoreFocusAfterRename, typingElsewhere } from './rename-focus';
 import { ZOOM_MAX, ZOOM_MIN, type Point, useViewport, wheelZoom } from './useViewport';
 
 const emit = defineEmits<{ select: [key: string]; zoom: [zoom: number] }>();
@@ -172,8 +173,6 @@ function focusNode(key: string | null | undefined) {
   const el = key ? nodeEl(key) : null;
   (el ?? wrap.value)?.focus({ preventScroll: true });
 }
-
-const focusIsLost = () => !document.activeElement || document.activeElement === document.body;
 
 /** Is the laid-out box entirely inside the canvas at the current viewport? */
 function boxInView(p: Placed): boolean {
@@ -317,7 +316,11 @@ async function toggleCollapse(key: string) {
 }
 
 // ---- rename -------------------------------------------------------------------------------------
-/** After a refused save the field reopens with the rejected draft and the server's message. */
+/**
+ * After a refused save the field reopens with the rejected draft and the server's message — unless
+ * the user is typing in another field by then (the rename ended with a click there): reopening would
+ * take their focus, so the message stays on the toast instead.
+ */
 const retry = shallowRef<{ key: string; draft: string; error: string } | null>(null);
 
 function startRename(key: string) {
@@ -327,11 +330,11 @@ function startRename(key: string) {
   ui.startEditing(key);
 }
 
+/** Closes the rename field; focus goes back to the node only if nothing else took it (rename-focus.ts). */
 async function endRename(key: string) {
   if (ui.editingId === key) ui.stopEditing();
   if (retry.value?.key === key) retry.value = null;
-  await nextTick();
-  if (focusIsLost()) focusNode(key);
+  await restoreFocusAfterRename(() => focusNode(key));
 }
 
 async function commitRename(key: string, title: string) {
@@ -340,7 +343,7 @@ async function commitRename(key: string, title: string) {
   await endRename(key);
   if (!node || title === node.title) return;
   const ok = await tree.patchNode(key, { title });
-  if (!ok && tree.byId(key) && !ui.editingId) {
+  if (!ok && tree.byId(key) && !ui.editingId && !typingElsewhere(wrap.value)) {
     retry.value = { key, draft: title, error: tree.error ?? 'The title could not be saved.' };
     tree.clearError();
     ui.startEditing(key);
@@ -371,7 +374,7 @@ watch(
     deleting = null;
     if (!was) return;
     await nextTick();
-    if (focusIsLost() || !document.activeElement?.isConnected) focusNode(tree.byId(was.key) ? was.key : was.parent);
+    if (focusIsLost()) focusNode(tree.byId(was.key) ? was.key : was.parent);
   },
 );
 
