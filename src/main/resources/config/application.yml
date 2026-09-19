@@ -166,6 +166,22 @@ spring:
   output:
     ansi:
       console-available: true
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: opportunity-solution-tree-mcp
+        version: 0.0.1
+        type: SYNC
+        stdio: false
+        sse-endpoint: /mcp
+        sse-message-endpoint: /mcp/message
+        instructions: 'Ombuto OST MCP server. Read-only tools only.'
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: false
 
 server:
   servlet:

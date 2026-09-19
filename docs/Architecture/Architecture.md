@@ -73,7 +73,17 @@ hand-written pieces sit on top of the generated code:
   the same mechanism.
 - **MCP server.** Read-only tools (list products, get tree, get node, list
   interviews) call the same services, so they are scoped the same way. Callers
-  present a Keycloak bearer token.
+  present a Keycloak bearer token. The starter is
+  `org.springframework.ai:spring-ai-starter-mcp-server-webmvc`, pinned via the
+  `spring-ai-bom` (property `spring-ai.version` in `pom.xml`) at **2.0.1** — a
+  Spring Boot 4-compatible line. The transport is Server-Sent Events over HTTP
+  (Spring AI's WebMVC SSE) served on `/mcp` (message channel `/mcp/message`),
+  configured in `application.yml` under `spring.ai.mcp.server`. Capabilities are
+  set to tools only: `resource`, `prompt` and `completion` are all disabled.
+  MCPSRV-001 wires the starter, an isolated permit-all `SecurityFilterChain`
+  for `/mcp/**` (in `McpSecurityConfiguration`) and a single `ping` probe tool
+  so the transport can be verified end-to-end; MCPSRV-002 replaces the
+  permit-all chain with a stateless Keycloak resource-server chain.
 
 **Frontend** loads a team's whole tree (all of the team's products as top-level
 branches) in one request into a Pinia store and renders it on the Tree Builder

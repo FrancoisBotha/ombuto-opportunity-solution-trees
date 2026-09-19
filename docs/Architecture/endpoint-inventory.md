@@ -95,6 +95,25 @@ authorisation is enforced per call inside the service.
 | `TeamProductResource`    | `/api/teams/{teamId}/products` | Lists a team's products (including archived); non-members get 403 via `teamAccessService.requireReadTeam`.                               |
 | `AdminTeamResource`      | `/api/admin/teams/**`          | Admin team list / create / delete and member management. `ROLE_ADMIN` (class-level and the `/api/admin/**` filter rule).                 |
 
+## MCP endpoint
+
+MCPSRV-001 wires the Spring AI MCP server starter (WebMVC / SSE transport,
+`org.springframework.ai:spring-ai-starter-mcp-server-webmvc`, pinned to Spring AI **2.0.1**
+via the `spring-ai-bom` in `pom.xml`) into the same Spring Boot process. Endpoint path is
+`/mcp` (SSE) with message posts on `/mcp/message`, configured in `application.yml` under
+`spring.ai.mcp.server`. Capabilities are locked down to **tools only** — resources, prompts and
+completions are all disabled. The only tool registered in this ticket is `ping`, a trivial
+read-only probe that exposes no application data; it exists to prove tool discovery and
+invocation over the transport. A dedicated, stateless, CSRF-exempt `SecurityFilterChain` in
+`McpSecurityConfiguration` isolates `/mcp/**` from the session-based `SecurityConfiguration` so
+the existing web login, CSRF and REST API rules are untouched. Bearer-token authentication and
+the business tools are added by later MCPSRV tickets.
+
+| Endpoint       | Verb | Transport                | Protection                                                                                            |
+| -------------- | ---- | ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `/mcp`         | GET  | SSE stream (MCP)         | Permit-all in this ticket (isolated chain); replaced by Keycloak bearer-token auth in MCPSRV-002.     |
+| `/mcp/message` | POST | JSON-RPC message channel | Same as above. CSRF is disabled on this chain only; the session-based chain keeps CSRF for `/api/**`. |
+
 ## Platform endpoints (not team-owned)
 
 | Controller           | Path(s)                                     | Verbs             | Protection                                                                                                                                                                                                                                                                             |
