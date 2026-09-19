@@ -1,6 +1,13 @@
 <template>
   <section class="ost-canvas-page" data-cy="ostCanvasPage">
-    <CanvasToolbar :zoom="zoom" @product="chooseProduct" @zoom-in="canvas?.zoomIn()" @zoom-out="canvas?.zoomOut()" @fit="canvas?.fit()" />
+    <CanvasToolbar
+      :zoom="zoom"
+      @product="chooseProduct"
+      @zoom-in="canvas?.zoomIn()"
+      @zoom-out="canvas?.zoomOut()"
+      @fit="canvas?.fit()"
+      @jump="jumpTo"
+    />
     <div class="ost-canvas-page__body">
       <NodePalette v-if="tree.canEdit" :resolve-target="resolveAttachTarget" @attach="attachFromPalette" />
       <TreeCanvas ref="canvas" @select="selectFromCanvas" @zoom="zoom = $event" />
@@ -109,6 +116,13 @@ function replaceQuery(patch: Record<string, string | undefined>) {
 
 function selectFromCanvas(key: string) {
   ui.select(key);
+}
+
+/** Keyboard jump from the search box: select the match and bring it into view (expanding collapsed ancestors). */
+function jumpTo(key: string) {
+  if (!tree.byId(key)) return;
+  ui.select(key);
+  void canvas.value?.centreOn(key);
 }
 
 function chooseProduct(productId: string | 'all') {

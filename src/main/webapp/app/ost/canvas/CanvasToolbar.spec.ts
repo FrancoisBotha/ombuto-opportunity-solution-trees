@@ -40,3 +40,33 @@ describe('CanvasToolbar', () => {
     w.unmount();
   });
 });
+
+describe('CanvasToolbar keyboard jump to a node (C17)', () => {
+  it('Enter / Shift+Enter in the search box step through the matches (types shown, in scope) and announce them', async () => {
+    const { setupStores } = await import('../panel/panel.test-util');
+    const ctx = await setupStores();
+    const w = mount(CanvasToolbar, { props: { zoom: 1 }, attachTo: document.body, global: { plugins: [ctx.pinia] } });
+    const search = w.get('[data-cy="ost-search"]');
+    await search.setValue('in');
+    expect(search.attributes('aria-describedby')).toBeTruthy();
+
+    await search.trigger('keydown', { key: 'Enter' });
+    await search.trigger('keydown', { key: 'Enter' });
+    await search.trigger('keydown', { key: 'Enter' });
+    await search.trigger('keydown', { key: 'Enter', shiftKey: true });
+    const order = ['outcome-1', 'opportunity-1', 'solution-1'];
+    expect(w.emitted('jump')).toEqual([[order[0]], [order[1]], [order[2]], [order[1]]]);
+    expect(w.get('[data-cy="ost-search-status"]').text()).toBe('Match 2 of 3: Hard to find people');
+
+    // Hidden types are skipped; a new query starts over.
+    ctx.ui.toggleType('outcome');
+    await search.trigger('keydown', { key: 'Enter' });
+    expect(w.emitted('jump')!.at(-1)).toEqual(['opportunity-1']);
+
+    await search.setValue('nothing like this');
+    await search.trigger('keydown', { key: 'Enter' });
+    expect(w.emitted('jump')).toHaveLength(5);
+    expect(w.get('[data-cy="ost-search-status"]').text()).toBe('No matching nodes on the canvas');
+    w.unmount();
+  });
+});

@@ -11,11 +11,15 @@
         placeholder="Search nodes"
         autocomplete="off"
         :value="ui.query"
+        :aria-describedby="jumpHintId"
         data-cy="ost-search"
         @input="ui.setQuery(($event.target as HTMLInputElement).value)"
         @keydown.esc="ui.setQuery('')"
+        @keydown.enter.prevent="jump($event.shiftKey ? -1 : 1)"
       />
+      <span :id="jumpHintId" class="ost-sr-only">Enter selects the next match on the canvas, Shift+Enter the previous one.</span>
     </label>
+    <span class="ost-sr-only" role="status" data-cy="ost-search-status">{{ jumpStatus }}</span>
 
     <div class="ost-toolbar__chips" role="group" aria-label="Show node types">
       <button
@@ -62,9 +66,16 @@
 </template>
 
 <script setup lang="ts">
-/** Canvas toolbar row: product scope · search · type-filter chips · zoom −/%/+ · Fit. */
+/**
+ * Canvas toolbar row: product scope · search · type-filter chips · zoom −/%/+ · Fit.
+ *
+ * The search box is also the keyboard way to any node (NFR-3): the canvas only renders the nodes in
+ * view, so Tab cannot reach the rest. Enter emits `jump` with the next match (Shift+Enter the
+ * previous; it wraps) — in tree order, among the types shown and the product(s) in scope — and the
+ * page selects and centres it. A status line announces "Match 2 of 5: <title>".
+ */
 import { PhMagnifyingGlass } from '@phosphor-icons/vue';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { countByType } from '../domain/derive';
 import { TYPE_BOX } from '../domain/rules';
@@ -73,9 +84,10 @@ import { useOstTreeStore } from '../stores/ost-tree.store';
 import { useOstUiStore } from '../stores/ost-ui.store';
 
 import CanvasProductCombo from './CanvasProductCombo.vue';
+import { searchMatches } from './canvas-model';
 
 defineProps<{ zoom: number }>();
-const emit = defineEmits<{ product: [productId: string | 'all']; zoomIn: []; zoomOut: []; fit: [] }>();
+const emit = defineEmits<{ product: [productId: string | 'all']; zoomIn: []; zoomOut: []; fit: []; jump: [key: string] }>();
 
 const tree = useOstTreeStore();
 const ui = useOstUiStore();
@@ -83,6 +95,37 @@ const ui = useOstUiStore();
 const CHIP_TYPES: NodeType[] = ['outcome', 'opportunity', 'solution', 'assumption', 'evidence'];
 
 const productCounts = computed(() => Object.fromEntries(tree.products.map(p => [p.id, tree.descendantCount(p.id)])));
+
+// ---- keyboard jump to a match -------------------------------------------------------------------
+const jumpHintId = `ost-search-hint-${Math.random().toString(36).slice(2, 9)}`;
+const cursor = ref(-1);
+const jumpStatus = ref('');
+
+watch(
+  () => [ui.query, ui.productId, ui.hiddenTypes] as const,
+  () => {
+    cursor.value = -1;
+    jumpStatus.value = '';
+  },
+);
+
+function jump(step: 1 | -1) {
+  const inScope = new Set(tree.roots.map(r => r.id));
+  const rootOf = (key: string) => tree.ancestors(key)[0]?.id ?? key;
+  const matches = searchMatches(tree.nodes, ui.query, ui.hiddenTypes, n => inScope.has(rootOf(n.id)));
+  if (!matches.length) {
+    cursor.value = -1;
+    jumpStatus.value = ui.query.trim() ? 'No matching nodes on the canvas' : '';
+    return;
+  }
+  // Continue from the current match, or from the selected node when it is one of them.
+  const from = cursor.value >= 0 ? cursor.value : matches.indexOf(ui.selectedId ?? '');
+  const next = from < 0 ? (step > 0 ? 0 : matches.length - 1) : (from + step + matches.length) % matches.length;
+  cursor.value = next;
+  const key = matches[next];
+  jumpStatus.value = `Match ${next + 1} of ${matches.length}: ${tree.byId(key)?.title ?? ''}`;
+  emit('jump', key);
+}
 
 const chips = computed(() => {
   const counts = countByType(tree.nodes);
