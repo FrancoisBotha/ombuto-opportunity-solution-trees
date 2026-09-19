@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
@@ -11,7 +12,9 @@ import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERN
  * first and nothing for title / notes edits; a viewer reads the chat but cannot post; the
  * jump-to-latest button in a long thread.
  *
- * The team is deleted afterwards (product first, then the team as admin). No seeded team is touched.
+ * Cleanup: the product (and its subtree) is deleted in afterAll; the team is registered with
+ * support/cleanup.ts and deleted as admin once every spec has finished (deleting it mid-run breaks
+ * other workers' requests). No seeded team is touched.
  */
 
 interface TreeNode {
@@ -128,6 +131,7 @@ test.describe('OST collaboration tabs', () => {
     });
     expect(team.status()).toBe(201);
     teamId = (await team.json()).id;
+    registerTeamForCleanup(teamId);
     const found = (await (await user.api('get', `/api/team-management/teams/${teamId}/user-search?q=admin`)).json()) as {
       id: string;
       login: string;
@@ -162,10 +166,9 @@ test.describe('OST collaboration tabs', () => {
   });
 
   test.afterAll(async () => {
-    if (teamId) {
-      if (productId) await user.api('delete', `/api/products/${productId}`);
-      const res = await admin.api('delete', `/api/admin/teams/${teamId}`);
-      expect(res.status(), 'team cleanup').toBe(204);
+    if (productId) {
+      const res = await user.api('delete', `/api/products/${productId}`);
+      expect(res.status(), 'product cleanup').toBe(204);
     }
     await user?.context.close();
     await admin?.context.close();
