@@ -62,7 +62,7 @@
       @commit="emit('renameCommit', $event)"
       @cancel="emit('renameCancel')"
     />
-    <div v-else class="ost-node__title" data-cy="ost-node-title" @dblclick.stop="onTitleDblclick">{{ node.title }}</div>
+    <div v-else class="ost-node__title" data-cy="ost-node-title" :title="node.title" @dblclick.stop="onTitleDblclick">{{ node.title }}</div>
 
     <div v-if="node.type !== 'product'" class="ost-node__meta">
       <span v-if="node.status" class="ost-node__badge" :class="`ost-node__badge--${tone}`" :data-tone="tone" data-cy="ost-node-status">{{
@@ -359,6 +359,19 @@ const priorityDots = computed(() =>
   text-wrap: pretty;
   overflow: hidden;
   overflow-wrap: anywhere;
+  /* Clamped so a node never grows into the edge elbow below it (layout ROW_PITCH 156; the elbow
+     sits halfway between the layout box bottom and the next row). The full title is the tooltip,
+     the accessible name and the panel title. Types with a two-line meta row get two lines. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+.ost-node--product .ost-node__title,
+.ost-node--solution .ost-node__title,
+.ost-node--assumption .ost-node__title {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .ost-node__meta {

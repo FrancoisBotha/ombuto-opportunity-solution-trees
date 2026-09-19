@@ -47,7 +47,7 @@
           @add="toggleAddMenu(id)"
           @add-choose="createChild(id, $event)"
           @add-close="ui.openAddMenu(null)"
-          @toggle="ui.toggleCollapse(id)"
+          @toggle="toggleCollapse(id)"
           @chat="ui.openChat(id)"
           @activate="activate(id)"
           @rename="startRename(id)"
@@ -57,6 +57,23 @@
         />
       </template>
     </VueFlow>
+
+    <div v-if="!tree.loading && !tree.products.length" class="ost-canvas__empty">
+      <div class="ost-state" data-cy="ost-canvas-empty">
+        <div class="ost-state__title">No products in this tree yet</div>
+        <p class="ost-state__text">
+          Products are created on the team’s page. Each product becomes a branch of the tree with its own outcomes, opportunities and
+          experiments.
+        </p>
+        <router-link
+          v-if="tree.canEdit && tree.team"
+          class="ost-btn ost-btn--primary"
+          :to="`/teams/${tree.team.id}`"
+          data-cy="ost-canvas-go-to-team"
+          >Go to the team</router-link
+        >
+      </div>
+    </div>
 
     <CanvasLegend :can-edit="tree.canEdit" />
     <CanvasMinimap
@@ -134,6 +151,7 @@ const scores = computed(() => evidenceScores(tree.nodes));
 watch(zoom, z => emit('zoom', z), { immediate: true });
 
 function onMinimapWheel(deltaY: number) {
+  view.userMoved();
   const s = view.size();
   flow.setViewport(wheelZoom({ ...flow.viewport.value }, { x: s.width / 2, y: s.height / 2 }, deltaY));
 }
@@ -228,6 +246,7 @@ const creating = ref(false);
 async function createChild(parentKey: string, type: NodeType) {
   if (creating.value || !tree.canEdit) return;
   creating.value = true;
+  view.userMoved(); // editing is the user taking over the view: no automatic re-fit from here on
   ui.openAddMenu(null);
   try {
     const key = await tree.createNode(parentKey, type);
@@ -241,6 +260,23 @@ async function reveal(key: string) {
   await nextTick();
   const p = tree.placed[key];
   if (p && !boxInView(p)) view.centreOnBox(p);
+}
+
+// ---- collapse -----------------------------------------------------------------------------------
+/**
+ * Collapse / expand re-lays out the branch; keep the toggled node where it was on screen (eased
+ * with the node transition) so its chip never slides away from the pointer or under the sidebar.
+ */
+async function toggleCollapse(key: string) {
+  const before = tree.placed[key];
+  ui.toggleCollapse(key);
+  await nextTick();
+  const after = tree.placed[key];
+  if (!before || !after) return;
+  const z = flow.viewport.value.zoom;
+  const dx = (before.x - after.x) * z;
+  const dy = (before.y - after.y) * z;
+  if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) view.panBy(dx, dy);
 }
 
 // ---- rename -------------------------------------------------------------------------------------
@@ -370,8 +406,8 @@ function applyPendingCentre() {
 function fit() {
   if (!ready.value) return;
   view.fit(
-    tree.placed,
-    tree.roots.map(r => r.id),
+    () => tree.placed,
+    () => tree.roots.map(r => r.id),
   );
   applyPendingCentre();
 }
@@ -421,6 +457,19 @@ defineExpose({ zoomIn: view.zoomIn, zoomOut: view.zoomOut, fit, centreOn, resolv
   outline: none;
   background-image: radial-gradient(circle, color-mix(in srgb, var(--color-text) 9%, transparent) 1px, transparent 1px);
   background-size: 28px 28px;
+}
+
+.ost-canvas__empty {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.ost-canvas__empty .ost-state {
+  margin: 0 16px;
+  pointer-events: auto;
 }
 
 .ost-canvas__flow {

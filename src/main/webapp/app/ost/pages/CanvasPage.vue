@@ -44,12 +44,22 @@ watch(
   () => [route.query.product, route.query.node, tree.team?.id] as const,
   ([product, node]) => {
     const productKey = queryKey(product);
-    ui.setProduct(productKey && tree.byId(productKey)?.type === 'product' ? productKey : 'all');
     const nodeKey = queryKey(node);
-    // A ?node= that is not the current selection came from outside (deep link, other page): centre it.
-    if (nodeKey && tree.byId(nodeKey) && nodeKey !== ui.selectedId) {
-      ui.select(nodeKey);
-      canvas.value?.centreOn(nodeKey);
+    // A ?node= that is not the current selection came from outside (deep link, other page).
+    const linked = nodeKey && nodeKey !== ui.selectedId ? tree.byId(nodeKey) : undefined;
+    let scope: string | 'all' = productKey && tree.byId(productKey)?.type === 'product' ? productKey : 'all';
+    // A linked node outside the product in scope: scope the canvas to its product instead.
+    if (linked && scope !== 'all') {
+      const root = linked.type === 'product' ? linked : tree.ancestors(linked.id)[0];
+      if (root && root.id !== scope) scope = root.id;
+    }
+    ui.setProduct(scope);
+    // Keep the URL honest once the tree is here: no unknown ?product=, and the scope actually shown.
+    const wanted = scope === 'all' ? undefined : scope;
+    if (tree.team && (productKey ?? undefined) !== wanted) replaceQuery({ product: wanted });
+    if (linked) {
+      ui.select(linked.id);
+      canvas.value?.centreOn(linked.id);
     }
   },
   { immediate: true },

@@ -105,6 +105,11 @@ export function centreOn(point: Point, size: Size, zoom: number): Viewport {
 /**
  * Binds the maths to a Vue Flow store and the canvas element: a non-passive wheel listener
  * (Vue Flow's zoom-on-scroll must be off), toolbar steps, fit and centring.
+ *
+ * Automatic fits stay live: after a fit, until the user moves the view (wheel, pointer press in
+ * the canvas, zoom buttons, centring, panning), every canvas resize fits again instead of just
+ * shifting — the first fit often runs while the app sidebar is still settling, and a fit computed
+ * for a canvas that then shrinks leaves the outer branches clipped.
  */
 export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
   const rect = () => {
@@ -118,23 +123,32 @@ export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
   const current = (): Viewport => ({ ...flow.viewport.value });
   /** Canvas box the current viewport was computed for (see the resize observer below). */
   let last: ReturnType<typeof rect> | null = null;
-  const apply = (next: Viewport) => {
+  const apply = (next: Viewport, duration?: number) => {
     const r = rect();
     if (r.width && r.height) last = r;
-    return flow.setViewport(next);
+    return flow.setViewport(next, duration ? { duration } : undefined);
+  };
+
+  /** Re-runs the last fit on resize while the view is still the automatic one; null once the user moved it. */
+  let refit: (() => boolean) | null = null;
+  /** The user took over the view: resizes no longer re-fit. */
+  const userMoved = () => {
+    refit = null;
   };
 
   function onWheel(event: WheelEvent) {
     event.preventDefault();
+    userMoved();
     const r = el.value!.getBoundingClientRect();
     apply(wheelZoom(current(), { x: event.clientX - r.left, y: event.clientY - r.top }, event.deltaY));
   }
 
-  // When the canvas's left/top edge moves (app sidebar animating) keep the point in the middle of
-  // the canvas in the middle. When only the right/bottom edge moves (detail panel opening or
-  // closing, window resize) the content stays where it is on screen, as in the prototype — so the
-  // first click on a node (which opens the panel) never slides the node from under the pointer,
-  // and a double-click to rename still lands on the same title.
+  // While a fit is live, a resize fits again. Otherwise: when the canvas's left/top edge moves
+  // (app sidebar animating) keep the point in the middle of the canvas in the middle; when only the
+  // right/bottom edge moves (detail panel opening or closing, window resize) the content stays
+  // where it is on screen, as in the prototype — so the first click on a node (which opens the
+  // panel) never slides the node from under the pointer, and a double-click to rename still lands
+  // on the same title.
   const resizer =
     typeof ResizeObserver === 'undefined'
       ? null
@@ -142,7 +156,8 @@ export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
           const now = rect();
           if (last && now.width && now.height && (now.width !== last.width || now.height !== last.height)) {
             const anchored = Math.abs(now.left - last.left) < 0.5 && Math.abs(now.top - last.top) < 0.5;
-            if (!anchored) {
+            if (refit) refit();
+            else if (!anchored) {
               const v = current();
               apply({ zoom: v.zoom, x: v.x + (now.width - last.width) / 2, y: v.y + (now.height - last.height) / 2 });
             }
@@ -154,7 +169,12 @@ export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
     el,
     (next, prev) => {
       prev?.removeEventListener('wheel', onWheel);
+      prev?.removeEventListener('pointerdown', userMoved, true);
+      prev?.removeEventListener('keydown', userMoved, true);
       next?.addEventListener('wheel', onWheel, { passive: false });
+      // Any press or key in the canvas (pan, node click, minimap, keyboard) is the user taking over.
+      next?.addEventListener('pointerdown', userMoved, true);
+      next?.addEventListener('keydown', userMoved, true);
       if (prev) resizer?.unobserve(prev);
       if (next) resizer?.observe(next);
     },
@@ -162,29 +182,53 @@ export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
   );
   onBeforeUnmount(() => {
     el.value?.removeEventListener('wheel', onWheel);
+    el.value?.removeEventListener('pointerdown', userMoved, true);
+    el.value?.removeEventListener('keydown', userMoved, true);
     resizer?.disconnect();
   });
 
   return {
     zoom: computed(() => flow.viewport.value.zoom),
     size,
-    zoomIn: () => apply(stepZoom(current(), size(), 1)),
-    zoomOut: () => apply(stepZoom(current(), size(), -1)),
-    /** Frames `placed`; returns false when the canvas has no size yet or nothing is laid out. */
-    fit(placed: Record<string, Placed>, rootIds: string[]): boolean {
-      const next = fitViewport(placed, rootIds, size());
-      if (next) apply(next);
-      return !!next;
+    zoomIn: () => {
+      userMoved();
+      return apply(stepZoom(current(), size(), 1));
+    },
+    zoomOut: () => {
+      userMoved();
+      return apply(stepZoom(current(), size(), -1));
+    },
+    /**
+     * Frames the laid-out branch (`placed()` / `rootIds()` are read again on every re-fit); returns
+     * false when the canvas has no size yet or nothing is laid out. Stays live until the user moves.
+     */
+    fit(placed: () => Record<string, Placed>, rootIds: () => string[]): boolean {
+      const run = () => {
+        const next = fitViewport(placed(), rootIds(), size());
+        if (next) apply(next);
+        return !!next;
+      };
+      refit = run;
+      return run();
     },
     /** Centres a laid-out box, never zooming out below the fit floor. */
     centreOnBox(p: Placed): boolean {
       const s = size();
       if (!s.width) return false;
+      userMoved();
       apply(centreOn({ x: p.x, y: p.y + p.h / 2 }, s, Math.max(FIT_FLOOR, flow.viewport.value.zoom)));
       return true;
     },
     centreOnPoint(point: Point) {
+      userMoved();
       apply(centreOn(point, size(), flow.viewport.value.zoom));
     },
+    /** Moves the view by a screen delta (keeps a node anchored across a re-layout), eased like nodes. */
+    panBy(dx: number, dy: number, duration = 180) {
+      userMoved();
+      const v = current();
+      apply({ zoom: v.zoom, x: v.x + dx, y: v.y + dy }, duration);
+    },
+    userMoved,
   };
 }
