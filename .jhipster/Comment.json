@@ -3,7 +3,7 @@
     "changelogDate": "20260918102619"
   },
   "applications": ["opportunitySolutionTree"],
-  "documentation": "Threaded comment on any tree node. Exactly one of the node relationships is set.",
+  "documentation": "Flat, chat-style comment on a tree node: no replies, no threading. Exactly one of the node relationships is set.",
   "dto": "mapstruct",
   "fields": [
     {
@@ -32,12 +32,6 @@
       "relationshipType": "many-to-one",
       "relationshipValidateRules": "required",
       "relationshipWithBuiltInEntity": true
-    },
-    {
-      "otherEntityName": "comment",
-      "relationshipName": "parent",
-      "relationshipSide": "left",
-      "relationshipType": "many-to-one"
     },
     {
       "otherEntityField": "title",

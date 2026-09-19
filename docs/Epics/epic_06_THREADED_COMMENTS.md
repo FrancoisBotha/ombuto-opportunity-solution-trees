@@ -1,16 +1,22 @@
 # Epic 6: Threaded Comments
 
-> **Mostly delivered by [Epic 11: OST Tree Builder](epic_11_OST_TREE_BUILDER.md) (2026-09-20);
-> the rest depends on Epic 5.** Chat already exists on every node type except Product (post,
-> edit and delete your own, comment counts on nodes and the panel badge, a chat modal from the
-> node chip). Still open here: threaded replies (the `Comment.parent` relationship exists but the
-> UI is flat) and live delivery, which belongs to
-> [Epic 5](epic_05_REALTIME_COLLABORATION.md). Re-scope before planning.
+> **Superseded by [Epic 11: OST Tree Builder](epic_11_OST_TREE_BUILDER.md) (2026-09-20). Closed;
+> do not plan work from it.** Node discussion shipped in Epic 11 as a **flat, chat-style thread**
+> on every node type except Product: post, edit and delete your own message, comment counts on
+> nodes and the panel badge, and a chat modal from the node chip.
+>
+> **Threading is a rejected decision, not deferred work.** Chat stays flat — the
+> `Comment.parent` self-relationship was removed from `ombuto.jdl` and the schema on 2026-09-20,
+> so replies are not "not yet built", they are out of the product. Everything below that talks
+> about threads, replies or reply depth is kept for history only.
+>
+> The one genuinely open item — live delivery of messages over the team topic — belongs to
+> [Epic 5: Realtime Collaboration](epic_05_REALTIME_COLLABORATION.md).
 
-Status: NEW
+Status: SUPERSEDED
 Owner: human
 Created: 2026-09-18
-Last Updated: 2026-09-18
+Last Updated: 2026-09-20
 Depends On: epic_05_REALTIME_COLLABORATION
 
 ---

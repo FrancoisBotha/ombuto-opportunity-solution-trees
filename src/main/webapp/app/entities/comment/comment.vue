@@ -45,10 +45,6 @@
               <span>Author</span>
               <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'author.login'"></jhi-sort-indicator>
             </th>
-            <th scope="col" @click="changeOrder('parent.id')">
-              <span>Parent</span>
-              <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'parent.id'"></jhi-sort-indicator>
-            </th>
             <th scope="col" @click="changeOrder('outcome.title')">
               <span>Outcome</span>
               <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'outcome.title'"></jhi-sort-indicator>
@@ -82,11 +78,6 @@
             <td>{{ formatDateShort(comment.editedDate) || '' }}</td>
             <td>
               {{ comment.author ? comment.author.login : '' }}
-            </td>
-            <td>
-              <div v-if="comment.parent">
-                <router-link :to="{ name: 'CommentView', params: { commentId: comment.parent.id } }">{{ comment.parent.id }}</router-link>
-              </div>
             </td>
             <td>
               <div v-if="comment.outcome">

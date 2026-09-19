@@ -22,7 +22,6 @@ import org.mapstruct.*;
 @Mapper(componentModel = "spring")
 public interface CommentMapper extends EntityMapper<CommentDTO, Comment> {
     @Mapping(target = "author", source = "author", qualifiedByName = "userLogin")
-    @Mapping(target = "parent", source = "parent", qualifiedByName = "commentId")
     @Mapping(target = "outcome", source = "outcome", qualifiedByName = "outcomeTitle")
     @Mapping(target = "opportunity", source = "opportunity", qualifiedByName = "opportunityTitle")
     @Mapping(target = "solution", source = "solution", qualifiedByName = "solutionTitle")
@@ -35,11 +34,6 @@ public interface CommentMapper extends EntityMapper<CommentDTO, Comment> {
     @Mapping(target = "id", source = "id")
     @Mapping(target = "login", source = "login")
     UserDTO toDtoUserLogin(User user);
-
-    @Named("commentId")
-    @BeanMapping(ignoreByDefault = true)
-    @Mapping(target = "id", source = "id")
-    CommentDTO toDtoCommentId(Comment comment);
 
     @Named("outcomeTitle")
     @BeanMapping(ignoreByDefault = true)

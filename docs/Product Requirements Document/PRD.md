@@ -36,7 +36,7 @@ them.
   Experiments, with a status on each node. The canvas can be focused on a single
   product.
 - Real-time collaboration — several people edit the same tree at once and see
-  each other's changes immediately, with threaded comments on nodes.
+  each other's changes immediately, with chat-style comments on nodes.
 - Teams and products — many teams, each with one tree that holds all of the
   team's products as top-level branches. A user can belong to several teams,
   with an owner, editor or viewer role in each.

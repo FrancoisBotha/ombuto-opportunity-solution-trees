@@ -5,7 +5,6 @@ const JhiConfigurationComponent = () => import('@/admin/configuration/configurat
 const JhiHealthComponent = () => import('@/admin/health/health.vue');
 const JhiLogsComponent = () => import('@/admin/logs/logs.vue');
 const JhiMetricsComponent = () => import('@/admin/metrics/metrics.vue');
-const JhiTrackerComponent = () => import('@/admin/tracker/tracker.vue');
 
 export default [
   {
@@ -36,12 +35,6 @@ export default [
     path: '/admin/configuration',
     name: 'JhiConfigurationComponent',
     component: JhiConfigurationComponent,
-    meta: { authorities: [Authority.ADMIN] },
-  },
-  {
-    path: '/admin/tracker',
-    name: 'JhiTrackerComponent',
-    component: JhiTrackerComponent,
     meta: { authorities: [Authority.ADMIN] },
   },
 ];

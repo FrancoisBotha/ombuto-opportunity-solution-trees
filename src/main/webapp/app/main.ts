@@ -13,7 +13,6 @@ import JhiItemCount from '@/shared/jhi-item-count.vue';
 import JhiSortIndicator from '@/shared/sort/jhi-sort-indicator.vue';
 import { useStore } from '@/store';
 
-import { useTrackerService } from './admin/tracker/tracker.service';
 import App from './app.vue';
 import router from './router';
 
@@ -82,8 +81,6 @@ const app = createApp({
 
     provide('accountService', accountService);
     // jhipster-needle-add-entity-service-to-main - JHipster will import entities services here
-
-    provide('trackerService', useTrackerService({ authenticated }));
   },
   template: '<App/>',
 });

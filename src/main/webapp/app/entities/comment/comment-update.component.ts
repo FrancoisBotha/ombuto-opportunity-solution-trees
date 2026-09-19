@@ -31,8 +31,6 @@ export default defineComponent({
     const userService = inject('userService', () => new UserService());
     const users: Ref<Array<any>> = ref([]);
 
-    const comments: Ref<IComment[]> = ref([]);
-
     const outcomeService = inject('outcomeService', () => new OutcomeService());
 
     const outcomes: Ref<IOutcome[]> = ref([]);
@@ -81,11 +79,6 @@ export default defineComponent({
         .then(res => {
           users.value = res.data;
         });
-      commentService()
-        .retrieve()
-        .then(res => {
-          comments.value = res.data;
-        });
       outcomeService()
         .retrieve()
         .then(res => {
@@ -129,7 +122,6 @@ export default defineComponent({
       author: {
         required: validations.required('This field is required.'),
       },
-      parent: {},
       outcome: {},
       opportunity: {},
       solution: {},
@@ -147,7 +139,6 @@ export default defineComponent({
       isSaving,
       currentLanguage,
       users,
-      comments,
       outcomes,
       opportunities,
       solutions,

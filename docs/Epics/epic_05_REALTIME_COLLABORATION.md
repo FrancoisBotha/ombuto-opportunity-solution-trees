@@ -1,6 +1,6 @@
 # Epic 5: Real-Time Collaboration
 
-Status: NEW
+Status: TICKETS
 Owner: human
 Created: 2026-09-18
 Last Updated: 2026-09-20
@@ -54,7 +54,9 @@ overwriting or missing each other's work.
   deleted by someone else ("This item was deleted by someone else."), and applies
   a role demotion.
 - **Chat:** flat comments on every type except product, with counts on nodes and
-  the panel badge (epic 6's scope, minus threading and live delivery).
+  the panel badge (epic 6's scope, minus live delivery). Chat is flat by
+  decision — `Comment.parent` was removed from the model on 2026-09-20 and there
+  is no threading to add.
 
 ## 4. Scope
 
@@ -69,7 +71,7 @@ overwriting or missing each other's work.
 - **Out of Scope:** presence and live cursors; field-level locking; CRDT/OT
   merging (last write wins per field remains the decision); event replay or a
   durable event log; an external broker or multi-instance deployment;
-  notifications outside the open page; threaded replies (epic 6).
+  notifications outside the open page.
 
 ## 5. Functional Requirements
 
@@ -163,9 +165,23 @@ epic and a JDL change.
   backoff); event application in `ost-tree.store.ts` alongside the existing
   in-flight patch sequencing; indicator and pulse in the canvas.
 - **Existing sample code:** JHipster's `tracker` sample
-  (`web/websocket/ActivityService.java`, `app/admin/tracker/*`) is unrelated to
-  the tree. Decide explicitly: keep it as admin-only, or remove it. Do not let
-  it share the tree topic.
+  (`web/websocket/ActivityService.java`, `app/admin/tracker/*`) was removed on
+  2026-09-20. Only the STOMP infrastructure remains —
+  `config/WebsocketConfiguration` (the `/websocket/tracker` SockJS endpoint and
+  the simple `/topic` broker, both keeping their generated names) and
+  `config/WebsocketSecurityConfiguration`, which now requires authentication for
+  every `/topic/**` destination and denies everything else. Also kept for this
+  epic, and unreferenced until it lands: `app/shared/jhipster/encode-csrf-token.ts`
+  and the `@stomp/rx-stomp` and `sockjs-client` dependencies. Do not delete them
+  as dead code. This epic builds the team topic on that infrastructure.
+
+  Two things to settle in this epic's first ticket:
+  - **Rename the endpoint.** `/websocket/tracker` names something that no longer
+    exists. Nothing connects to it yet, so renaming it (e.g. `/websocket/ost`) is
+    free now and a breaking change later.
+  - **Authenticated is not enough.** `/topic/**` currently only requires a signed-in
+    user, so any member of any team could subscribe to another team's topic.
+    FR-034's team-scoped check is therefore mandatory, not a refinement.
 
 ## 10. Acceptance Criteria
 
@@ -199,8 +215,9 @@ Epic is complete when:
 ## 12. Dependencies
 
 Epic 11 (the Tree Builder: flat tree read, write APIs, team lock, OST client
-stores). Epic 6 (threaded comments) now depends on this epic only for live
-delivery; the rest of its scope already shipped in epic 11.
+stores). Epic 6 is closed: its chat scope shipped in epic 11 as a flat thread,
+threading was rejected outright, and the only item it handed on is live delivery
+of chat messages — which is in scope here.
 
 ## 13. References
 

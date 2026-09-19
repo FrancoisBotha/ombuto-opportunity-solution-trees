@@ -159,7 +159,7 @@ entity Interview {
 /* Collaboration                                                       */
 /* ------------------------------------------------------------------ */
 
-/** Threaded comment on any tree node. Exactly one of the node relationships is set. */
+/** Flat, chat-style comment on a tree node: no replies, no threading. Exactly one of the node relationships is set. */
 entity Comment {
   body TextBlob required
   createdDate Instant required
@@ -227,7 +227,6 @@ relationship ManyToOne {
   Interview{interviewer(login)} to User with builtInEntity
 
   Comment{author(login) required} to User with builtInEntity
-  Comment{parent} to Comment
   Comment{outcome(title)} to Outcome
   Comment{opportunity(title)} to Opportunity
   Comment{solution(title)} to Solution
