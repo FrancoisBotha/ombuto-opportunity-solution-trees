@@ -100,7 +100,7 @@ describe('DetailPanel', () => {
       expect(tree.byId('outcome-1')?.title).toBe('Renamed outcome');
     });
 
-    it('Escape cancels the title edit', async () => {
+    it('Escape cancels the title edit and keeps focus in the field', async () => {
       const { wrapper, service } = await mountPanel('outcome-1');
       const input = wrapper.get('[data-cy="ost-panel-title"]');
       (input.element as HTMLInputElement).focus();
@@ -109,6 +109,11 @@ describe('DetailPanel', () => {
       await flushPromises();
       expect(service.patchNode.called).toBe(false);
       expect((input.element as HTMLInputElement).value).toBe('Weekly interviews');
+      expect(document.activeElement).toBe(input.element);
+      // Leaving the field afterwards commits nothing.
+      await input.trigger('blur');
+      await flushPromises();
+      expect(service.patchNode.called).toBe(false);
     });
 
     it('shows a refused title inline and rolls it back', async () => {
