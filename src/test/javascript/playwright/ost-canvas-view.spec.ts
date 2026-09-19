@@ -643,21 +643,24 @@ test.describe('OST tree canvas — render & navigate', () => {
     });
   }
 
-  test('seeded Team Jupiter renders all 24 nodes (read-only check)', async () => {
+  test('seeded Team Jupiter renders every node the API returns (read-only check)', async () => {
     const page = user.page;
     const teams = (await (await user.api('get', '/api/team-management/my-teams')).json()) as { id: number; name: string }[];
     const jupiter = teams.find(t => t.name === 'Team Jupiter');
     expect(jupiter, 'Team Jupiter').toBeTruthy();
     const tree = (await (await user.api('get', `/api/teams/${jupiter!.id}/tree`)).json()) as { nodes: TreeNode[] };
-    expect(tree.nodes).toHaveLength(24);
+    // The canvas must render exactly what the API returns. Deliberately NOT a fixed number:
+    // the seeded tree is shared dev data, so a stray node added by hand must not fail the suite.
+    const expected = tree.nodes.length;
+    expect(expected, 'seeded tree looks unseeded — wipe target/h2db and restart').toBeGreaterThanOrEqual(20);
 
     await page.goto(`/trees/${jupiter!.id}/canvas`);
     await expect(page.getByTestId('ost-canvas')).toBeVisible();
-    await expect(page.locator('[data-cy^="ost-minimap-node-"]')).toHaveCount(24);
+    await expect(page.locator('[data-cy^="ost-minimap-node-"]')).toHaveCount(expected);
     // Zoom all the way out so every node is inside the viewport (only visible nodes are rendered).
     for (let i = 0; i < 10; i++) await page.getByTestId('ost-zoom-out').click();
     await expect.poll(() => zoomPercent(page)).toBe(35);
-    await expect(page.locator('.ost-node')).toHaveCount(24);
+    await expect(page.locator('.ost-node')).toHaveCount(expected);
     for (const n of tree.nodes) await expect(node(page, n.key)).toHaveClass(new RegExp(`ost-node--${n.type.toLowerCase()}`));
   });
 });
