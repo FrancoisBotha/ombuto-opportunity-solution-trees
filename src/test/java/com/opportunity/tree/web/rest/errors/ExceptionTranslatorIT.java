@@ -105,6 +105,18 @@ class ExceptionTranslatorIT {
     }
 
     @Test
+    void responseStatusReasonIsTheCleanDetail() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/response-status-with-reason").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.detail").value("The team was changed meanwhile"))
+            .andExpect(content().string(not(containsString("409 CONFLICT"))))
+            .andExpect(content().string(not(containsString("ResponseStatusException"))))
+            .andExpect(content().string(not(containsString("ProblemDetail"))));
+    }
+
+    @Test
     void lockFailuresAreAConflictWithoutSql() throws Exception {
         for (String path : new String[] { "cannot-acquire-lock", "jpa-pessimistic-lock" }) {
             mockMvc
@@ -176,7 +188,8 @@ class ExceptionTranslatorIT {
             .andExpect(status().isMethodNotAllowed())
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.message").value("error.http.405"))
-            .andExpect(jsonPath("$.detail").value("Request method 'POST' is not supported"));
+            .andExpect(jsonPath("$.detail").value("Request method 'POST' is not supported"))
+            .andExpect(content().string(not(containsString("HttpRequestMethodNotSupportedException"))));
     }
 
     @Test
