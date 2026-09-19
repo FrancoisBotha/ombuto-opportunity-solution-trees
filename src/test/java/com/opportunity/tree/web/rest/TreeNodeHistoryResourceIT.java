@@ -138,10 +138,7 @@ class TreeNodeHistoryResourceIT {
                 jsonPath("$[*].eventType", contains("LINK_REMOVED", "COMMENT_DELETED", "COMMENT_ADDED", "QUESTION_ADDED", "LINK_ADDED"))
             )
             .andExpect(
-                jsonPath(
-                    "$[*].summary",
-                    contains("Link removed", "Comment deleted", "Comment added", "Open question added", "Link added")
-                )
+                jsonPath("$[*].summary", contains("Link removed", "Comment deleted", "Comment added", "Open question added", "Link added"))
             )
             .andExpect(jsonPath("$[*].authorLogin", contains(EDITOR, EDITOR, EDITOR, EDITOR, EDITOR)));
     }

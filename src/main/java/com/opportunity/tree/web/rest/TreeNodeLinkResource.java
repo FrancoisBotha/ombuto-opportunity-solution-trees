@@ -39,7 +39,9 @@ public class TreeNodeLinkResource {
         @RequestBody(required = false) TreeLinkWriteDTO request
     ) {
         LOG.debug("REST request to add a link to {} {}", type, id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(treeNodeLinkService.addLink(TreeNodeRules.parseType(type, "type"), id, request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            treeNodeLinkService.addLink(TreeNodeRules.parseType(type, "type"), id, request)
+        );
     }
 
     @PatchMapping("/links/{id}")

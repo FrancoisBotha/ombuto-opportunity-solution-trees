@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.config.ApplicationProperties;
 import com.opportunity.tree.domain.Authority;
+import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.HistoryEventType;
@@ -25,7 +26,6 @@ import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.security.AuthoritiesConstants;
-import com.opportunity.tree.domain.Team;
 import jakarta.persistence.EntityManager;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -392,12 +392,27 @@ class DevDataSeederIT {
         // Venus and Best Team are still missing, so the run writes something...
         assertThat(seeder(true).seed()).isTrue();
 
-        for (String name : List.of(DevDataSeeder.TEAM_JUPITER, DevDataSeeder.TEAM_VENUS, DevDataSeeder.BEST_TEAM, DevDataSeeder.TEAM_MARS)) {
+        for (String name : List.of(
+            DevDataSeeder.TEAM_JUPITER,
+            DevDataSeeder.TEAM_VENUS,
+            DevDataSeeder.BEST_TEAM,
+            DevDataSeeder.TEAM_MARS
+        )) {
             assertThat(teamsNamed(name)).as(name).isEqualTo(1);
         }
         // ...but the pre-existing teams are left alone: no members added, and no tree in the old Jupiter.
-        assertThat(teamMemberRepository.findAll().stream().filter(m -> m.getTeam().getId().equals(existingJupiter.getId()))).isEmpty();
-        assertThat(teamMemberRepository.findAll().stream().filter(m -> m.getTeam().getId().equals(existingMars.getId()))).isEmpty();
+        assertThat(
+            teamMemberRepository
+                .findAll()
+                .stream()
+                .filter(m -> m.getTeam().getId().equals(existingJupiter.getId()))
+        ).isEmpty();
+        assertThat(
+            teamMemberRepository
+                .findAll()
+                .stream()
+                .filter(m -> m.getTeam().getId().equals(existingMars.getId()))
+        ).isEmpty();
         assertThat(nodeCount("Product")).isZero();
         assertThat(rolesOf(DevDataSeeder.USER_LOGIN)).isEqualTo(Map.of(DevDataSeeder.TEAM_VENUS, TeamRole.OWNER));
 
@@ -426,13 +441,15 @@ class DevDataSeederIT {
         List<Instant> seededHistory = em
             .createQuery(
                 "select h.createdDate from NodeHistory h where h.nodeType = :type and h.nodeId in " +
-                "(select o.id from Opportunity o where o.outcome.product.team.name = :team)",
+                    "(select o.id from Opportunity o where o.outcome.product.team.name = :team)",
                 Instant.class
             )
             .setParameter("type", TreeNodeType.OPPORTUNITY)
             .setParameter("team", DevDataSeeder.TEAM_JUPITER)
             .getResultList();
-        assertThat(seededHistory).isNotEmpty().allSatisfy(t -> assertThat(t).isBetween(monthStart, now));
+        assertThat(seededHistory)
+            .isNotEmpty()
+            .allSatisfy(t -> assertThat(t).isBetween(monthStart, now));
     }
 
     @Test
@@ -463,8 +480,9 @@ class DevDataSeederIT {
 
     @Test
     void onlySchemaNotReadyErrorsAreRetried() {
-        assertThat(DevDataSeeder.isSchemaNotReady(new BadSqlGrammarException("seed", "select 1", new SQLException("no table", "42P01"))))
-            .isTrue();
+        assertThat(
+            DevDataSeeder.isSchemaNotReady(new BadSqlGrammarException("seed", "select 1", new SQLException("no table", "42P01")))
+        ).isTrue();
         assertThat(DevDataSeeder.isSchemaNotReady(new RuntimeException("wrapped", new SQLException("no column", "42703")))).isTrue();
         assertThat(DevDataSeeder.isSchemaNotReady(new DataIntegrityViolationException("dup", new SQLException("dup", "23505")))).isFalse();
         assertThat(DevDataSeeder.isSchemaNotReady(new IllegalStateException("Missing authority ROLE_X"))).isFalse();

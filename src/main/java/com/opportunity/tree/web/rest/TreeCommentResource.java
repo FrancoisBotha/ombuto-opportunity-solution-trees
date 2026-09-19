@@ -47,7 +47,9 @@ public class TreeCommentResource {
         @RequestBody(required = false) TreeCommentWriteDTO request
     ) {
         LOG.debug("REST request to post a comment on {} {}", type, id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(treeCommentService.addComment(TreeNodeRules.parseType(type, "type"), id, request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            treeCommentService.addComment(TreeNodeRules.parseType(type, "type"), id, request)
+        );
     }
 
     @PatchMapping("/comments/{id}")
