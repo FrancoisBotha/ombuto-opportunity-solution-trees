@@ -4,15 +4,7 @@ import { OpportunityStatus } from '@/shared/model/enumerations/opportunity-statu
 import { OutcomeStatus } from '@/shared/model/enumerations/outcome-status.model';
 import { SolutionStatus } from '@/shared/model/enumerations/solution-status.model';
 
-import type {
-  IOpportunityTreeNode,
-  IOutcomeTreeNode,
-  IProductTreeNode,
-  ISolutionTreeNode,
-  ITeamTree,
-  TreeNode,
-  TreeNodeType,
-} from './tree.model';
+import type { IOpportunityTreeNode, IOutcomeTreeNode, IProductTreeNode, ISolutionTreeNode, ITeamTree, TreeNodeType } from './tree.model';
 
 const teamsApiUrl = 'api/teams';
 const productsApiUrl = 'api/products';
@@ -107,22 +99,6 @@ export default class TreeService {
       opportunity: { id: opportunityId },
     };
     return axios.post<ISolutionTreeNode>(solutionsApiUrl, body).then(res => res.data);
-  }
-
-  updateNode(type: TreeNodeType, id: number, patch: Record<string, unknown>): Promise<TreeNode> {
-    let url: string;
-    if (type === 'product') url = `${productsApiUrl}/${id}`;
-    else if (type === 'outcome') url = `${outcomesApiUrl}/${id}`;
-    else if (type === 'opportunity') url = `${opportunitiesApiUrl}/${id}`;
-    else url = `${solutionsApiUrl}/${id}`;
-    const body = { id, ...patch };
-    return axios.patch(url, body, { headers: { 'Content-Type': 'application/merge-patch+json' } }).then(res => {
-      const data = res.data;
-      if (type === 'product') return this.normaliseProduct(data);
-      if (type === 'outcome') return this.normaliseOutcome(data);
-      if (type === 'opportunity') return this.normaliseOpportunity(data);
-      return data as ISolutionTreeNode;
-    });
   }
 
   deleteNode(type: TreeNodeType, id: number): Promise<void> {

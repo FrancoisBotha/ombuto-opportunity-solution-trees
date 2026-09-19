@@ -227,63 +227,6 @@ export default defineComponent({
 
     const dismissWriteError = () => treeStore.clearWriteError();
 
-    // --- Detail panel state ---
-    const OUTCOME_STATUSES = ['DRAFT', 'ACTIVE', 'ACHIEVED', 'ABANDONED'] as const;
-    const OPPORTUNITY_STATUSES = ['IDENTIFIED', 'EXPLORING', 'PRIORITISED', 'IN_PROGRESS', 'ADDRESSED', 'PARKED', 'DISCARDED'] as const;
-    const SOLUTION_STATUSES = ['IDEA', 'ASSUMPTION_MAPPING', 'TESTING', 'VALIDATED', 'INVALIDATED', 'SHIPPED', 'DROPPED'] as const;
-
-    const selectedNode = computed(() => {
-      if (!treeStore.selectedNodeType || treeStore.selectedNodeId == null) return null;
-      return treeStore.findNode(treeStore.selectedNodeType, treeStore.selectedNodeId);
-    });
-    const selectedNodeType = computed(() => treeStore.selectedNodeType);
-    const detailStatusOptions = computed<readonly string[]>(() => {
-      switch (treeStore.selectedNodeType) {
-        case 'outcome':
-          return OUTCOME_STATUSES;
-        case 'opportunity':
-          return OPPORTUNITY_STATUSES;
-        case 'solution':
-          return SOLUTION_STATUSES;
-        default:
-          return [];
-      }
-    });
-    const detailForm = ref<{ title: string; status: string }>({ title: '', status: '' });
-    const isSavingDetail = ref(false);
-
-    watch(
-      [selectedNode, selectedNodeType],
-      ([node, type]) => {
-        if (!node || !type || type === 'product') {
-          detailForm.value = { title: '', status: '' };
-          return;
-        }
-        const anyNode = node as { title?: string; status?: string | null };
-        detailForm.value = {
-          title: anyNode.title ?? '',
-          status: (anyNode.status as string | null | undefined) ?? '',
-        };
-      },
-      { immediate: true },
-    );
-
-    const saveDetail = async () => {
-      const type = treeStore.selectedNodeType;
-      const id = treeStore.selectedNodeId;
-      if (!type || id == null || type === 'product') return;
-      const patch: Record<string, unknown> = {
-        title: detailForm.value.title,
-      };
-      if (detailForm.value.status) patch.status = detailForm.value.status;
-      isSavingDetail.value = true;
-      try {
-        await treeStore.updateNode(type, id, patch, treeService());
-      } finally {
-        isSavingDetail.value = false;
-      }
-    };
-
     return {
       teamId,
       isLoading,
@@ -340,13 +283,6 @@ export default defineComponent({
       closeDeleteModal,
       confirmDelete,
       dismissWriteError,
-      // detail panel
-      selectedNode,
-      selectedNodeType,
-      detailStatusOptions,
-      detailForm,
-      isSavingDetail,
-      saveDetail,
     };
   },
 });

@@ -137,40 +137,6 @@
       </template>
     </div>
 
-    <!-- Detail panel -->
-    <aside v-if="selectedNode && selectedNodeType && selectedNodeType !== 'product'" class="tree-detail-panel" data-cy="treeDetailPanel">
-      <h5 class="mb-2">Edit {{ selectedNodeType }}</h5>
-      <form @submit.prevent="saveDetail">
-        <div class="mb-2">
-          <label for="tem-detail-title" class="form-label">Title</label>
-          <input
-            id="tem-detail-title"
-            v-model="detailForm.title"
-            type="text"
-            class="form-control"
-            data-cy="treeDetailTitleInput"
-            :disabled="!canEdit"
-          />
-        </div>
-        <div v-if="detailStatusOptions.length > 0" class="mb-2">
-          <label for="tem-detail-status" class="form-label">Status</label>
-          <select
-            id="tem-detail-status"
-            v-model="detailForm.status"
-            class="form-select"
-            data-cy="treeDetailStatusSelect"
-            :disabled="!canEdit"
-          >
-            <option value="">(none)</option>
-            <option v-for="s in detailStatusOptions" :key="s" :value="s">{{ s }}</option>
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm" data-cy="treeDetailSaveButton" :disabled="!canEdit || isSavingDetail">
-          {{ isSavingDetail ? 'Saving…' : 'Save' }}
-        </button>
-      </form>
-    </aside>
-
     <!-- Add product modal -->
     <div v-if="showAddProductModal" class="tree-editor-modal" data-cy="treeEditorAddProductModal" @click.self="closeAddProductModal">
       <div class="tree-editor-modal__dialog">
@@ -394,15 +360,6 @@
 :deep(.tree-node-card--selected .tree-node-card__actions),
 :deep(.tree-node-card:focus-within .tree-node-card__actions) {
   display: flex;
-}
-
-.tree-detail-panel {
-  margin-top: 0.75rem;
-  padding: 1rem;
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: 0.5rem;
-  max-width: 480px;
 }
 
 .tree-editor-modal {

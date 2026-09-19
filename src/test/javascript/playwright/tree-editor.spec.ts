@@ -175,9 +175,9 @@ test.describe('TREE-008 — build-a-tree end to end', () => {
     await page.getByTestId(`treeNode-opportunity-${opp1Id}`).click();
     const detail = page.getByTestId('treeDetailPanel');
     await expect(detail).toBeVisible();
-    await page.getByTestId('treeDetailTitleInput').fill(editedOpportunityTitle);
-    await page.getByTestId('treeDetailStatusSelect').selectOption(editedOpportunityStatus);
-    await page.getByTestId('treeDetailSaveButton').click();
+    await detail.getByTestId('detailTitle').fill(editedOpportunityTitle);
+    await detail.getByTestId('detailStatus').selectOption(editedOpportunityStatus);
+    await detail.getByTestId('detailSave').click();
 
     const editedCard = page.getByTestId(`treeNode-opportunity-${opp1Id}`);
     await expect(editedCard.getByTestId('treeNodeTitle')).toHaveText(editedOpportunityTitle);
