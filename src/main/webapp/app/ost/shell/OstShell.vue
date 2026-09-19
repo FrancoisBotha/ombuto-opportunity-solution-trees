@@ -60,12 +60,13 @@
  * loads the team's tree whenever :teamId changes, shows not-found / forbidden states (C4) and
  * hosts every overlay. Child routes render the pages.
  */
-import { computed, inject, onMounted, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import type { TeamMemberDTO } from '../ost.model';
 import OstService from '../ost.service';
 import OverlayHost from '../overlays/OverlayHost.vue';
+import { useOstRealtimeStore } from '../stores/ost-realtime.store';
 import { useOstTreeStore } from '../stores/ost-tree.store';
 import '../styles/ost-styles';
 
@@ -82,6 +83,7 @@ const route = useRoute();
 const router = useRouter();
 const ostService = inject('ostService', () => new OstService());
 const tree = useOstTreeStore();
+const realtime = useOstRealtimeStore();
 tree.setServiceFactory(ostService);
 
 const rawTeamId = computed(() => String(route.params.teamId ?? ''));
@@ -104,8 +106,18 @@ const memberTitle = (m: TeamMemberDTO) => {
   return `${name} (${ROLE_LABEL[m.role] ?? m.role})`;
 };
 
-function load() {
-  if (teamId.value !== null) tree.loadTree(teamId.value);
+async function load() {
+  const id = teamId.value;
+  await realtime.closeTeam();
+  if (id === null) return;
+  const loaded = await tree.loadTree(id);
+  if (!loaded || teamId.value !== id) return;
+  realtime.openTeam(id, {
+    // Event application is owned by the tree-store integration ticket. The transport still
+    // validates, sequences and batches every event before handing it across this boundary.
+    applyEvents: () => undefined,
+    reloadTree: () => tree.loadTree(id),
+  });
 }
 
 function switchTeam(id: number) {
@@ -117,6 +129,10 @@ watch(teamId, load, { immediate: true });
 
 onMounted(() => {
   tree.loadTeams();
+});
+
+onBeforeUnmount(() => {
+  void realtime.closeTeam();
 });
 </script>
 

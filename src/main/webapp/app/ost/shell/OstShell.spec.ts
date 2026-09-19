@@ -1,12 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia } from 'pinia';
+import { Subject } from 'rxjs';
 import sinon, { type SinonStubbedInstance } from 'sinon';
 import { type Router, createMemoryHistory, createRouter } from 'vue-router';
 
 import { dto, treeDto } from '../domain/fixtures.test-util';
 import OstService from '../ost.service';
+import { useOstRealtimeStore } from '../stores/ost-realtime.store';
 import { useOstUiStore } from '../stores/ost-ui.store';
 
 import OstShell from './OstShell.vue';
@@ -19,6 +21,13 @@ describe('OstShell', () => {
   let service: SinonStubbedInstance<OstService>;
   let router: Router;
   let pinia: ReturnType<typeof createPinia>;
+  let stomp: {
+    connectionState$: Subject<number>;
+    configure: ReturnType<typeof vi.fn>;
+    activate: ReturnType<typeof vi.fn>;
+    deactivate: ReturnType<typeof vi.fn>;
+    watch: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     localStorage.clear();
@@ -31,6 +40,14 @@ describe('OstShell', () => {
       id === 7 ? treeDto([dto('product-1', null), dto('outcome-1', 'product-1')]) : treeDto([], { id, name: 'Team Venus' }),
     );
     pinia = createPinia();
+    stomp = {
+      connectionState$: new Subject(),
+      configure: vi.fn(),
+      activate: vi.fn(),
+      deactivate: vi.fn(async () => undefined),
+      watch: vi.fn(() => new Subject()),
+    };
+    useOstRealtimeStore(pinia).setClientFactory(() => stomp as any);
     router = createRouter({
       history: createMemoryHistory(),
       routes: [
