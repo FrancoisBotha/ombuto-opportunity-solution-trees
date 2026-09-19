@@ -261,6 +261,11 @@ public class TreeNodeWriteService {
         if (fields.isEmpty()) {
             return dtoAssembler.toDto(type, id);
         }
+        // Under the team's structure lock, like every other write that can race a cascade delete:
+        // a patch (and the history row it records) never lands on a node deleted meanwhile — that
+        // is a 409 concurrencyFailure, not an NPE / stale-row 500.
+        structureLock.lockTeam(teamId);
+        structureLock.requireNode(type, id, teamId);
 
         Instant now = Instant.now();
         switch (type) {

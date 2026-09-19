@@ -8,6 +8,7 @@ import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PessimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
+import org.hibernate.JDBCException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +76,9 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler
     public ResponseEntity<Object> handleAnyException(Throwable ex, NativeWebRequest request) {
+        if (isConstraintViolation(ex)) {
+            return dataIntegrityConflict(ex, request);
+        }
         LOG.debug("Converting Exception to Problem Details:", ex);
         ProblemDetailWithCause pdCause = wrapAndCustomizeProblem(ex, request);
         return handleExceptionInternal((Exception) ex, pdCause, buildHeaders(ex), HttpStatusCode.valueOf(pdCause.getStatus()), request);
@@ -92,13 +97,59 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler
     public ResponseEntity<Object> handleDataIntegrityViolation(DataIntegrityViolationException ex, NativeWebRequest request) {
-        LOG.warn("Data integrity violation on {}: {}", extractURI(request), ex.getMostSpecificCause().getMessage());
+        return dataIntegrityConflict(ex, request);
+    }
+
+    /**
+     * The same 409 for a constraint violation Spring did not translate into a
+     * {@link DataIntegrityViolationException}: a raw Hibernate
+     * {@code org.hibernate.exception.ConstraintViolationException} from a service's flush, or one
+     * raised at transaction commit (wrapped in a {@code TransactionSystemException} /
+     * {@code RollbackException}). Detected anywhere in the cause chain (see
+     * {@link #isConstraintViolation}); the SQL text is only logged.
+     */
+    private ResponseEntity<Object> dataIntegrityConflict(Throwable ex, NativeWebRequest request) {
+        LOG.warn("Data integrity violation on {}: {}", extractURI(request), mostSpecificMessage(ex));
         ProblemDetailWithCause problem = ProblemDetailWithCauseBuilder.instance()
             .withStatus(HttpStatus.CONFLICT.value())
             .withDetail(DATA_INTEGRITY_DETAIL)
             .withProperty(MESSAGE_KEY, ERR_DATA_INTEGRITY)
             .build();
-        return handleExceptionInternal(ex, customizeProblem(problem, ex, request), null, HttpStatus.CONFLICT, request);
+        Exception exception = ex instanceof Exception e ? e : new IllegalStateException(ex);
+        return handleExceptionInternal(exception, customizeProblem(problem, ex, request), null, HttpStatus.CONFLICT, request);
+    }
+
+    /**
+     * Is a database constraint violation anywhere in the cause chain? Spring's
+     * {@link DataIntegrityViolationException}, Hibernate's {@code ConstraintViolationException},
+     * {@link java.sql.SQLIntegrityConstraintViolationException}, or any SQL exception with an
+     * SQLState of class 23 (integrity constraint violation).
+     */
+    static boolean isConstraintViolation(Throwable error) {
+        int depth = 0;
+        for (Throwable t = error; t != null && depth < 32; t = t.getCause() == t ? null : t.getCause(), depth++) {
+            if (
+                t instanceof DataIntegrityViolationException ||
+                t instanceof org.hibernate.exception.ConstraintViolationException ||
+                t instanceof java.sql.SQLIntegrityConstraintViolationException
+            ) {
+                return true;
+            }
+            String state = t instanceof JDBCException j ? j.getSQLState() : t instanceof SQLException sql ? sql.getSQLState() : null;
+            if (state != null && state.startsWith("23")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String mostSpecificMessage(Throwable ex) {
+        Throwable last = ex;
+        int depth = 0;
+        for (Throwable t = ex; t != null && depth < 32; t = t.getCause() == t ? null : t.getCause(), depth++) {
+            last = t;
+        }
+        return last.getMessage();
     }
 
     /**

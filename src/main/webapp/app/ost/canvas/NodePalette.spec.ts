@@ -179,4 +179,36 @@ describe('NodePalette', () => {
       expect(wrapper.find('[data-cy="ost-palette-solution"]').exists()).toBe(true);
     });
   });
+
+  describe('leaving the canvas', () => {
+    it('unmounting disarms an armed type', async () => {
+      await tool('assumption').trigger('click');
+      expect(ui.tool).toBe('assumption');
+      wrapper.unmount();
+      expect(ui.tool).toBeNull();
+      wrapper = mount(NodePalette, { props: { resolveTarget }, attachTo: document.body });
+    });
+
+    it('unmounting mid-drag clears the drag and its drop target', async () => {
+      await press('solution');
+      await moveTo(400, 200);
+      expect(ui.paletteDrag).not.toBeNull();
+      expect(ui.dropTargetId).toBe('opportunity-1');
+      wrapper.unmount();
+      expect(ui.paletteDrag).toBeNull();
+      expect(ui.dropTargetId).toBeNull();
+      wrapper = mount(NodePalette, { props: { resolveTarget }, attachTo: document.body });
+    });
+  });
+
+  describe('icons', () => {
+    /** Phosphor regular carets (as the prototype paths): 8-unit arcs; bold would be 12. */
+    const caretPath = () => wrapper.get('[data-cy="ost-palette-toggle"] svg path').attributes('d') ?? '';
+
+    it('the hide and rail carets use the regular weight', async () => {
+      expect(caretPath()).toMatch(/a8,8/);
+      await wrapper.get('[data-cy="ost-palette-toggle"]').trigger('click');
+      expect(caretPath()).toMatch(/a8,8/);
+    });
+  });
 });

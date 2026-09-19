@@ -13,7 +13,7 @@
     >
       <span class="ost-product-combo__label" data-cy="ost-product-combo-label">{{ current ? current.title : 'All products' }}</span>
       <span class="ost-product-combo__meta">{{ current ? nodeCount(current.id) : branchCount }}</span>
-      <PhCaretDown :size="12" weight="bold" class="ost-product-combo__caret" aria-hidden="true" />
+      <PhCaretDown :size="12" class="ost-product-combo__caret" aria-hidden="true" />
     </button>
     <div v-if="open" class="ost-product-combo__menu" role="listbox" aria-label="Scope the canvas" @keydown="onMenuKey">
       <button
@@ -27,7 +27,7 @@
         @click="choose('all')"
       >
         <span class="ost-product-combo__box" :class="{ 'is-on': productId === 'all' }">
-          <PhCheck v-if="productId === 'all'" :size="11" weight="bold" aria-hidden="true" />
+          <PhCheck v-if="productId === 'all'" :size="11" aria-hidden="true" />
         </span>
         <span class="ost-product-combo__name">All products</span>
         <span class="ost-product-combo__aside">{{ branchCount }}</span>

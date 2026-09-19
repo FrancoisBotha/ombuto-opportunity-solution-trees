@@ -1,9 +1,13 @@
-import { expect, test as teardown } from '@playwright/test';
+import { type APIRequestContext, type APIResponse, expect, test as teardown } from '@playwright/test';
 
 import { registeredTeams } from './support/cleanup';
+import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /** Seed data (ost-seed.spec.ts): refused even if a spec registered one by mistake. */
 const SEEDED = new Set(['Team Jupiter', 'Team Venus', 'Best Team', 'Team Mars']);
+
+/** Test users whose credentials the suite knows; a team's products are deleted as one of them. */
+const KNOWN_USERS: Record<string, string> = { [ADMIN_USERNAME]: ADMIN_PASSWORD, [USER_USERNAME]: USER_PASSWORD };
 
 interface AdminTeam {
   id: number;
@@ -11,46 +15,102 @@ interface AdminTeam {
   productCount: number;
 }
 
+interface AdminMember {
+  login: string;
+  role: 'OWNER' | 'EDITOR' | 'VIEWER';
+}
+
+type Api = (verb: 'get' | 'delete', url: string) => Promise<APIResponse>;
+
 /**
  * Runs once after all specs (the `cleanup` project, teardown of `setup`), signed in as admin
  * (setup's stored session). Deletes every team the specs registered with registerTeamForCleanup:
  * first each product (DELETE /api/products/{id}, which removes the product's whole subtree), then
  * the team (DELETE /api/admin/teams/{id}, refused while products remain). Seeded teams are never
  * registered, and never touched here.
+ *
+ * Products can only be listed and deleted by an OWNER or EDITOR of their team, and the admin is not
+ * always one: then the products are deleted as a member who is (found through the admin members
+ * API, signed in with the suite's known credentials). Whatever cannot be deleted is reported per
+ * team, with the reason.
  */
-teardown('delete the throwaway teams created by the specs', async ({ request }) => {
+teardown('delete the throwaway teams created by the specs', async ({ request, browser }) => {
+  teardown.setTimeout(120_000);
   const { ids, forget } = registeredTeams();
   if (!ids.length) return;
 
   const cookies = (await request.storageState()).cookies;
   const xsrf = cookies.find(cookie => cookie.name === 'XSRF-TOKEN')?.value ?? '';
   const headers = { 'X-XSRF-TOKEN': xsrf };
+  const asAdmin: Api = (verb, url) => (request as APIRequestContext)[verb](url, verb === 'delete' ? { headers } : {});
 
   const listed = await request.get('/api/admin/teams?size=5000');
   expect(listed.ok(), `list teams as admin: HTTP ${listed.status()}`).toBe(true);
   const existing = new Map(((await listed.json()) as AdminTeam[]).map(team => [team.id, team]));
 
-  const failures: string[] = [];
-  for (const id of ids) {
-    const team = existing.get(id);
-    if (!team) continue; // already gone
-    if (SEEDED.has(team.name)) {
-      failures.push(`${team.name} (${id}) is seed data and was not deleted`);
-      continue;
+  /** Sessions of other known users, opened on demand and closed at the end. */
+  const sessions = new Map<string, Session>();
+  const sessionFor = async (login: string): Promise<Api | null> => {
+    if (login === ADMIN_USERNAME) return asAdmin;
+    const password = KNOWN_USERS[login];
+    if (!password) return null;
+    let session = sessions.get(login);
+    if (!session) {
+      session = await openSession(browser, login, password);
+      sessions.set(login, session);
     }
-    if (team.productCount > 0) {
-      const products = await request.get(`/api/teams/${id}/products`);
-      if (!products.ok()) {
-        failures.push(`list products of ${team.name} (${id}): HTTP ${products.status()}`);
+    return session.api;
+  };
+
+  /** Lists the team's products as admin, else as an OWNER/EDITOR we can sign in as. */
+  async function productApi(team: AdminTeam): Promise<{ api: Api; products: { id: number }[] } | string> {
+    const tried: string[] = [];
+    const asAdminList = await asAdmin('get', `/api/teams/${team.id}/products`);
+    if (asAdminList.ok()) return { api: asAdmin, products: await asAdminList.json() };
+    tried.push(`${ADMIN_USERNAME}: HTTP ${asAdminList.status()}`);
+    const members = await asAdmin('get', `/api/admin/teams/${team.id}/members`);
+    if (!members.ok()) return `members not listed (HTTP ${members.status()}); tried ${tried.join(', ')}`;
+    const editors = ((await members.json()) as AdminMember[]).filter(m => m.role !== 'VIEWER' && m.login !== ADMIN_USERNAME);
+    for (const member of editors) {
+      const api = await sessionFor(member.login);
+      if (!api) {
+        tried.push(`${member.login}: no known credentials`);
         continue;
       }
-      for (const product of (await products.json()) as { id: number }[]) {
-        const deleted = await request.delete(`/api/products/${product.id}`, { headers });
-        if (deleted.status() !== 204) failures.push(`product ${product.id} of ${team.name}: HTTP ${deleted.status()}`);
-      }
+      const list = await api('get', `/api/teams/${team.id}/products`);
+      if (list.ok()) return { api, products: await list.json() };
+      tried.push(`${member.login}: HTTP ${list.status()}`);
     }
-    const deleted = await request.delete(`/api/admin/teams/${id}`, { headers });
-    if (![200, 204].includes(deleted.status())) failures.push(`${team.name} (${id}): HTTP ${deleted.status()} ${await deleted.text()}`);
+    return `no OWNER/EDITOR could list its products (${tried.join(', ') || 'no editors'})`;
+  }
+
+  const failures: string[] = [];
+  try {
+    for (const id of ids) {
+      const team = existing.get(id);
+      if (!team) continue; // already gone
+      const label = `${team.name} (${id})`;
+      if (SEEDED.has(team.name)) {
+        failures.push(`${label} is seed data and was not deleted`);
+        continue;
+      }
+      if (team.productCount > 0) {
+        const found = await productApi(team);
+        if (typeof found === 'string') {
+          failures.push(`${label}: ${team.productCount} product(s) left — ${found}`);
+          continue;
+        }
+        for (const product of found.products) {
+          const deleted = await found.api('delete', `/api/products/${product.id}`);
+          if (deleted.status() !== 204) failures.push(`${label}: product ${product.id} not deleted — HTTP ${deleted.status()}`);
+        }
+      }
+      const deleted = await request.delete(`/api/admin/teams/${id}`, { headers });
+      if (![200, 204].includes(deleted.status()))
+        failures.push(`${label}: team not deleted — HTTP ${deleted.status()} ${await deleted.text()}`);
+    }
+  } finally {
+    for (const session of sessions.values()) await session.context.close();
   }
   expect(failures, 'throwaway teams left behind').toEqual([]);
   forget();

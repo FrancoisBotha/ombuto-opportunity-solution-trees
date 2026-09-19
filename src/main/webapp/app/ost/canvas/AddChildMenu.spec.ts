@@ -83,4 +83,12 @@ describe('AddChildMenu', () => {
     outside.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     expect(w.emitted('close')).toEqual([[false]]);
   });
+
+  it('reports close (without refocus) when it is unmounted while open', async () => {
+    const w = await open('outcome');
+    expect(w.emitted('close')).toBeUndefined();
+    w.unmount();
+    wrapper = null;
+    expect(w.emitted('close')).toEqual([[false]]);
+  });
 });

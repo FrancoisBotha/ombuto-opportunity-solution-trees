@@ -19,7 +19,7 @@
       :pan-on-scroll="false"
       :zoom-on-double-click="false"
       :pan-on-drag="true"
-      :only-render-visible-elements="true"
+      :only-render-visible-elements="!keepAllRendered"
       @node-click="onNodeClick"
       @node-drag-start="onDragStart"
       @node-drag="onDrag"
@@ -46,7 +46,7 @@
           :evidence-score="scores.get(id) ?? null"
           @add="toggleAddMenu(id)"
           @add-choose="createChild(id, $event)"
-          @add-close="ui.openAddMenu(null)"
+          @add-close="closeAddMenu(id)"
           @toggle="toggleCollapse(id)"
           @chat="ui.openChat(id)"
           @activate="activate(id)"
@@ -103,12 +103,18 @@
  * - drag a node onto another to re-parent: legal targets are highlighted, the one under the
  *   pointer is the drop target (edit-rules.ts); a drop calls tree.moveNode (append). Vue Flow keeps
  *   a dragged node where it was dropped, so after EVERY drag the positions are explicitly reset to
- *   the layout (snapToLayout) — a rejected or failed drop animates back;
+ *   the layout (snapToLayout) — a rejected or failed drop animates back. Escape, a window blur or
+ *   leaving the canvas mid-drag cancel it (the node snaps back); a release anywhere outside the
+ *   canvas is a rejected drop;
  * - the node `+` menu and the palette (drag or armed click) create via tree.createNode; the new
  *   node is selected, centred when off-screen and in rename mode;
  * - double-click (or F2) renames inline; Delete asks for confirmation (ConfirmDeleteDialog).
+ *
+ * While a node is being renamed or has its + menu open, visibility culling is off: panning or
+ * wheel-zooming that node out of view must not unmount its rename field (losing the draft) or its
+ * menu. Vue Flow has no per-node exemption, so every laid-out node renders until the edit ends.
  */
-import { computed, markRaw, nextTick, ref, shallowRef, watch } from 'vue';
+import { computed, markRaw, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue';
 
 import { type EdgeTypesObject, type NodeDragEvent, type NodeMouseEvent, VueFlow, useVueFlow } from '@vue-flow/core';
 
@@ -141,6 +147,8 @@ const view = useViewport(flow, wrap);
 const zoom = view.zoom;
 
 const visible = computed(() => laidOutNodes(tree.nodes, tree.placed));
+/** A rename field or + menu is open: keep every node rendered (see the header). */
+const keepAllRendered = computed(() => tree.canEdit && !!(ui.editingId || ui.addMenuId));
 const flowNodes = computed(() => toFlowNodes(visible.value, tree.placed, n => isDraggable(n, tree.canEdit) && ui.editingId !== n.id));
 const flowEdges = computed(() => toFlowEdges(visible.value, tree.placed));
 // One pass each over the nodes, shared by every node body (no per-node scans). Scores are
@@ -183,15 +191,27 @@ function flowPoint(client: Point): Point | null {
   return clientToFlow(client, r, flow.viewport.value);
 }
 
-/** Put every rendered node back where the layout says (Vue Flow keeps dragged positions). */
-function snapToLayout() {
+/**
+ * Put every node back where the layout says (Vue Flow keeps dragged positions). computedPosition
+ * too: Vue Flow only recomputes it inside a MOUNTED node, while visibility culling decides on it — a
+ * node dropped outside the pane (over the app sidebar, outside the window) is culled at once and
+ * would stay invisible at its stale spot, Fit or not. Same for a culled node the layout moved.
+ * A node being dragged is left alone unless `all`.
+ */
+function snapToLayout(all = true) {
   for (const n of flowNodes.value) {
     const live = flow.findNode(n.id);
-    if (live && (live.position.x !== n.position.x || live.position.y !== n.position.y)) {
-      flow.updateNode(n.id, { position: { ...n.position } });
+    if (!live || (!all && live.dragging)) continue;
+    const { x, y } = n.position;
+    const cp = live.computedPosition;
+    if (live.position.x !== x || live.position.y !== y || cp.x !== x || cp.y !== y) {
+      flow.updateNode(n.id, { position: { x, y }, computedPosition: { ...cp, x, y } });
     }
   }
 }
+
+// Layout changes (collapse, create, move, remote edits) move culled nodes too.
+watch(flowNodes, () => nextTick(() => snapToLayout(false)), { flush: 'post' });
 
 // ---- legal targets (node drag, palette drag, armed tool) ------------------------------------------
 const dragKey = ref<string | null>(null);
@@ -202,11 +222,17 @@ const legal = computed<ReadonlySet<string>>(() => {
   return type ? attachTargets(type, tree.nodes) : NONE;
 });
 
+/**
+ * Rendered height (flow units) of a node Vue Flow has measured: a clamped three-line title renders
+ * taller than its layout box, and a drop on that extra strip must still hit the node.
+ */
+const renderedHeight = (key: string): number | undefined => flow.findNode(key)?.dimensions.height || undefined;
+
 /** For the palette: the legal node under a client point for a new `type`, or null. */
 function resolveAttachTarget(type: NodeType, clientX: number, clientY: number): string | null {
   if (!tree.canEdit) return null;
   const point = flowPoint({ x: clientX, y: clientY });
-  return point ? dropTargetAt(point, tree.placed, attachTargets(type, tree.nodes)) : null;
+  return point ? dropTargetAt(point, tree.placed, attachTargets(type, tree.nodes), null, renderedHeight) : null;
 }
 
 // ---- selection / activation -------------------------------------------------------------------
@@ -238,6 +264,11 @@ function toggleAddMenu(key: string) {
   }
   ui.select(key);
   ui.openAddMenu(key);
+}
+
+/** A menu reports close when dismissed or unmounted; only the menu that is open may close it. */
+function closeAddMenu(key: string) {
+  if (ui.addMenuId === key) ui.openAddMenu(null);
 }
 
 const creating = ref(false);
@@ -347,23 +378,63 @@ function clientOf(event: MouseEvent | TouchEvent): Point | null {
   return { x: event.clientX, y: event.clientY };
 }
 
-function onDragStart({ node }: NodeDragEvent) {
+/** Last pointer position of the node drag (to end Vue Flow's gesture where it is). */
+let dragClient: Point | null = null;
+
+function listenNodeDrag(on: boolean) {
+  if (on) {
+    window.addEventListener('keydown', onNodeDragKeydown, true);
+    window.addEventListener('blur', cancelNodeDrag);
+  } else {
+    window.removeEventListener('keydown', onNodeDragKeydown, true);
+    window.removeEventListener('blur', cancelNodeDrag);
+  }
+}
+
+function onDragStart({ node, event }: NodeDragEvent) {
   if (!tree.canEdit) return;
   ui.openAddMenu(null);
   dragKey.value = node.id;
+  dragClient = clientOf(event);
+  listenNodeDrag(true);
 }
 
 function onDrag({ event, node }: NodeDragEvent) {
   if (dragKey.value !== node.id) return;
   const client = clientOf(event);
+  dragClient = client ?? dragClient;
   const point = client ? flowPoint(client) : null;
-  ui.setDropTarget(point ? dropTargetAt(point, tree.placed, legal.value, node.id) : null);
+  ui.setDropTarget(point ? dropTargetAt(point, tree.placed, legal.value, node.id, renderedHeight) : null);
+}
+
+function onNodeDragKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !dragKey.value) return;
+  event.preventDefault();
+  event.stopPropagation();
+  cancelNodeDrag();
+}
+
+/**
+ * Escape / window blur mid-drag: no drop. Clears the drop state, then ends Vue Flow's own gesture
+ * (d3-drag listens for mouseup on the window) so the node stops following the pointer; its
+ * drag-stop snaps it back. A touch drag ends with its touchend and is ignored as a drop meanwhile.
+ */
+function cancelNodeDrag() {
+  if (!dragKey.value) return;
+  dragKey.value = null;
+  ui.setDropTarget(null);
+  listenNodeDrag(false);
+  const at = dragClient ?? { x: 0, y: 0 };
+  window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window, clientX: at.x, clientY: at.y }));
+  void nextTick(() => snapToLayout());
 }
 
 async function onDragStop({ node }: NodeDragEvent) {
   const key = node.id;
   const target = dragKey.value === key ? ui.dropTargetId : null;
   dragKey.value = null;
+  dragClient = null;
+  listenNodeDrag(false);
   ui.setDropTarget(null);
   const moving = target ? tree.moveNode(key, target) : null;
   // Rejected: straight back. Accepted: the optimistic move re-lays out; a failed move rolls back.
@@ -443,6 +514,19 @@ watch(
   },
   { flush: 'post' },
 );
+
+/**
+ * Leaving the canvas (route change): the nodes' rename fields have settled by now (children unmount
+ * before this hook), so drop whatever transient edit state is left — nothing may re-open or stay
+ * armed on the next visit.
+ */
+onUnmounted(() => {
+  listenNodeDrag(false);
+  if (ui.editingId) ui.stopEditing();
+  if (ui.addMenuId) ui.openAddMenu(null);
+  if (ui.dropTargetId) ui.setDropTarget(null);
+  dragKey.value = null;
+});
 
 defineExpose({ zoomIn: view.zoomIn, zoomOut: view.zoomOut, fit, centreOn, resolveAttachTarget, createChild, focusNode });
 </script>

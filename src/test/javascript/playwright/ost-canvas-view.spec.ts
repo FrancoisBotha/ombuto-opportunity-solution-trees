@@ -1,13 +1,14 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
  * OST step 7: the tree canvas renders and navigates — frames, layout, collapse, search, type
  * filters, product scope + re-fit, zoom/Fit, overview map, selection + ?node= deep link, viewer mode.
  *
- * Builds its own throwaway team through the API (`user` owns it, `admin` is a VIEWER) and deletes it
- * afterwards. The only seeded data touched is a read-only look at Team Jupiter.
+ * Builds its own throwaway team through the API (`user` owns it, `admin` is a VIEWER), deletes its
+ * products afterwards and registers the team for the run-end cleanup (support/cleanup.ts). The only seeded data touched is a read-only look at Team Jupiter.
  */
 
 interface TreeNode {
@@ -125,6 +126,7 @@ test.describe('OST tree canvas — render & navigate', () => {
     const team = await user.api('post', '/api/team-management/teams', { name: `e2e canvas ${stamp}`, description: 'ost-canvas-view' });
     expect(team.status()).toBe(201);
     teamId = (await team.json()).id;
+    registerTeamForCleanup(teamId);
     const found = (await (await user.api('get', `/api/team-management/teams/${teamId}/user-search?q=admin`)).json()) as {
       id: string;
       login: string;
@@ -168,10 +170,9 @@ test.describe('OST tree canvas — render & navigate', () => {
   });
 
   test.afterAll(async () => {
-    if (teamId) {
-      for (const id of productIds) await user.api('delete', `/api/tree/nodes/product/${id}`);
-      const res = await admin.api('delete', `/api/admin/teams/${teamId}`);
-      expect(res.status(), 'team cleanup').toBe(204);
+    for (const id of productIds) {
+      const res = await user.api('delete', `/api/tree/nodes/product/${id}`);
+      expect(res.status(), `product ${id} cleanup`).toBe(204);
     }
     await user?.context.close();
     await admin?.context.close();
@@ -496,14 +497,11 @@ test.describe('OST tree canvas — render & navigate', () => {
     const res = await user.api('post', '/api/team-management/teams', { name: `e2e empty canvas ${stamp}`, description: 'ost-canvas-view' });
     expect(res.status()).toBe(201);
     const emptyId = (await res.json()).id as number;
-    try {
-      await page.goto(`/trees/${emptyId}/canvas`);
-      await expect(page.getByTestId('ost-canvas-empty')).toContainText('No products in this tree yet');
-      await expect(page.getByTestId('ost-canvas-go-to-team')).toHaveAttribute('href', `/teams/${emptyId}`);
-      await expect(page.locator('.ost-node')).toHaveCount(0);
-    } finally {
-      expect((await admin.api('delete', `/api/admin/teams/${emptyId}`)).status()).toBe(204);
-    }
+    registerTeamForCleanup(emptyId);
+    await page.goto(`/trees/${emptyId}/canvas`);
+    await expect(page.getByTestId('ost-canvas-empty')).toContainText('No products in this tree yet');
+    await expect(page.getByTestId('ost-canvas-go-to-team')).toHaveAttribute('href', `/teams/${emptyId}`);
+    await expect(page.locator('.ost-node')).toHaveCount(0);
   });
 
   for (const [width, height] of [

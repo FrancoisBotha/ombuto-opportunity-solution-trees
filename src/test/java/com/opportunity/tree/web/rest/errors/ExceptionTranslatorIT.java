@@ -50,6 +50,21 @@ class ExceptionTranslatorIT {
     }
 
     @Test
+    void untranslatedConstraintViolationsAreAConflictWithoutSql() throws Exception {
+        for (String path : new String[] { "hibernate-constraint-violation", "constraint-violation-at-commit" }) {
+            mockMvc
+                .perform(get("/api/exception-translator-test/" + path).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.message").value("error.dataintegrity"))
+                .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DATA_INTEGRITY_DETAIL))
+                .andExpect(content().string(not(containsString("delete from"))))
+                .andExpect(content().string(not(containsString("foreign key"))))
+                .andExpect(content().string(not(containsString("fk_comment"))));
+        }
+    }
+
+    @Test
     void lockFailuresAreAConflictWithoutSql() throws Exception {
         for (String path : new String[] { "cannot-acquire-lock", "jpa-pessimistic-lock" }) {
             mockMvc

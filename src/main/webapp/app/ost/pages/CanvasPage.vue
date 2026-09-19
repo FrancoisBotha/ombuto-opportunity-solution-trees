@@ -17,7 +17,8 @@
  * writes ?product= and the canvas re-fits.
  *
  * Editors also get the node palette (left) and the Delete key: with focus on the page (not in a
- * field), Delete asks to delete the selected node. Viewers get neither.
+ * field), Delete asks to delete the selected node. Viewers get neither. Leaving the page disarms
+ * the palette and ends any palette drag, so no armed type or drop highlight outlives the canvas.
  */
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { type LocationQuery, useRoute, useRouter } from 'vue-router';
@@ -84,7 +85,11 @@ onMounted(() => {
   if (nodeKey && tree.byId(nodeKey)) canvas.value?.centreOn(nodeKey);
   window.addEventListener('keydown', onKeydown);
 });
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown);
+  if (ui.tool) ui.armTool(null);
+  if (ui.paletteDrag || ui.dropTargetId) ui.endPaletteDrag();
+});
 
 function replaceQuery(patch: Record<string, string | undefined>) {
   const query: LocationQuery = { ...route.query };

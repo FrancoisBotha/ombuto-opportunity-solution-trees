@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
@@ -9,8 +10,8 @@ import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERN
  * ghost chip, click-to-arm, collapse to a rail), delete with a descendant count, keyboard paths,
  * and viewers seeing none of it.
  *
- * Builds its own throwaway team through the API (`user` owns it, `admin` is a VIEWER) and deletes it
- * afterwards. Seeded teams are never touched.
+ * Builds its own throwaway team through the API (`user` owns it, `admin` is a VIEWER), deletes its
+ * products afterwards and registers the team for the run-end cleanup (support/cleanup.ts). Seeded teams are never touched.
  */
 
 interface TreeNode {
@@ -77,6 +78,25 @@ async function pickUp(page: Page, from: Locator, to: { x: number; y: number }) {
   await page.mouse.move(to.x, to.y, { steps: 12 });
 }
 
+/** A node's flow position (its Vue Flow wrapper's transform), or null when it is not rendered. */
+async function flowPos(page: Page, key: string) {
+  return page.evaluate(k => {
+    const el = document.querySelector<HTMLElement>(`.vue-flow__node[data-id="${CSS.escape(k)}"]`);
+    if (!el) return null;
+    const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+    return { x: Math.round(m.m41), y: Math.round(m.m42) };
+  }, key);
+}
+
+/** Wheel notches at a client point (the canvas zooms about the cursor). */
+async function wheelAt(page: Page, at: { x: number; y: number }, deltaY: number, notches: number) {
+  await page.mouse.move(at.x, at.y);
+  for (let i = 0; i < notches; i++) {
+    await page.mouse.wheel(0, deltaY);
+    await page.waitForTimeout(30);
+  }
+}
+
 test.describe.configure({ mode: 'serial' });
 
 test.describe('OST tree canvas — editing', () => {
@@ -140,6 +160,7 @@ test.describe('OST tree canvas — editing', () => {
     const team = await user.api('post', '/api/team-management/teams', { name: `e2e canvas edit ${stamp}`, description: 'ost-canvas-edit' });
     expect(team.status()).toBe(201);
     teamId = (await team.json()).id;
+    registerTeamForCleanup(teamId);
     const found = (await (await user.api('get', `/api/team-management/teams/${teamId}/user-search?q=admin`)).json()) as {
       id: string;
       login: string;
@@ -166,10 +187,9 @@ test.describe('OST tree canvas — editing', () => {
   });
 
   test.afterAll(async () => {
-    if (teamId) {
-      for (const id of productIds) await user.api('delete', `/api/products/${id}`);
-      const res = await admin.api('delete', `/api/admin/teams/${teamId}`);
-      expect(res.status(), 'team cleanup').toBe(204);
+    for (const id of productIds) {
+      const res = await user.api('delete', `/api/tree/nodes/product/${id}`);
+      expect(res.status(), `product ${id} cleanup`).toBe(204);
     }
     await user?.context.close();
     await admin?.context.close();
@@ -350,6 +370,217 @@ test.describe('OST tree canvas — editing', () => {
     expect(Math.abs(after.y - before.y)).toBeLessThan(1);
   });
 
+  test('a rename or + menu survives its node being zoomed out of view and back (the draft is kept)', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    // The canvas narrows when the detail panel opens: always measure it now.
+    const canvasBox = () => box(page.getByTestId('ost-canvas'));
+    const title = node(page, k.o2).getByTestId('ost-node-title');
+    const input = page.getByTestId('ost-rename-input');
+    const nodeInView = async () => {
+      const canvas = await canvasBox();
+      const b = await node(page, k.o2).boundingBox();
+      return (
+        !!b && b.x + b.width > canvas.x && b.x < canvas.x + canvas.width && b.y + b.height > canvas.y && b.y < canvas.y + canvas.height
+      );
+    };
+
+    // The top corner farther from the node (the bottom corners hold the legend and the overview map).
+    let far = { x: 0, y: 0 };
+    /** Zoom all the way out about the node, then in about the far corner: the node leaves the view. */
+    const zoomAway = async () => {
+      const canvas = await canvasBox();
+      const at = centre(await box(node(page, k.o2)));
+      far = { x: at.x > canvas.x + canvas.width / 2 ? canvas.x + 20 : canvas.x + canvas.width - 20, y: canvas.y + 20 };
+      await wheelAt(page, at, 400, 24);
+      await expect(page.getByTestId('ost-zoom-level')).toHaveText('35%');
+      await wheelAt(page, far, -400, 24);
+      await expect(page.getByTestId('ost-zoom-level')).toHaveText('160%');
+      await settle(page);
+    };
+    /** Zoom back out about the same corner: the node comes back. */
+    const zoomBack = async () => {
+      await wheelAt(page, far, 400, 24);
+      await expect(page.getByTestId('ost-zoom-level')).toHaveText('35%');
+      await settle(page);
+    };
+
+    await title.dblclick();
+    await expect(input).toBeFocused();
+    await input.fill('Draft kept off-screen');
+    await zoomAway();
+    expect(await nodeInView()).toBe(false);
+    await expect(input).toHaveValue('Draft kept off-screen');
+    await zoomBack();
+    expect(await nodeInView()).toBe(true);
+    await expect(input).toHaveValue('Draft kept off-screen');
+    await expect(input).toBeFocused();
+    await input.press('Enter');
+    await expect(title).toHaveText('Draft kept off-screen');
+    await expect.poll(async () => (await serverNode(k.o2))?.title).toBe('Draft kept off-screen');
+    await expect(input).toHaveCount(0);
+
+    // The + menu likewise stays open (and closes normally) around a zoom out of view.
+    await page.getByTestId('ost-fit').click();
+    await settle(page);
+    await page.getByTestId(`ost-node-add-${k.o2}`).click();
+    await expect(page.getByTestId('ost-add-menu')).toBeVisible();
+    await zoomAway();
+    expect(await nodeInView()).toBe(false);
+    await zoomBack();
+    expect(await nodeInView()).toBe(true);
+    await expect(page.getByTestId('ost-add-menu')).toBeVisible();
+    await page.getByTestId('ost-add-menu-opportunity').focus();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('ost-add-menu')).toHaveCount(0);
+    await expect(page.getByTestId('ost-rename-input')).toHaveCount(0);
+  });
+
+  test('a node released outside the canvas, or a drag cancelled by Escape or a window blur, snaps back and stays rendered', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    const dragged = node(page, k.s1);
+    const home = await flowPos(page, k.s1);
+    expect(home).not.toBeNull();
+    const canvas = await box(page.getByTestId('ost-canvas'));
+    expect(canvas.x).toBeGreaterThan(120); // x=100 is the app sidebar / palette, outside the canvas
+
+    /** Back at its layout position, rendered (after Fit, which shows the layout), parent unchanged. */
+    const expectHome = async () => {
+      await expect(page.locator('[data-drop-target]')).toHaveCount(0);
+      await page.getByTestId('ost-fit').click();
+      await settle(page);
+      await expect(dragged).toBeVisible();
+      await expect.poll(() => flowPos(page, k.s1)).toEqual(home);
+      expect((await serverNode(k.s1))?.parentKey).toBe(k.opB);
+    };
+
+    // Released over the app sidebar.
+    await pickUp(page, dragged, { x: 100, y: canvas.y + canvas.height / 2 });
+    await page.mouse.up();
+    await expectHome();
+
+    // Released outside the browser window.
+    await pickUp(page, dragged, { x: 5, y: canvas.y + 40 });
+    await page.mouse.move(-40, canvas.y + 40, { steps: 3 });
+    await page.mouse.up();
+    await expectHome();
+
+    // Escape over a legal target cancels: nothing highlighted, the release does not move it.
+    const opA = node(page, k.opA);
+    await pickUp(page, dragged, centre(await box(opA)));
+    await expect(opA).toHaveAttribute('data-drop-hover', 'true');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-drop-target]')).toHaveCount(0);
+    const over = centre(await box(opA));
+    await page.mouse.move(over.x + 3, over.y + 3);
+    await expect(page.locator('[data-drop-hover]')).toHaveCount(0);
+    await page.mouse.up();
+    await expectHome();
+
+    // A window blur mid-drag cancels too; the release then lands outside the window.
+    await pickUp(page, dragged, centre(await box(opA)));
+    await expect(opA).toHaveAttribute('data-drop-hover', 'true');
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await expect(page.locator('[data-drop-target]')).toHaveCount(0);
+    await page.mouse.move(-40, canvas.y + 40, { steps: 3 });
+    await page.mouse.up();
+    await expectHome();
+  });
+
+  test('a move the server refuses rolls the tree back and snaps the node back again', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    const dragged = node(page, k.s1);
+    const home = await flowPos(page, k.s1);
+    let refused = 0;
+    await page.route('**/api/tree/nodes/move', async route => {
+      refused += 1;
+      await new Promise(resolve => setTimeout(resolve, 400)); // long enough to see the optimistic move
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({ status: 409, title: 'Conflict', message: 'error.concurrencyFailure' }),
+      });
+    });
+    try {
+      // opA can take a solution: the optimistic move lays s1 out under opA first.
+      await pickUp(page, dragged, centre(await box(node(page, k.opA))));
+      await expect(node(page, k.opA)).toHaveAttribute('data-drop-hover', 'true');
+      await page.mouse.up();
+      await expect.poll(() => flowPos(page, k.s1)).not.toEqual(home);
+      await expect(page.getByTestId('ostError')).toContainText('Someone else changed this tree at the same moment');
+      await settle(page);
+      await expect.poll(() => flowPos(page, k.s1)).toEqual(home);
+      await expect(dragged).toBeVisible();
+      expect(refused).toBe(1);
+      expect((await serverNode(k.s1))?.parentKey).toBe(k.opB);
+    } finally {
+      await page.unroute('**/api/tree/nodes/move');
+    }
+    // The refused request is the only console error.
+    expect(takeErrors(page).filter(e => !e.includes('status of 409 (Conflict)'))).toEqual([]);
+    await page.reload();
+    await expect(dragged).toBeVisible();
+    await settle(page);
+    expect(await flowPos(page, k.s1)).toEqual(home);
+  });
+
+  test('keyboard focus draws its ring on its own layer, never hiding the selected, target or search-match state', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    const o1 = node(page, k.o1);
+    const o2 = node(page, k.o2);
+    const ring = (el: Locator) =>
+      el.evaluate(n => {
+        const after = getComputedStyle(n, '::after');
+        return after.content !== 'none' && after.borderTopStyle === 'solid' ? after.borderTopWidth : null;
+      });
+    const outline = (el: Locator) => el.evaluate(n => `${getComputedStyle(n).outlineStyle} ${getComputedStyle(n).outlineWidth}`);
+
+    // Selected + focused: the selection outline stays, the ring is outside it.
+    await o1.focus();
+    await page.keyboard.press('Enter');
+    await expect(o1).toHaveClass(/\bis-selected\b/);
+    await expect(o1).toBeFocused();
+    expect(await outline(o1)).toBe('solid 2px');
+    expect(await ring(o1)).toBe('2px');
+
+    // Legal target (armed palette type) + focused: the dashed target outline stays.
+    await page.getByTestId('ost-palette-opportunity').click();
+    await expect(o2).toHaveAttribute('data-drop-target', 'true');
+    await o2.focus();
+    expect(await outline(o2)).toBe('dashed 1px');
+    expect(await ring(o2)).toBe('2px');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-drop-target]')).toHaveCount(0);
+
+    // Search match + focused: the match halo (box-shadow) stays.
+    await page.getByTestId('ost-search').fill((await serverNode(k.o2))!.title);
+    await expect(o2).toHaveClass(/\bis-match\b/);
+    await o2.focus();
+    expect(await o2.evaluate(n => getComputedStyle(n).boxShadow)).toMatch(/3px/);
+    expect(await ring(o2)).toBe('2px');
+    await page.getByTestId('ost-search').fill('');
+
+    // Not focused: no ring.
+    await page.getByTestId('ost-search').focus();
+    expect(await ring(o2)).toBeNull();
+  });
+
+  test('leaving the canvas disarms the palette; coming back nothing is armed or highlighted', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    await page.getByTestId('ost-palette-evidence').click();
+    await expect(page.getByTestId('ost-palette-evidence')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('ostTabTrees').click();
+    await expect(page.getByTestId('ostDashboardPage')).toBeVisible();
+    await page.goBack();
+    await expect(node(page, k.productA)).toBeVisible();
+    await expect(page.getByTestId('ost-palette-evidence')).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('[data-drop-target]')).toHaveCount(0);
+  });
+
   test('dragging a palette type onto a node attaches it there; an invalid drop does nothing', async () => {
     const page = user.page;
     await openCanvas(page);
@@ -463,8 +694,8 @@ test.describe('OST tree canvas — editing', () => {
     await page.keyboard.press('Enter');
     await expect(o1).toHaveClass(/\bis-selected\b/);
     await expect(o1).toHaveAttribute('aria-label', 'Outcome: Outcome one, selected');
-    // Focus ring is visible (box-shadow ring outside the selection outline).
-    expect(await o1.evaluate(el => getComputedStyle(el).boxShadow)).toMatch(/7px/);
+    // Focus ring is visible (its own ::after layer outside the selection outline).
+    expect(await o1.evaluate(el => getComputedStyle(el, '::after').borderTopWidth)).toBe('2px');
 
     await page.keyboard.press('Tab');
     await expect(page.getByTestId(`ost-node-add-${k.o1}`)).toBeFocused();

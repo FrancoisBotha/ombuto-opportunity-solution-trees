@@ -4,7 +4,8 @@
  * validation for inline rename. No Vue, no DOM — unit tested on their own (edit-rules.spec.ts).
  *
  * Hit testing follows the prototype (Ombuto OST.dc.html nodeDown / paletteDown): the POINTER, in
- * flow coordinates, must be inside a laid-out box [x - w/2, x + w/2] × [y, y + h].
+ * flow coordinates, must be inside a laid-out box [x - w/2, x + w/2] × [y, y + h], where h is the
+ * larger of the layout height and the node's rendered height (a clamped title renders taller).
  */
 import type { Placed } from '../domain/layout';
 import { ALLOWED } from '../domain/rules';
@@ -33,16 +34,21 @@ export function clientToFlow(client: Point, rect: { left: number; top: number },
 export const insideRect = (client: Point, r: { left: number; top: number; right: number; bottom: number }): boolean =>
   client.x > r.left && client.x < r.right && client.y > r.top && client.y < r.bottom;
 
+/** Rendered height of a node in flow units, when known (measured by Vue Flow). */
+export type HeightOf = (key: string) => number | undefined;
+
 /**
  * Key of the laid-out box under the flow point, skipping `exclude` (the node being dragged, which
- * always sits under the pointer). The tidy layout never overlaps boxes; if it ever did, the last in
- * paint order wins.
+ * always sits under the pointer). A box is max(layout height, rendered height) tall. The tidy
+ * layout never overlaps boxes; if it ever did, the last in paint order wins.
  */
-export function boxAt(point: Point, placed: Record<string, Placed>, exclude?: string | null): string | null {
+export function boxAt(point: Point, placed: Record<string, Placed>, exclude?: string | null, heightOf?: HeightOf): string | null {
   let hit: string | null = null;
   for (const [key, p] of Object.entries(placed)) {
     if (key === exclude) continue;
-    if (point.x > p.x - p.w / 2 && point.x < p.x + p.w / 2 && point.y > p.y && point.y < p.y + p.h) hit = key;
+    if (point.x <= p.x - p.w / 2 || point.x >= p.x + p.w / 2 || point.y <= p.y) continue;
+    const h = Math.max(p.h, heightOf?.(key) ?? 0);
+    if (point.y < p.y + h) hit = key;
   }
   return hit;
 }
@@ -91,8 +97,9 @@ export function dropTargetAt(
   placed: Record<string, Placed>,
   legal: ReadonlySet<string>,
   exclude?: string | null,
+  heightOf?: HeightOf,
 ): string | null {
-  const key = boxAt(point, placed, exclude);
+  const key = boxAt(point, placed, exclude, heightOf);
   return key && legal.has(key) ? key : null;
 }
 

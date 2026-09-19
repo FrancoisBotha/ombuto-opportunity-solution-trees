@@ -9,7 +9,7 @@
       data-cy="ost-palette-toggle"
       @click="ui.setLeftOpen(true)"
     >
-      <PhCaretRight :size="13" weight="bold" aria-hidden="true" />
+      <PhCaretRight :size="13" aria-hidden="true" />
     </button>
     <span class="ost-palette-rail__label" aria-hidden="true">Palette</span>
   </div>
@@ -26,7 +26,7 @@
         data-cy="ost-palette-toggle"
         @click="hide"
       >
-        <PhCaretLeft :size="13" weight="bold" aria-hidden="true" />
+        <PhCaretLeft :size="13" aria-hidden="true" />
       </button>
     </div>
 
@@ -70,7 +70,8 @@
  *   highlighted by the canvas, dropping on a legal node attaches, anywhere else does nothing;
  * - click a type to arm it (click it again, or Escape, to disarm), then click or press Enter on a
  *   highlighted node.
- * A drag always ends cleanly: pointerup, pointercancel, window blur, Escape and unmount all clear it.
+ * A drag always ends cleanly: pointerup, pointercancel, window blur, Escape and unmount all clear it;
+ * unmount (leaving the canvas) also disarms an armed type.
  * `resolveTarget` (from the canvas) maps a client point to the legal node under it, or null.
  */
 import { PhCaretLeft, PhCaretRight } from '@phosphor-icons/vue';
@@ -194,6 +195,7 @@ function hide() {
 
 onBeforeUnmount(() => {
   abortDrag();
+  if (ui.tool) ui.armTool(null);
   window.removeEventListener('keydown', onArmedKeydown);
 });
 </script>

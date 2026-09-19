@@ -35,14 +35,22 @@ export type LoadFailure = 'forbidden' | 'notFound' | 'error';
 
 export const httpStatus = (err: any): number | null => err?.response?.status ?? err?.status ?? null;
 
+/** The server's message key without the `error.` prefix (e.g. `concurrencyFailure`), if any. */
+export function messageKey(err: any): string | undefined {
+  const raw: unknown = err?.response?.data?.message;
+  return typeof raw === 'string' ? raw.replace(/^error\./, '') : undefined;
+}
+
+/** A write about a node another session has deleted (the store re-reads the tree to tell). */
+export const DELETED_ELSEWHERE = 'This item was deleted by someone else.';
+
 /**
  * `type` (the node the failed write was about) makes the title rule specific: products 100,
  * assumptions and evidence 500, the other types 200 characters.
  */
 export function describeError(err: any, fallback = 'Something went wrong. Your change was not saved.', type?: NodeType): string {
   const status = httpStatus(err);
-  const raw: string | undefined = err?.response?.data?.message;
-  const key = typeof raw === 'string' ? raw.replace(/^error\./, '') : undefined;
+  const key = messageKey(err);
   if (key === 'invalidtitle' && type)
     return `${type === 'product' ? 'Product names' : 'Titles'} need ${TITLE_MIN} to ${titleMax(type)} characters.`;
   if (key && MESSAGES[key]) return MESSAGES[key];

@@ -3,10 +3,10 @@ import { join } from 'node:path';
 
 /**
  * Throwaway teams are deleted once, after every spec has finished (cleanup.teardown.ts), not in
- * each spec's afterAll: deleting a team while other workers are still running makes the backend
- * fail unrelated requests of that team's members (TeamAccessService.currentUserMemberships loads
- * the caller's memberships, then each team; a team deleted in between is an ObjectNotFoundException
- * → HTTP 500 — this broke TEAMS-008's "add member" in parallel runs).
+ * each spec's afterAll: deleting a team while other workers are still running used to make the
+ * backend fail unrelated requests of that team's members (HTTP 500, fixed in step 9b —
+ * TeamDeletedMidRequestIT), and still pulls data out from under specs that run in parallel.
+ * The teardown deletes each team's products as a member who may (see there), then the team.
  *
  * Specs register the teams they create; the registry is a directory of per-worker files, so a run
  * that stops early is cleaned up by the next one.

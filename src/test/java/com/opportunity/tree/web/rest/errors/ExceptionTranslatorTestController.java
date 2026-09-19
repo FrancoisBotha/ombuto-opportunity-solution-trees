@@ -28,6 +28,29 @@ public class ExceptionTranslatorTestController {
         throw new DataIntegrityViolationException(RAW_SQL, new java.sql.SQLException(RAW_SQL, "23503"));
     }
 
+    /** What a service's own flush raises: Hibernate's exception, not translated by Spring. */
+    @GetMapping("/hibernate-constraint-violation")
+    public void hibernateConstraintViolation() {
+        throw new org.hibernate.exception.ConstraintViolationException(
+            RAW_SQL,
+            new java.sql.SQLException(RAW_SQL, "23503"),
+            "delete from opportunity where id=?",
+            "fk_comment__opportunity_id"
+        );
+    }
+
+    /** What a constraint violation raised at transaction commit looks like. */
+    @GetMapping("/constraint-violation-at-commit")
+    public void constraintViolationAtCommit() {
+        throw new org.springframework.transaction.TransactionSystemException(
+            "Could not commit JPA transaction",
+            new jakarta.persistence.RollbackException(
+                "Error while committing the transaction",
+                new jakarta.persistence.PersistenceException(RAW_SQL, new java.sql.SQLException(RAW_SQL, "23503"))
+            )
+        );
+    }
+
     @GetMapping("/cannot-acquire-lock")
     public void cannotAcquireLock() {
         throw new CannotAcquireLockException(RAW_SQL);

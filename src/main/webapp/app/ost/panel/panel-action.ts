@@ -21,6 +21,9 @@ export interface PanelErrors {
 
 const KEY: InjectionKey<PanelErrors> = Symbol('ostPanelErrors');
 
+/** A field's save outcome callback: whether the save stuck (NotesField keeps a failed draft). */
+export type Settled = (...args: [ok: boolean]) => void;
+
 const createErrors = (): PanelErrors => {
   const message = ref<string | null>(null);
   const nodeKey = ref<string | null>(null);

@@ -74,6 +74,19 @@ describe('edit rules', () => {
       expect(dropTargetAt({ x: 900, y: 30 }, placed, legal)).toBeNull();
     });
 
+    it('a node rendered taller than its layout box (clamped 3-line title) is hit over its rendered height', () => {
+      const heights: Record<string, number> = { a: 101, b: 60 };
+      const heightOf = (key: string) => heights[key];
+      // 95 is below a's 90px layout box but inside its 101px rendered box.
+      expect(boxAt({ x: 100, y: 95 }, placed)).toBeNull();
+      expect(boxAt({ x: 100, y: 95 }, placed, null, heightOf)).toBe('a');
+      expect(boxAt({ x: 100, y: 101 }, placed, null, heightOf)).toBeNull(); // bottom edge
+      expect(dropTargetAt({ x: 100, y: 95 }, placed, new Set(['a']), null, heightOf)).toBe('a');
+      // Never shorter than the layout box (a node that renders smaller, or is not measured yet).
+      expect(boxAt({ x: 400, y: 80 }, placed, null, heightOf)).toBe('b');
+      expect(boxAt({ x: 100, y: 250 }, placed, null, heightOf)).toBe('c');
+    });
+
     it('converts client points to flow points through the viewport', () => {
       const rect = { left: 200, top: 100 };
       expect(clientToFlow({ x: 200, y: 100 }, rect, { x: 0, y: 0, zoom: 1 })).toEqual({ x: 0, y: 0 });

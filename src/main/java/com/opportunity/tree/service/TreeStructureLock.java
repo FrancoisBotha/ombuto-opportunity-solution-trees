@@ -24,9 +24,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Serialises structural writes within one team's tree: node create, move, product reorder and
- * cascade delete, product create (and a product changing team), and appending a link or an open
- * question.
+ * Serialises writes within one team's tree that read-then-write sibling lists or can race a cascade
+ * delete: node create, move, product reorder and cascade delete, product create (and a product
+ * changing team), appending a link or an open question, field patches (which write history), and
+ * chat posts / edits / deletes (a comment inserted after the cascade collected the node's comments
+ * would break that delete with a foreign-key violation).
  *
  * <p>Those writes read a parent's children and then renumber or append to them
  * ({@code sortOrder}). Run concurrently, two moves between the same parents update the same

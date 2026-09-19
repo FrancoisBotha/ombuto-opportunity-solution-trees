@@ -131,7 +131,6 @@ const reopenButton = ref<HTMLButtonElement | null>(null);
 // ---- title: commit on Enter / blur, Escape cancels -----------------------------------------------
 const title = ref(node.value?.title ?? '');
 const titleFocused = ref(false);
-let cancelling = false;
 
 watch(
   () => [node.value?.id, node.value?.title] as const,
@@ -149,17 +148,16 @@ watch(
 
 const blurTarget = (event: Event) => (event.target as HTMLElement).blur();
 
+/** Escape reverts the typed title; focus stays in the field (a later blur has nothing to commit). */
 function cancelTitle(event: KeyboardEvent) {
-  cancelling = true;
   title.value = node.value?.title ?? '';
-  (event.target as HTMLElement).blur();
-  cancelling = false;
+  (event.target as HTMLInputElement).select();
 }
 
 function commitTitle() {
   titleFocused.value = false;
   const current = node.value;
-  if (cancelling || !current || !tree.canEdit) return;
+  if (!current || !tree.canEdit) return;
   const next = title.value.trim();
   if (next.length < 2) {
     title.value = current.title;

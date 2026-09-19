@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type VueWrapper, flushPromises, mount } from '@vue/test-utils';
 
@@ -108,5 +108,40 @@ describe('NodeTitleEditor (inline rename)', () => {
     await input(w).trigger('keydown', { key: 'Escape' });
     document.removeEventListener('keydown', listener);
     expect(seen).toEqual([]);
+  });
+
+  describe('unmounted while open (its node left the canvas)', () => {
+    it('commits a valid draft', async () => {
+      const w = await open('Old title');
+      await input(w).setValue('  Typed but not confirmed ');
+      w.unmount();
+      wrapper = null;
+      expect(w.emitted('commit')).toEqual([['Typed but not confirmed']]);
+      expect(w.emitted('cancel')).toBeUndefined();
+    });
+
+    it('cancels an invalid draft', async () => {
+      const w = await open('Old title');
+      await input(w).setValue('x');
+      w.unmount();
+      wrapper = null;
+      expect(w.emitted('cancel')).toHaveLength(1);
+      expect(w.emitted('commit')).toBeUndefined();
+    });
+
+    it('emits nothing more after Enter', async () => {
+      const onCommit = vi.fn();
+      const onCancel = vi.fn();
+      const w = mount(NodeTitleEditor, {
+        props: { type: 'opportunity', label: 'opportunity', value: 'Old title', onCommit, onCancel },
+        attachTo: document.body,
+      });
+      await flushPromises();
+      await input(w).setValue('Done title');
+      await input(w).trigger('keydown', { key: 'Enter' });
+      w.unmount();
+      expect(onCommit.mock.calls).toEqual([['Done title']]);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
@@ -8,8 +9,8 @@ import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERN
  * owner, notes, children, quick-add, Open detail, Delete) and the Links tab (add / edit / remove /
  * restore defaults). Every edit is checked after a reload and on the canvas node.
  *
- * Builds its own throwaway team through the API (`user` owns it, `admin` is a VIEWER) and deletes
- * it afterwards. No seeded team is touched.
+ * Builds its own throwaway team through the API (`user` owns it, `admin` is a VIEWER), deletes its
+ * product afterwards and registers the team for the run-end cleanup (support/cleanup.ts). No seeded team is touched.
  */
 
 interface TreeNode {
@@ -97,6 +98,7 @@ test.describe('OST detail panel', () => {
     const team = await user.api('post', '/api/team-management/teams', { name: `e2e panel ${stamp}`, description: 'ost-detail-panel' });
     expect(team.status()).toBe(201);
     teamId = (await team.json()).id;
+    registerTeamForCleanup(teamId);
     const found = (await (await user.api('get', `/api/team-management/teams/${teamId}/user-search?q=admin`)).json()) as {
       id: string;
       login: string;
@@ -131,10 +133,9 @@ test.describe('OST detail panel', () => {
   });
 
   test.afterAll(async () => {
-    if (teamId) {
-      if (productId) await user.api('delete', `/api/products/${productId}`);
-      const res = await admin.api('delete', `/api/admin/teams/${teamId}`);
-      expect(res.status(), 'team cleanup').toBe(204);
+    if (productId) {
+      const res = await user.api('delete', `/api/tree/nodes/product/${productId}`);
+      expect(res.status(), 'product cleanup').toBe(204);
     }
     await user?.context.close();
     await admin?.context.close();
