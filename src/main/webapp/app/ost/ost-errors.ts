@@ -1,4 +1,6 @@
 /** Turns an axios error from the OST API into a short sentence for the UI. */
+import { TITLE_MIN, titleMax } from './canvas/edit-rules';
+import type { NodeType } from './domain/types';
 
 const MESSAGES: Record<string, string> = {
   unknowntype: 'That node type is not recognised.',
@@ -7,7 +9,7 @@ const MESSAGES: Record<string, string> = {
   invalidparent: 'That node cannot go there.',
   unknownfield: 'That field cannot be changed.',
   fieldnotapplicable: 'That field does not apply to this node.',
-  invalidtitle: 'Titles need 2 to 200 characters (500 for assumptions and evidence).',
+  invalidtitle: 'Titles need 2 to 200 characters (100 for products, 500 for assumptions and evidence).',
   invalidnotes: 'Those notes are not valid.',
   invalidstatus: 'That status is not valid for this node.',
   invalidconfidence: 'Confidence must be between 0 and 100.',
@@ -21,7 +23,7 @@ const MESSAGES: Record<string, string> = {
   linknameinvalid: 'Link names need 1 to 100 characters.',
   linkurlinvalid: 'Links must start with http:// or https://.',
   questiontextinvalid: 'Questions need 1 to 500 characters.',
-  commentbodyinvalid: 'Messages cannot be empty.',
+  commentbodyinvalid: 'Messages need 1 to 10,000 characters.',
   chatnotsupported: 'Products have no chat.',
   historynotsupported: 'Products have no history.',
   // 409s (see ExceptionTranslator)
@@ -33,10 +35,16 @@ export type LoadFailure = 'forbidden' | 'notFound' | 'error';
 
 export const httpStatus = (err: any): number | null => err?.response?.status ?? err?.status ?? null;
 
-export function describeError(err: any, fallback = 'Something went wrong. Your change was not saved.'): string {
+/**
+ * `type` (the node the failed write was about) makes the title rule specific: products 100,
+ * assumptions and evidence 500, the other types 200 characters.
+ */
+export function describeError(err: any, fallback = 'Something went wrong. Your change was not saved.', type?: NodeType): string {
   const status = httpStatus(err);
   const raw: string | undefined = err?.response?.data?.message;
   const key = typeof raw === 'string' ? raw.replace(/^error\./, '') : undefined;
+  if (key === 'invalidtitle' && type)
+    return `${type === 'product' ? 'Product names' : 'Titles'} need ${TITLE_MIN} to ${titleMax(type)} characters.`;
   if (key && MESSAGES[key]) return MESSAGES[key];
   if (status === 403) return 'You do not have permission to change this tree.';
   if (status === 404) return 'That item no longer exists.';

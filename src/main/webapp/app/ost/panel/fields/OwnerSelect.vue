@@ -1,6 +1,6 @@
 <template>
   <div class="ost-field">
-    <label class="ost-field__label" :for="id">Owner</label>
+    <label class="ost-field__label ost-field__label--6" :for="id">Owner</label>
     <select :id="id" class="ost-input ost-owner" :value="value" :disabled="readonly" data-cy="ost-owner" @change="onChange">
       <option value="">Unassigned</option>
       <option v-for="option in options" :key="option.login" :value="option.login">{{ option.label }}</option>

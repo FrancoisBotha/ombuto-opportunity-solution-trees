@@ -10,6 +10,14 @@ describe('OST error messages', () => {
     expect(describeError(apiError(400, 'error.unknowntype'))).toBe('That node type is not recognised.');
   });
 
+  it('states the title rule of the node type when one is given', () => {
+    const invalid = apiError(400, 'error.invalidtitle');
+    expect(describeError(invalid, undefined, 'product')).toBe('Product names need 2 to 100 characters.');
+    expect(describeError(invalid, undefined, 'opportunity')).toBe('Titles need 2 to 200 characters.');
+    expect(describeError(invalid, undefined, 'evidence')).toBe('Titles need 2 to 500 characters.');
+    expect(describeError(invalid)).toContain('100 for products');
+  });
+
   it('explains the 409 conflicts', () => {
     expect(describeError(apiError(409, 'error.concurrencyFailure'))).toBe(
       'Someone else changed this tree at the same moment — please try again.',

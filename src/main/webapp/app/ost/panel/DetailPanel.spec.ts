@@ -167,4 +167,86 @@ describe('DetailPanel', () => {
       expect(service.patchNode.called).toBe(false);
     });
   });
+
+  describe('step-10 review follow-ups (C15)', () => {
+    it.each([
+      ['product-1', '100'],
+      ['outcome-1', '200'],
+      ['opportunity-1', '200'],
+      ['assumption-1', '500'],
+      ['evidence-1', '500'],
+    ])('%s: title maxlength %s', async (key, max) => {
+      const { wrapper } = await mountPanel(key);
+      expect(wrapper.get('[data-cy="ost-panel-title"]').attributes('maxlength')).toBe(max);
+    });
+
+    it('explains a refused title with the rule of the node type', async () => {
+      const { wrapper, service } = await mountPanel('product-1');
+      service.patchNode.rejects(apiError(400, 'error.invalidtitle'));
+      const input = wrapper.get('[data-cy="ost-panel-title"]');
+      await input.setValue('Product that is fine locally');
+      await input.trigger('blur');
+      await flushPromises();
+      expect(wrapper.get('[data-cy="ost-panel-error"]').text()).toBe('Product names need 2 to 100 characters.');
+    });
+
+    it('a failure that returns after the selection changed is not shown against the new node', async () => {
+      const { wrapper, service, tree, ui } = await mountPanel('outcome-1');
+      let reject!: (e: unknown) => void;
+      service.patchNode.returns(new Promise((_, r) => (reject = r)) as any);
+      const input = wrapper.get('[data-cy="ost-panel-title"]');
+      await input.setValue('Renamed outcome');
+      await input.trigger('blur');
+      ui.select('solution-1');
+      await flushPromises();
+      reject(apiError(500));
+      await flushPromises();
+      expect(wrapper.find('[data-cy="ost-panel-error"]').exists()).toBe(false);
+      // left on the toast, labelled with the node it was about
+      expect(tree.error).toBe('“Weekly interviews”: Something went wrong. Your change was not saved.');
+    });
+
+    it('tabs: aria-controls / tabpanel wiring and a roving tabindex', async () => {
+      const { wrapper } = await mountPanel('opportunity-1');
+      const active = wrapper.get('[data-cy="ost-tab-detail"]');
+      const panel = wrapper.get('[role="tabpanel"]');
+      expect(active.attributes('aria-controls')).toBe(panel.attributes('id'));
+      expect(panel.attributes('aria-labelledby')).toBe(active.attributes('id'));
+      expect(active.attributes('tabindex')).toBe('0');
+      expect(wrapper.get('[data-cy="ost-tab-links"]').attributes('tabindex')).toBe('-1');
+      expect(wrapper.get('[data-cy="ost-tab-links"]').attributes('aria-controls')).toBeUndefined();
+    });
+
+    it('tabs: arrow keys (wrapping), Home and End select and focus', async () => {
+      const { wrapper, ui } = await mountPanel('opportunity-1');
+      const list = wrapper.get('[role="tablist"]');
+      await list.trigger('keydown', { key: 'ArrowRight' });
+      await flushPromises();
+      expect(ui.panelTab).toBe('links');
+      expect(document.activeElement?.getAttribute('data-cy')).toBe('ost-tab-links');
+      await list.trigger('keydown', { key: 'End' });
+      await flushPromises();
+      expect(ui.panelTab).toBe('history');
+      await list.trigger('keydown', { key: 'ArrowRight' });
+      await flushPromises();
+      expect(ui.panelTab).toBe('detail');
+      await list.trigger('keydown', { key: 'ArrowLeft' });
+      await flushPromises();
+      expect(ui.panelTab).toBe('history');
+      await list.trigger('keydown', { key: 'Home' });
+      await flushPromises();
+      expect(ui.panelTab).toBe('detail');
+      expect(document.activeElement?.getAttribute('data-cy')).toBe('ost-tab-detail');
+    });
+
+    it('hide moves focus to the Details tab, reopening moves it back to the hide button', async () => {
+      const { wrapper } = await mountPanel('solution-1');
+      await wrapper.get('[data-cy="ost-panel-hide"]').trigger('click');
+      await flushPromises();
+      expect(document.activeElement?.getAttribute('data-cy')).toBe('ost-panel-reopen');
+      await wrapper.get('[data-cy="ost-panel-reopen"]').trigger('click');
+      await flushPromises();
+      expect(document.activeElement?.getAttribute('data-cy')).toBe('ost-panel-hide');
+    });
+  });
 });

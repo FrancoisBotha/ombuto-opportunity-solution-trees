@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { enableAutoUnmount, flushPromises } from '@vue/test-utils';
 
@@ -159,12 +159,38 @@ describe('DetailTab', () => {
       expect(service.patchNode.called).toBe(false);
     });
 
-    it('arrow keys commit a step', async () => {
+    it('key presses move the value at once but commit one PATCH once the keys are idle (C15)', async () => {
       const { wrapper, service } = await mountTab('opportunity-1');
-      service.patchNode.resolves(dto('opportunity-1', 'outcome-1', { status: 'EXPLORING', priority: 60, valueRating: 3 }));
-      await wrapper.get('[data-cy="ost-priority"]').trigger('keydown', { key: 'PageUp' });
+      service.patchNode.resolves(dto('opportunity-1', 'outcome-1', { status: 'EXPLORING', priority: 63, valueRating: 3 }));
+      vi.useFakeTimers();
+      try {
+        const slider = wrapper.get('[data-cy="ost-priority"]');
+        await slider.trigger('keydown', { key: 'PageUp' });
+        for (let i = 0; i < 3; i++) await slider.trigger('keydown', { key: 'ArrowRight', repeat: true });
+        expect(slider.attributes('aria-valuenow')).toBe('63');
+        vi.advanceTimersByTime(300);
+        expect(service.patchNode.called).toBe(false);
+        vi.advanceTimersByTime(200);
+      } finally {
+        vi.useRealTimers();
+      }
       await flushPromises();
-      expect(service.patchNode.calledOnceWith('opportunity', 1, { priority: 60 })).toBe(true);
+      expect(service.patchNode.calledOnceWith('opportunity', 1, { priority: 63 })).toBe(true);
+    });
+
+    it('blur commits a pending keyboard value immediately; back to the start sends nothing', async () => {
+      const { wrapper, service } = await mountTab('opportunity-1');
+      service.patchNode.resolves(dto('opportunity-1', 'outcome-1', { status: 'EXPLORING', priority: 100, valueRating: 3 }));
+      const slider = wrapper.get('[data-cy="ost-priority"]');
+      await slider.trigger('keydown', { key: 'ArrowUp' });
+      await slider.trigger('keydown', { key: 'ArrowDown' });
+      await slider.trigger('blur');
+      await flushPromises();
+      expect(service.patchNode.called).toBe(false);
+      await slider.trigger('keydown', { key: 'End' });
+      await slider.trigger('blur');
+      await flushPromises();
+      expect(service.patchNode.calledOnceWith('opportunity', 1, { priority: 100 })).toBe(true);
     });
   });
 
@@ -271,6 +297,35 @@ describe('DetailTab', () => {
       const as = await mountTab('assumption-2', viewer);
       expect(as.wrapper.get('[data-cy="ost-confidence-80"]').attributes('disabled')).toBeDefined();
       expect(as.wrapper.get('[data-cy="ost-owner"]').attributes('disabled')).toBeDefined();
+    });
+  });
+
+  describe('accessibility and layout (C15)', () => {
+    it('confidence: only the step equal to the value is pressed', async () => {
+      const { wrapper } = await mountTab('assumption-2');
+      const pressed = [20, 40, 60, 80, 100].map(v => wrapper.get(`[data-cy="ost-confidence-${v}"]`).attributes('aria-pressed'));
+      expect(pressed).toEqual(['false', 'false', 'true', 'false', 'false']);
+      // steps up to the value still look filled
+      expect(wrapper.get('[data-cy="ost-confidence-40"]').classes()).toContain('is-on');
+    });
+
+    it('evidence strength: the meter says "untested" instead of 0%', async () => {
+      const lonely = await mountTab('solution-2');
+      const bar = lonely.wrapper.get('[data-cy="ost-evidence-bar"]');
+      expect(bar.attributes('aria-valuetext')).toMatch(/^Untested/);
+      const tested = await mountTab('solution-1');
+      const score = tested.wrapper.get('[data-cy="ost-evidence-bar"]').attributes('data-score');
+      expect(tested.wrapper.get('[data-cy="ost-evidence-bar"]').attributes('aria-valuetext')).toBe(`${score}%`);
+    });
+
+    it('labels use the prototype spacing per field', async () => {
+      const { wrapper } = await mountTab('opportunity-1');
+      const label = (text: string) => wrapper.findAll('.ost-field__label').find(l => l.text().startsWith(text))!;
+      expect(label('Status').classes()).toContain('ost-field__label--6');
+      expect(label('Opportunity value').classes()).toContain('ost-field__label--7');
+      expect(label('Priority').classes()).toContain('ost-field__label--8');
+      expect(label('Notes').classes()).toContain('ost-field__label--6');
+      expect(label('Children').classes()).toContain('ost-field__label--7');
     });
   });
 });

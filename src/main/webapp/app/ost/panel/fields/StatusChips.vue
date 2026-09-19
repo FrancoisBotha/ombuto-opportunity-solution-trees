@@ -1,6 +1,6 @@
 <template>
   <div class="ost-field">
-    <div class="ost-field__label" :id="labelId">Status</div>
+    <div :id="labelId" class="ost-field__label ost-field__label--6">Status</div>
     <div class="ost-chips" role="group" :aria-labelledby="labelId">
       <button
         v-for="option in options"

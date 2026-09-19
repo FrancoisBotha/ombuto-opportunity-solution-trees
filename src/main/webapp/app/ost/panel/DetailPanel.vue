@@ -14,7 +14,15 @@
             <span v-if="!crumbs.length">Top of the tree</span>
           </nav>
         </div>
-        <button type="button" class="ost-panel__hide" title="Hide panel" aria-label="Hide panel" data-cy="ost-panel-hide" @click="hide">
+        <button
+          ref="hideButton"
+          type="button"
+          class="ost-panel__hide"
+          title="Hide panel"
+          aria-label="Hide panel"
+          data-cy="ost-panel-hide"
+          @click="hide"
+        >
           <PhX :size="14" aria-hidden="true" />
         </button>
       </div>
@@ -35,14 +43,16 @@
     <PanelTabs :node="node" :active="activeTab" @select="ui.setPanelTab($event)" />
 
     <div class="ost-panel__body">
-      <div v-if="errors.message.value" class="ost-panel__error" role="alert" data-cy="ost-panel-error">
-        <span>{{ errors.message.value }}</span>
+      <div v-if="shownError" class="ost-panel__error" role="alert" data-cy="ost-panel-error">
+        <span>{{ shownError }}</span>
         <button type="button" class="ost-panel__error-close" aria-label="Dismiss" @click="errors.report(null)">
           <PhX :size="11" aria-hidden="true" />
         </button>
       </div>
 
-      <component :is="TAB_COMPONENTS[activeTab]" :key="`${activeTab}:${node.id}`" :node-key="node.id" />
+      <div :id="tabPanelDomId(activeTab)" class="ost-panel__tabpanel" role="tabpanel" :aria-labelledby="tabDomId(activeTab)">
+        <component :is="TAB_COMPONENTS[activeTab]" :key="`${activeTab}:${node.id}`" :node-key="node.id" />
+      </div>
 
       <div class="ost-panel__footer">
         <router-link
@@ -60,7 +70,7 @@
   </aside>
 
   <div v-else-if="node" class="ost-panel-reopen">
-    <button type="button" class="ost-panel-reopen__btn" title="Show details" data-cy="ost-panel-reopen" @click="ui.setRightOpen(true)">
+    <button ref="reopenButton" type="button" class="ost-panel-reopen__btn" title="Show details" data-cy="ost-panel-reopen" @click="reopen">
       <PhCaretLeft :size="13" weight="bold" aria-hidden="true" />
       Details
     </button>
@@ -74,10 +84,11 @@
  * leaves a "Details" tab on the canvas edge; a node click reopens it too (ui.select).
  * Viewers (canEdit false) get everything read-only.
  */
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import { PhCaretLeft, PhX } from '@phosphor-icons/vue';
 
+import { titleMax as titleMaxFor } from '../canvas/edit-rules';
 import { type PanelTab, panelTabsFor } from '../domain/derive';
 import { TYPE_BOX } from '../domain/rules';
 import { useOstTreeStore } from '../stores/ost-tree.store';
@@ -85,6 +96,7 @@ import { useOstUiStore } from '../stores/ost-ui.store';
 
 import PanelTabs from './PanelTabs.vue';
 import { providePanelErrors, usePanelAction } from './panel-action';
+import { tabDomId, tabPanelDomId } from './panel-format';
 import ChatTab from './tabs/ChatTab.vue';
 import DetailTab from './tabs/DetailTab.vue';
 import HistoryTab from './tabs/HistoryTab.vue';
@@ -106,7 +118,15 @@ const activeTab = computed<PanelTab>(() => {
   const tabs = node.value ? panelTabsFor(node.value.type) : [];
   return tabs.includes(ui.panelTab) ? ui.panelTab : 'detail';
 });
-const titleMax = computed(() => (node.value?.type === 'assumption' || node.value?.type === 'evidence' ? 500 : 200));
+/** Server limits per type: products 100, assumptions + evidence 500, the rest 200. */
+const titleMax = computed(() => (node.value ? titleMaxFor(node.value.type) : 200));
+/** The error slot only shows messages about the node on screen. */
+const shownError = computed(() => {
+  const key = errors.nodeKey.value;
+  return errors.message.value && (key === null || key === node.value?.id) ? errors.message.value : null;
+});
+const hideButton = ref<HTMLButtonElement | null>(null);
+const reopenButton = ref<HTMLButtonElement | null>(null);
 
 // ---- title: commit on Enter / blur, Escape cancels -----------------------------------------------
 const title = ref(node.value?.title ?? '');
@@ -143,7 +163,7 @@ function commitTitle() {
   const next = title.value.trim();
   if (next.length < 2) {
     title.value = current.title;
-    if (next.length) errors.report('Titles need at least 2 characters.');
+    if (next.length) errors.report('Titles need at least 2 characters.', current.id);
     return;
   }
   if (next === current.title) {
@@ -160,8 +180,17 @@ function go(key: string) {
   ui.requestCentre(key);
 }
 
-function hide() {
+/** Hiding moves focus to the "Details" edge tab, reopening from it back to the hide button. */
+async function hide() {
   ui.setRightOpen(false);
+  await nextTick();
+  reopenButton.value?.focus();
+}
+
+async function reopen() {
+  ui.setRightOpen(true);
+  await nextTick();
+  hideButton.value?.focus();
 }
 </script>
 

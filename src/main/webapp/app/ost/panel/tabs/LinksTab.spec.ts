@@ -192,4 +192,44 @@ describe('LinksTab', () => {
       expect(service.updateLink.called).toBe(false);
     });
   });
+
+  describe('step-10 review follow-ups (C15)', () => {
+    it('a stored name change resets the name draft only, never the URL being typed', async () => {
+      const { wrapper, tree } = await mountTab('opportunity-1');
+      const row = wrapper.get('[data-cy="ost-link-row-11"]');
+      const url = row.get('[data-cy="ost-link-url"]');
+      (url.element as HTMLInputElement).focus();
+      await url.setValue('https://typing.example/in-progress');
+      tree.byId('opportunity-1')!.links[0].name = 'Renamed elsewhere';
+      await flushPromises();
+      expect((row.get('[data-cy="ost-link-name"]').element as HTMLInputElement).value).toBe('Renamed elsewhere');
+      expect((url.element as HTMLInputElement).value).toBe('https://typing.example/in-progress');
+    });
+
+    it('a stored URL change does not overwrite a focused URL draft, but does once it is not focused', async () => {
+      const { wrapper, tree } = await mountTab('opportunity-1');
+      const row = wrapper.get('[data-cy="ost-link-row-11"]');
+      const url = row.get('[data-cy="ost-link-url"]');
+      (url.element as HTMLInputElement).focus();
+      await url.setValue('https://typing.example/');
+      tree.byId('opportunity-1')!.links[0].url = 'https://server.example/a';
+      await flushPromises();
+      expect((url.element as HTMLInputElement).value).toBe('https://typing.example/');
+      await url.setValue('https://server.example/a'); // nothing to save on blur
+      (url.element as HTMLInputElement).blur();
+      tree.byId('opportunity-1')!.links[0].url = 'https://server.example/b';
+      await flushPromises();
+      expect((url.element as HTMLInputElement).value).toBe('https://server.example/b');
+    });
+
+    it('Escape in the add-link form returns focus to "+ Add link"', async () => {
+      const { wrapper } = await mountTab('opportunity-1');
+      await wrapper.get('[data-cy="ost-link-add"]').trigger('click');
+      await flushPromises();
+      expect(document.activeElement?.getAttribute('data-cy')).toBe('ost-link-new-name');
+      await wrapper.get('[data-cy="ost-link-new-name"]').trigger('keydown', { key: 'Escape' });
+      await flushPromises();
+      expect(document.activeElement?.getAttribute('data-cy')).toBe('ost-link-add');
+    });
+  });
 });

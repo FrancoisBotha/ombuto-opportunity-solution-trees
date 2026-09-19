@@ -1,6 +1,6 @@
 <template>
   <div class="ost-field">
-    <label class="ost-field__label" :for="id">Notes</label>
+    <label class="ost-field__label ost-field__label--6" :for="id">Notes</label>
     <textarea
       :id="id"
       v-model="draft"

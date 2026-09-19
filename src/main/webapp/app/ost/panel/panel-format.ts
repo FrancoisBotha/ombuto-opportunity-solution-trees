@@ -2,6 +2,7 @@
  * Small presentation helpers for the detail panel (copy and thresholds from the prototype,
  * `Ombuto OST.dc.html`: confLabel, rollupNote, quickLink, the link dot colour).
  */
+import type { PanelTab } from '../domain/derive';
 import { defaultLinks } from '../domain/rules';
 import type { LinkRef, OstNode } from '../domain/types';
 import type { TeamMemberDTO } from '../ost.model';
@@ -53,3 +54,7 @@ export function evidenceNote(e: { tests: number; supported: number; refuted: num
 
 export const memberName = (m: Pick<TeamMemberDTO, 'login' | 'firstName' | 'lastName'>) =>
   [m.firstName, m.lastName].filter(Boolean).join(' ').trim() || m.login;
+
+/** DOM ids tying the panel's tabs to their tab panel (aria-controls / aria-labelledby). */
+export const tabDomId = (tab: PanelTab) => `ost-panel-tab-${tab}`;
+export const tabPanelDomId = (tab: PanelTab) => `ost-panel-tabpanel-${tab}`;
