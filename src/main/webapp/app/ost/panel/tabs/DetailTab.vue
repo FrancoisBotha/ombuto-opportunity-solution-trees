@@ -2,7 +2,15 @@
   <div v-if="node" class="ost-tab ost-detail" data-cy="ostTab-detail">
     <NodeFields :node-key="node.id" :readonly="readonly" />
 
-    <NotesField :value="node.note" :readonly="readonly" @change="saveNotes" />
+    <NotesField
+      :value="node.note"
+      :readonly="readonly"
+      :dropped="notesDropped"
+      @change="saveNotes"
+      @focus="onNotesFocus"
+      @blur="onNotesBlur"
+      @dismiss-dropped="dismissNotesDropped"
+    />
 
     <div class="ost-field">
       <div class="ost-field__label ost-field__label--7">Children ({{ children.length }})</div>
@@ -74,8 +82,18 @@ const {
 /** Notes report back whether the save stuck, so a failed draft stays in the field. */
 async function saveNotes(note: string, settled: Settled) {
   if (readonly.value || !node.value) return settled(false);
+  tree.acknowledgeDroppedRemote(props.nodeKey, 'note');
   settled(await run(() => tree.patchNode(props.nodeKey, { note })));
 }
+
+/** The remote value dropped for this node's Notes because a local edit was in flight or typing. */
+const notesDropped = computed<string | undefined>(() => {
+  const dropped = tree.droppedRemoteFor(props.nodeKey).note;
+  return typeof dropped === 'string' ? dropped : undefined;
+});
+const onNotesFocus = () => tree.markTyping(props.nodeKey, 'note');
+const onNotesBlur = () => tree.clearTyping(props.nodeKey, 'note');
+const dismissNotesDropped = () => tree.acknowledgeDroppedRemote(props.nodeKey, 'note');
 
 function go(key: string) {
   ui.select(key);

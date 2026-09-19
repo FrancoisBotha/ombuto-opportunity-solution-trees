@@ -39,6 +39,10 @@
         @keydown.esc.prevent="cancelTitle"
         @blur="commitTitle"
       />
+      <div v-if="titleDropped !== undefined" class="ost-field__hint ost-field__hint--tight" role="status" data-cy="ost-panel-title-dropped">
+        Someone else set this to “{{ titleDropped }}” — your edit is still unsaved.
+        <button type="button" class="ost-panel__dropped-dismiss ost-tap" data-cy="ost-panel-title-dropped-dismiss" @click="dismissTitleDropped">Dismiss</button>
+      </div>
     </header>
 
     <PanelTabs :node="node" :active="activeTab" @select="ui.setPanelTab($event)" />
@@ -154,6 +158,19 @@ watch(
 /** Focus starts from the stored title unless an edit is already typed. */
 function onTitleFocus() {
   if (!titleDirty.value) title.value = node.value?.title ?? '';
+  if (node.value) tree.markTyping(node.value.id, 'title');
+}
+
+/** The remote value that was suppressed because the user was editing this field. */
+const titleDropped = computed<string | undefined>(() => {
+  const key = node.value?.id;
+  if (!key) return undefined;
+  const dropped = tree.droppedRemoteFor(key).title;
+  return typeof dropped === 'string' ? dropped : undefined;
+});
+
+function dismissTitleDropped() {
+  if (node.value) tree.acknowledgeDroppedRemote(node.value.id, 'title');
 }
 
 // A new selection starts with a clean error slot.
@@ -168,12 +185,17 @@ const blurTarget = (event: Event) => (event.target as HTMLElement).blur();
 function cancelTitle(event: KeyboardEvent) {
   titleDirty.value = false;
   title.value = node.value?.title ?? '';
+  if (node.value) {
+    tree.clearTyping(node.value.id, 'title');
+    tree.acknowledgeDroppedRemote(node.value.id, 'title');
+  }
   (event.target as HTMLInputElement).select();
 }
 
 function commitTitle() {
   titleDirty.value = false;
   const current = node.value;
+  if (current) tree.clearTyping(current.id, 'title');
   if (!current || !tree.canEdit) return;
   const next = title.value.trim();
   if (next.length < 2) {
@@ -186,6 +208,7 @@ function commitTitle() {
     return;
   }
   const key = current.id;
+  tree.acknowledgeDroppedRemote(key, 'title');
   void run(() => tree.patchNode(key, { title: next }));
 }
 
@@ -314,6 +337,17 @@ async function reopen() {
   font-weight: 600;
   font-size: 17px;
   background: transparent;
+}
+
+.ost-panel__dropped-dismiss {
+  margin-left: 6px;
+  padding: 0;
+  font: inherit;
+  color: var(--color-accent-300);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .ost-panel__body {
