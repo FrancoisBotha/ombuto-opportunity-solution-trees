@@ -8,6 +8,193 @@
 @import 'bootstrap-vue-next/dist/bootstrap-vue-next.css';
 
 /* ==============================================================
+Theme
+
+The palette (both themes) lives in ../css/theme.css, imported first from app/main.ts. Bootstrap's
+own surfaces are re-pointed at those tokens here rather than by forking Pulse: one map from the
+`--ost-*` roles onto the `--bs-*` ones. `html[data-theme]` (0,1,1) deliberately outweighs both
+`:root` and Bootstrap's own `[data-bs-theme=dark]` block (0,1,0), whichever order they land in.
+===============================================================*/
+html[data-theme] {
+  --bs-body-bg: var(--ost-bg);
+  --bs-body-color: var(--ost-text);
+  --bs-emphasis-color: var(--ost-text);
+  --bs-secondary-color: var(--ost-text-muted);
+  --bs-tertiary-color: var(--ost-text-subtle);
+  --bs-secondary-bg: var(--ost-surface-2);
+  --bs-tertiary-bg: var(--ost-surface-2);
+  --bs-border-color: var(--ost-border);
+  --bs-link-color: var(--ost-link);
+  --bs-link-hover-color: var(--ost-link-hover);
+  --bs-heading-color: var(--ost-text);
+  --bs-code-color: var(--ost-accent);
+  --bs-highlight-bg: var(--ost-status-good-bg);
+
+  --bs-primary: var(--ost-accent);
+  --bs-primary-rgb: var(--ost-accent-rgb);
+
+  /* Surfaces that appear on every page. */
+  --bs-card-bg: var(--ost-surface);
+  --bs-card-border-color: var(--ost-border);
+  --bs-card-color: var(--ost-text);
+  --bs-modal-bg: var(--ost-surface);
+  --bs-modal-color: var(--ost-text);
+  --bs-modal-border-color: var(--ost-border);
+  --bs-modal-header-border-color: var(--ost-border);
+  --bs-modal-footer-border-color: var(--ost-border);
+  --bs-dropdown-bg: var(--ost-surface-2);
+  --bs-dropdown-color: var(--ost-text);
+  --bs-dropdown-border-color: var(--ost-border);
+  --bs-dropdown-link-color: var(--ost-text);
+  --bs-dropdown-link-hover-bg: var(--ost-sidebar-hover-bg);
+  --bs-dropdown-link-hover-color: var(--ost-text);
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--ost-text);
+  --bs-table-border-color: var(--ost-border);
+  --bs-table-striped-bg: var(--ost-sidebar-hover-bg);
+  --bs-table-striped-color: var(--ost-text);
+  --bs-table-hover-bg: var(--ost-sidebar-hover-bg);
+  --bs-table-hover-color: var(--ost-text);
+  --bs-pagination-bg: var(--ost-surface);
+  --bs-pagination-color: var(--ost-link);
+  --bs-pagination-border-color: var(--ost-border);
+  --bs-pagination-hover-bg: var(--ost-surface-2);
+  --bs-pagination-hover-color: var(--ost-link-hover);
+  --bs-pagination-disabled-bg: var(--ost-surface);
+  --bs-pagination-disabled-color: var(--ost-text-subtle);
+  --bs-pagination-disabled-border-color: var(--ost-border);
+  --bs-pagination-active-bg: var(--ost-accent);
+  --bs-pagination-active-border-color: var(--ost-accent);
+  --bs-pagination-active-color: var(--ost-accent-contrast);
+  --bs-nav-tabs-border-color: var(--ost-border);
+  --bs-nav-link-color: var(--ost-link);
+  --bs-nav-link-hover-color: var(--ost-link-hover);
+  --bs-list-group-bg: var(--ost-surface);
+  --bs-list-group-color: var(--ost-text);
+  --bs-list-group-border-color: var(--ost-border);
+  --bs-popover-bg: var(--ost-surface-2);
+  --bs-popover-body-color: var(--ost-text);
+  --bs-popover-border-color: var(--ost-border);
+  --bs-tooltip-bg: var(--ost-tooltip-bg);
+  --bs-tooltip-color: var(--ost-tooltip-fg);
+
+  background-color: var(--ost-bg);
+  color: var(--ost-text);
+}
+
+/* Pulse hard-codes a near-black list group; the tokens own it in both themes. */
+.list-group-item {
+  background-color: var(--ost-surface);
+  color: var(--ost-text);
+  border-color: var(--ost-border);
+}
+
+/* Form controls: Bootstrap drives these off --bs-body-bg, which is the page ground, not a field. */
+.form-control,
+.form-select {
+  background-color: var(--ost-surface);
+  color: var(--ost-text);
+  border-color: var(--ost-border-strong);
+
+  &:focus {
+    background-color: var(--ost-surface);
+    color: var(--ost-text);
+    border-color: var(--ost-accent);
+    box-shadow: 0 0 0 0.2rem var(--ost-accent-soft);
+  }
+
+  &::placeholder {
+    color: var(--ost-text-subtle);
+  }
+
+  &:disabled {
+    background-color: var(--ost-surface-2);
+    color: var(--ost-text-muted);
+  }
+}
+
+.form-check-input {
+  background-color: var(--ost-surface);
+  border-color: var(--ost-border-strong);
+
+  &:checked {
+    background-color: var(--ost-accent);
+    border-color: var(--ost-accent);
+  }
+}
+
+.input-group-text {
+  background-color: var(--ost-surface-2);
+  color: var(--ost-text);
+  border-color: var(--ost-border-strong);
+}
+
+/* Buttons: Pulse's purple is close to the accent, but only the tokens follow the theme. */
+.btn-primary {
+  --bs-btn-bg: var(--ost-accent);
+  --bs-btn-border-color: var(--ost-accent);
+  --bs-btn-color: var(--ost-accent-contrast);
+  --bs-btn-hover-bg: var(--ost-accent-strong);
+  --bs-btn-hover-border-color: var(--ost-accent-strong);
+  --bs-btn-hover-color: var(--ost-accent-contrast);
+  --bs-btn-active-bg: var(--ost-accent-strong);
+  --bs-btn-active-border-color: var(--ost-accent-strong);
+  --bs-btn-active-color: var(--ost-accent-contrast);
+  --bs-btn-disabled-bg: var(--ost-accent);
+  --bs-btn-disabled-border-color: var(--ost-accent);
+  --bs-btn-disabled-color: var(--ost-accent-contrast);
+}
+
+.btn-secondary,
+.btn-light,
+.btn-outline-secondary {
+  --bs-btn-bg: transparent;
+  --bs-btn-color: var(--ost-text);
+  --bs-btn-border-color: var(--ost-border-strong);
+  --bs-btn-hover-bg: var(--ost-surface-2);
+  --bs-btn-hover-color: var(--ost-text);
+  --bs-btn-hover-border-color: var(--ost-border-strong);
+  --bs-btn-active-bg: var(--ost-surface-2);
+  --bs-btn-active-color: var(--ost-text);
+  --bs-btn-active-border-color: var(--ost-border-strong);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-color: var(--ost-text-subtle);
+  --bs-btn-disabled-border-color: var(--ost-border);
+}
+
+.btn-info {
+  --bs-btn-color: var(--ost-accent-contrast);
+  --bs-btn-hover-color: var(--ost-accent-contrast);
+  --bs-btn-active-color: var(--ost-accent-contrast);
+}
+
+/* Alerts: Bootstrap 5.3 tints these from the theme variables, which Pulse leaves light. */
+.alert {
+  --bs-alert-bg: var(--ost-surface-2);
+  --bs-alert-color: var(--ost-text);
+  --bs-alert-border-color: var(--ost-border);
+}
+
+.alert-success,
+.alert-info {
+  --bs-alert-bg: var(--ost-status-good-bg);
+  --bs-alert-color: var(--ost-status-good-fg);
+  --bs-alert-border-color: var(--ost-status-good-border);
+}
+
+.alert-warning,
+.alert-danger {
+  --bs-alert-bg: var(--ost-status-bad-bg);
+  --bs-alert-color: var(--ost-status-bad-fg);
+  --bs-alert-border-color: var(--ost-status-bad-border);
+}
+
+.badge.bg-secondary {
+  background-color: var(--ost-surface-2) !important;
+  color: var(--ost-text);
+}
+
+/* ==============================================================
 Bootstrap tweaks
 ===============================================================*/
 
@@ -19,13 +206,18 @@ h4 {
   font-weight: 300;
 }
 
+body {
+  background-color: var(--ost-bg);
+  color: var(--ost-text);
+}
+
 a:hover {
   /* make sure browsers use the pointer cursor for anchors, even with no href */
   cursor: pointer;
 }
 
 .dropdown-item:hover {
-  color: $dropdown-link-hover-color;
+  color: var(--ost-text);
 }
 
 /* ==========================================================================
@@ -33,8 +225,8 @@ Browser Upgrade Prompt
 ========================================================================== */
 .browserupgrade {
   margin: 0.2em 0;
-  background: #ccc;
-  color: #000;
+  background: var(--ost-surface-2);
+  color: var(--ost-text);
   padding: 0.2em 0;
 }
 
@@ -45,11 +237,13 @@ Generic styles
   padding: 1.5%;
   margin-top: 20px;
   border: none;
+  background-color: var(--ost-surface);
+  color: var(--ost-text);
 }
 
 .error {
-  color: white;
-  background-color: red;
+  color: var(--ost-status-bad-fg);
+  background-color: var(--ost-status-bad-bg);
 }
 
 .pad {
@@ -69,21 +263,17 @@ Generic styles
   word-break: break-all;
 }
 
-.form-control {
-  background-color: #fff;
-}
-
 .readonly {
-  background-color: #eee;
+  background-color: var(--ost-surface-2);
   opacity: 1;
 }
 
 .footer {
   margin-top: 1.5rem;
   padding-top: 0.75rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.125);
+  border-top: 1px solid var(--ost-border);
   font-size: 0.8rem;
-  color: #7f958c;
+  color: var(--ost-text-muted);
   text-align: center;
 
   p {
@@ -168,7 +358,7 @@ entity detail page css
       padding: 0.5em 0;
     }
     dd {
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid var(--ost-border);
       padding: 0.5em 0;
       margin-left: 0;
     }

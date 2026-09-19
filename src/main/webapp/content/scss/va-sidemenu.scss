@@ -15,8 +15,8 @@ $row-gutter: 0.4rem;
   left: 0;
   height: calc(100vh - #{$navbar-height});
   width: $sidebar-collapsed-width;
-  background-color: $sidebar-menu-bg-color;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background-color: var(--ost-sidebar-bg);
+  border-right: 1px solid var(--ost-sidebar-border);
   transition: $sidebar-transition;
   z-index: 1020;
   overflow-y: auto;
@@ -24,13 +24,13 @@ $row-gutter: 0.4rem;
   font-size: 0.875rem;
   letter-spacing: 0.01em;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: var(--ost-border-strong) transparent;
 
   &::-webkit-scrollbar {
     width: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--ost-border-strong);
     border-radius: 2px;
   }
 
@@ -38,14 +38,22 @@ $row-gutter: 0.4rem;
     width: $sidebar-expanded-width;
   }
 
-  .menu-toggle-button {
+  /* Hamburger + the NAVIGATION section label (label only when expanded). */
+  .menu-toggle-row {
+    display: flex;
+    align-items: center;
     height: $row-height;
     margin: $row-gutter $row-gutter 0.25rem;
+  }
+
+  .menu-toggle-button {
+    height: $row-height;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex: 0 0 auto;
     width: calc(#{$sidebar-collapsed-width} - #{$row-gutter * 2});
-    color: $sidebar-menu-muted-color;
+    color: var(--ost-sidebar-muted);
     border-radius: $row-radius;
     cursor: pointer;
     transition:
@@ -53,9 +61,25 @@ $row-gutter: 0.4rem;
       background-color 0.15s;
 
     &:hover {
-      color: #fff;
-      background-color: $sidebar-menu-hover-bg-color;
+      color: var(--ost-text);
+      background-color: var(--ost-sidebar-hover-bg);
     }
+  }
+
+  .menu-section-label {
+    display: none;
+    color: var(--ost-sidebar-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  &.active .menu-section-label {
+    display: block;
+    animation: va-fade-in 0.2s ease 0.05s both;
   }
 
   ul {
@@ -69,29 +93,26 @@ $row-gutter: 0.4rem;
     margin: 1px 0;
     border-radius: $row-radius;
     line-height: $row-height;
-    transition: background-color 0.15s;
+    transition:
+      background-color 0.15s,
+      box-shadow 0.15s;
 
     &:hover {
-      background-color: $sidebar-menu-hover-bg-color;
+      background-color: var(--ost-sidebar-hover-bg);
     }
 
+    /* The accent-tinted active row. An inset ring, not a border: no layout shift. */
     &.active {
-      background-color: $sidebar-menu-active-bg-color;
+      background-color: var(--ost-sidebar-active-bg);
+      box-shadow: inset 0 0 0 1px var(--ost-sidebar-active-border);
 
       .menu-item,
       .menu-item-parent {
-        color: #fff;
+        color: var(--ost-sidebar-active-fg);
       }
 
-      &::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0.55rem;
-        bottom: 0.55rem;
-        width: 3px;
-        border-radius: 0 2px 2px 0;
-        background-color: $sidebar-menu-accent-color;
+      .va-icon {
+        opacity: 1;
       }
     }
 
@@ -100,7 +121,7 @@ $row-gutter: 0.4rem;
       margin-top: 0.6rem;
 
       .menu-item-parent {
-        color: $sidebar-menu-muted-color;
+        color: var(--ost-sidebar-muted);
         font-size: 0.7rem;
         font-weight: 600;
         text-transform: uppercase;
@@ -108,14 +129,14 @@ $row-gutter: 0.4rem;
       }
 
       &:hover .menu-item-parent {
-        color: $sidebar-menu-fg-color;
+        color: var(--ost-sidebar-fg);
       }
     }
   }
 
   .menu-item,
   .menu-item-parent {
-    color: $sidebar-menu-fg-color;
+    color: var(--ost-sidebar-fg);
     display: flex;
     align-items: center;
     text-decoration: none;
@@ -125,7 +146,7 @@ $row-gutter: 0.4rem;
     transition: color 0.15s;
 
     &:hover {
-      color: #fff;
+      color: var(--ost-text);
     }
   }
 
@@ -134,7 +155,7 @@ $row-gutter: 0.4rem;
     width: calc(#{$sidebar-collapsed-width} - #{$row-gutter * 2});
     text-align: center;
     font-size: 0.95rem;
-    opacity: 0.9;
+    opacity: 0.75;
   }
 
   /* Group header icons stay normal size; the small label is what shrinks */
@@ -144,7 +165,7 @@ $row-gutter: 0.4rem;
 
   .menu-item-child .va-icon {
     font-size: 0.85rem;
-    opacity: 0.75;
+    opacity: 0.65;
   }
 
   /* Labels: hidden when collapsed, fade in when expanded */
@@ -180,9 +201,9 @@ $row-gutter: 0.4rem;
     left: calc(#{$sidebar-collapsed-width} - #{$row-gutter} + 0.5rem);
     top: 50%;
     transform: translateY(-50%) translateX(-4px);
-    color: #fff;
-    background-color: $sidebar-menu-tooltip-bg-color;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    color: var(--ost-tooltip-fg);
+    background-color: var(--ost-tooltip-bg);
+    box-shadow: var(--ost-shadow);
     border-radius: 0.4rem;
     padding: 0 0.7rem;
     font-size: 0.8rem;
@@ -202,7 +223,7 @@ $row-gutter: 0.4rem;
       top: 50%;
       transform: translateY(-50%);
       border: 4px solid transparent;
-      border-right-color: $sidebar-menu-tooltip-bg-color;
+      border-right-color: var(--ost-tooltip-bg);
       border-left: 0;
     }
   }
@@ -253,7 +274,8 @@ $row-gutter: 0.4rem;
 .va-container {
   position: relative;
   padding: 1.5rem;
-  background-color: $main-content-bg-color;
+  background-color: var(--ost-content-bg);
+  color: var(--ost-text);
   min-height: calc(100vh - #{$navbar-height});
   display: flex;
   flex-direction: column;

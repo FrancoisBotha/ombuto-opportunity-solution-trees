@@ -1,7 +1,10 @@
 <template>
   <nav :class="['sidebar', { active: expanded }]" data-cy="sidebar">
-    <div class="menu-toggle-button" @click="toggleSidebar" data-cy="sidebarToggle" :title="expanded ? 'Collapse menu' : 'Expand menu'">
-      <font-awesome-icon icon="bars" />
+    <div class="menu-toggle-row">
+      <div class="menu-toggle-button" @click="toggleSidebar" data-cy="sidebarToggle" :title="expanded ? 'Collapse menu' : 'Expand menu'">
+        <font-awesome-icon icon="bars" />
+      </div>
+      <span class="menu-section-label">Navigation</span>
     </div>
 
     <ul>
