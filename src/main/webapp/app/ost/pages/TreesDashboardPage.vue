@@ -82,15 +82,20 @@ const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas'
 </script>
 
 <style scoped>
+/*
+ * Responsive to the page's own width (container queries), not the viewport: with the app sidebar
+ * expanded a 390px phone leaves the page ~160px wide, collapsed ~330px.
+ */
 .ost-page {
   height: 100%;
   overflow: auto;
-  padding: 34px 40px 60px;
+  container: ost-dashboard / inline-size;
 }
 
 .ost-page__inner {
-  max-width: 1080px;
+  max-width: 1160px;
   margin: 0 auto;
+  padding: 34px 40px 60px;
 }
 
 .ost-page__head {
@@ -101,18 +106,24 @@ const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas'
   border-bottom: 1px solid var(--color-divider);
 }
 
+.ost-page__head > div:first-child {
+  min-width: 0;
+}
+
 .ost-page__kicker {
   font-family: var(--font-heading);
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-accent-300);
+  overflow-wrap: anywhere;
 }
 
 .ost-root .ost-page__title {
   margin-top: 6px;
   font-size: 38px;
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
 }
 
 .ost-page__actions {
@@ -138,6 +149,7 @@ const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas'
 }
 
 .ost-stats__tile {
+  min-width: 0;
   padding: 16px 18px;
   background: var(--color-bg);
 }
@@ -154,6 +166,7 @@ const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas'
   letter-spacing: 0.07em;
   text-transform: uppercase;
   opacity: 0.6;
+  overflow-wrap: anywhere;
 }
 
 .ost-root .ost-section-label {
@@ -168,16 +181,21 @@ const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas'
 
 .ost-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* min(): a page narrower than one 280px card gets one full-width card, not an overflowing one. */
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 22px;
+}
+
+.ost-cards > * {
+  min-width: 0;
 }
 
 .ost-root .ost-dashboard__empty {
   margin: 0;
 }
 
-@media (max-width: 720px) {
-  .ost-page {
+@container ost-dashboard (max-width: 720px) {
+  .ost-page__inner {
     padding: 24px 16px 48px;
   }
 
@@ -185,13 +203,8 @@ const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas'
     flex-wrap: wrap;
   }
 
-  .ost-page__head > div:first-child {
-    min-width: 0;
-  }
-
   .ost-root .ost-page__title {
     font-size: 30px;
-    overflow-wrap: anywhere;
   }
 
   .ost-page__actions {
@@ -200,6 +213,62 @@ const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas'
 
   .ost-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ost-cards {
+    gap: 16px;
+  }
+}
+
+/* Phone with the app sidebar open: one stat per row, smaller type, the action may wrap. */
+@container ost-dashboard (max-width: 360px) {
+  .ost-page__inner {
+    padding: 20px 12px 40px;
+  }
+
+  .ost-root .ost-page__title {
+    font-size: 24px;
+  }
+
+  .ost-root .ost-page__action {
+    height: auto;
+    min-height: 34px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .ost-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ost-stats__tile {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .ost-stats__value {
+    flex: none;
+    font-size: 24px;
+  }
+
+  .ost-stats__label {
+    min-width: 0;
+    margin-top: 0;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+}
+
+/* Too narrow for number and label side by side: the label gets the tile's full width. */
+@container ost-dashboard (max-width: 220px) {
+  .ost-stats__tile {
+    display: block;
+  }
+
+  .ost-stats__label {
+    margin-top: 4px;
   }
 }
 </style>

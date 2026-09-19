@@ -56,6 +56,8 @@ const updated = computed(() => lastEditedLabel(props.card.lastActivity, props.ca
 
 <style scoped>
 .ost-product-card {
+  container: ost-card / inline-size;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -70,12 +72,14 @@ const updated = computed(() => lastEditedLabel(props.card.lastActivity, props.ca
 
 .ost-product-card__kicker {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-accent);
+  overflow-wrap: anywhere;
 }
 
 .ost-root .ost-product-card__name {
@@ -130,12 +134,14 @@ const updated = computed(() => lastEditedLabel(props.card.lastActivity, props.ca
   letter-spacing: 0.07em;
   text-transform: uppercase;
   opacity: 0.55;
+  overflow-wrap: anywhere;
 }
 
 .ost-product-card__meta {
   margin-top: 6px;
   font-size: 11px;
   color: color-mix(in srgb, var(--color-text) 50%, transparent);
+  overflow-wrap: anywhere;
 }
 
 .ost-root .ost-product-card__open {
@@ -144,5 +150,23 @@ const updated = computed(() => lastEditedLabel(props.card.lastActivity, props.ca
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* A card on a phone with the app sidebar open (~130px): tighter padding, counts two by two. */
+@container ost-dashboard (max-width: 360px) {
+  .ost-product-card {
+    padding: 12px;
+  }
+
+  .ost-root .ost-product-card__name {
+    font-size: 18px;
+  }
+}
+
+@container ost-card (max-width: 240px) {
+  .ost-product-card__counts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

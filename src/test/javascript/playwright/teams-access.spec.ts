@@ -2,6 +2,7 @@ import { type APIResponse, expect, test } from '@playwright/test';
 
 import { BASE_URL } from '../../../../playwright.config';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
@@ -14,7 +15,8 @@ import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERN
  * a role changes what the page offers, in the UI.
  *
  * The scenarios build on each other, so the file runs serially and stops at the
- * first failure.
+ * first failure. Every team it creates (and their products) is deleted after the
+ * run (support/cleanup.ts).
  */
 
 const DENIED = [403, 404]; // NFR-002: "not a member" and "does not exist" look the same.
@@ -69,6 +71,7 @@ test.describe('Epic 1 — team-scoped access control', () => {
     expect(created.status()).toBe(201);
     const body = await created.json();
     teamId = body.id;
+    registerTeamForCleanup(teamId);
     expect(body.role).toBe('OWNER');
     expect(body.memberCount).toBe(1);
 
@@ -88,6 +91,7 @@ test.describe('Epic 1 — team-scoped access control', () => {
       createdDate: '2001-01-01T00:00:00Z',
     });
     expect(forged.status()).toBe(201);
+    registerTeamForCleanup((await forged.json()).id);
     const createdDate = new Date((await forged.json()).createdDate).getTime();
     expect(Math.abs(Date.now() - createdDate)).toBeLessThan(5 * 60_000);
   });
@@ -227,6 +231,7 @@ test.describe('Epic 1 — team-scoped access control', () => {
     });
     expect(created.status()).toBe(201);
     const userTeamId = (await created.json()).id;
+    registerTeamForCleanup(userTeamId);
 
     expectDenied(await owner.api('get', `/api/team-management/teams/${userTeamId}`), 'admin reads a team they are not in');
     expectDenied(await owner.api('get', `/api/teams/${userTeamId}/products`), "admin lists that team's products");
