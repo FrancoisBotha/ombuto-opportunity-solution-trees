@@ -1,0 +1,1680 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="_ds/nocturne-e0aa7088-0ce0-492f-b31a-f41cca4b85b6/styles.css">
+<script src="_ds/nocturne-e0aa7088-0ce0-492f-b31a-f41cca4b85b6/_ds_bundle.js"></script>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font-body);background:var(--color-bg);color:var(--color-text)}
+  a{color:var(--color-accent-700);text-decoration:none}
+  a:hover{color:var(--color-accent)}
+  ::selection{background:var(--color-accent-200)}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--color-neutral-300)}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
+
+  <sc-if value="{{ confirmOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ cancelDelete }}" style="position:fixed;inset:0;z-index:160;display:flex;align-items:center;justify-content:center;padding:24px;background:color-mix(in srgb, #05060c 62%, transparent)">
+      <div onClick="{{ stopClick }}" style="width:340px;max-width:100%;padding:18px;display:flex;flex-direction:column;gap:12px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg)">
+        <div style="font-size:16px;font-weight:500">Delete this {{ confirmKind }}?</div>
+        <div style="font-size:13px;line-height:1.45;color:var(--color-neutral-300);text-wrap:pretty">“{{ confirmTitle }}”{{ confirmExtra }} will be removed from the tree. This can’t be undone.</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+          <button onClick="{{ cancelDelete }}" class="btn btn-secondary" style="height:32px;font-size:12.5px">Cancel</button>
+          <button onClick="{{ confirmDelete }}" style="height:32px;padding:0 14px;font:inherit;font-size:12.5px;cursor:pointer;border-radius:var(--radius-md);background:var(--color-neutral-900);border:1px solid var(--color-neutral-600);color:var(--color-neutral-100)" style-hover="{background:'var(--color-accent-800)',borderColor:'var(--color-accent-600)'}">Delete</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ chatOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeChat }}" style="position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;padding:24px;background:color-mix(in srgb, #05060c 62%, transparent)">
+      <div onClick="{{ stopClick }}" style="width:392px;max-width:100%;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg)">
+        <div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--color-neutral-800)">
+          <div style="display:flex">
+            <sc-for list="{{ chatPeople }}" as="p" hint-placeholder-count="2">
+              <span style="width:26px;height:26px;margin-left:-1px;border:1px solid var(--color-neutral-800);border-radius:50%;background:var(--color-neutral-900);display:grid;place-items:center;font-size:10px">{{ p.initials }}</span>
+            </sc-for>
+          </div>
+          <div style="min-width:0;flex:1">
+            <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ chatTitle }}</div>
+            <div style="font-size:10.5px;color:var(--color-neutral-400)">{{ chatSub }}</div>
+          </div>
+          <button onClick="{{ closeChat }}" class="btn btn-ghost" style="width:28px;height:28px;padding:0">✕</button>
+        </div>
+
+        <div style="position:relative;flex:1 1 auto;min-height:0;overflow:hidden;display:flex">
+          <div ref="{{ chatRef }}" onScroll="{{ onChatScroll }}" style="flex:1;min-height:0;max-height:100%;overflow-y:auto;padding:14px 14px 18px;display:flex;flex-direction:column;gap:3px">
+            <sc-for list="{{ chatMsgs }}" as="m" hint-placeholder-count="3">
+              <div style="{{ m.wrapStyle }}">
+                <sc-if value="{{ m.showStamp }}" hint-placeholder-val="{{ true }}">
+                  <div style="align-self:center;font-size:10px;color:var(--color-neutral-500);padding:10px 0 6px">{{ m.stamp }}</div>
+                </sc-if>
+                <sc-if value="{{ m.showWho }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:10px;color:var(--color-neutral-500);padding:0 10px 3px">{{ m.who }}</div>
+                </sc-if>
+                <div style="{{ m.bubbleStyle }}">{{ m.text }}</div>
+                <sc-if value="{{ m.mine }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:10px;padding:3px 6px 0">
+                    <button onClick="{{ m.onEdit }}" style="font:inherit;font-size:10.5px;background:none;border:0;padding:0;cursor:pointer;color:var(--color-neutral-400)" style-hover="{color:'var(--color-accent-300)'}">Edit</button>
+                    <button onClick="{{ m.onDelete }}" style="font:inherit;font-size:10.5px;background:none;border:0;padding:0;cursor:pointer;color:var(--color-neutral-400)" style-hover="{color:'var(--color-accent-300)'}">Delete</button>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ showScrollBtn }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ scrollChat }}" title="Jump to latest" style="position:absolute;right:12px;bottom:10px;width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:var(--color-neutral-900);border:1px solid var(--color-neutral-700);color:var(--color-accent-300);cursor:pointer;box-shadow:var(--shadow-md)" style-hover="{borderColor:'var(--color-accent-600)'}">
+              <svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M213.7 101.7 133.7 181.7a8 8 0 0 1-11.4 0l-80-80A8 8 0 0 1 53.7 90.3L128 164.7l74.3-74.4a8 8 0 0 1 11.4 11.4Z"></path></svg>
+            </button>
+          </sc-if>
+        </div>
+
+        <div style="padding:10px 12px 12px;border-top:1px solid var(--color-neutral-800);display:flex;flex-direction:column;gap:7px">
+          <sc-if value="{{ chatEditing }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--color-neutral-400)">
+              <span style="padding:2px 8px;border-radius:999px;background:var(--color-accent-900);color:var(--color-accent-200)">Editing message</span>
+              <button onClick="{{ cancelEdit }}" style="font:inherit;font-size:11px;background:none;border:0;padding:0;cursor:pointer;color:var(--color-neutral-400)" style-hover="{color:'var(--color-accent-300)'}">Cancel</button>
+            </div>
+          </sc-if>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="input" placeholder="Message the trio" value="{{ chatDraft }}" onInput="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" style="flex:1;font-size:13px;border-radius:999px;padding:8px 14px;background:var(--color-bg)">
+            <button onClick="{{ sendChat }}" title="Send" style="{{ sendStyle }}">
+              <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M208.5 127.2 71.3 204.2a8 8 0 0 1-11.6-9.2l19.6-63a4 4 0 0 1 3.2-2.8l80-12.1a2 2 0 0 0 0-3.9l-80-12.1a4 4 0 0 1-3.2-2.8L59.7 35.4A8 8 0 0 1 71.3 26l137.2 84a8 8 0 0 1 0 17.2Z"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+
+  <div style="display:flex;align-items:center;gap:22px;padding:0 18px;height:54px;flex:none;border-bottom:1px solid var(--color-divider)">
+    <div style="font-family:var(--font-heading);font-weight:600;font-size:18px;letter-spacing:.08em;text-transform:uppercase">Ombuto<span style="color:var(--color-accent)"> / </span>OST</div>
+    <div style="display:flex;gap:4px">
+      <button onClick="{{ goTrees }}" style="position:relative;font:inherit;font-size:13px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading);background:none;border:0;padding:6px 10px;cursor:pointer;color:inherit;white-space:nowrap" style-hover="{background:'color-mix(in srgb, var(--color-text) 7%, transparent)'}">Trees<sc-if value="{{ isTrees }}" hint-placeholder-val="{{ true }}"><i style="position:absolute;left:8px;right:8px;bottom:-1px;height:2px;background:var(--color-accent)"></i></sc-if></button>
+      <button onClick="{{ goCanvas }}" style="position:relative;font:inherit;font-size:13px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading);background:none;border:0;padding:6px 10px;cursor:pointer;color:inherit;white-space:nowrap" style-hover="{background:'color-mix(in srgb, var(--color-text) 7%, transparent)'}">Tree canvas<sc-if value="{{ isCanvas }}" hint-placeholder-val="{{ false }}"><i style="position:absolute;left:8px;right:8px;bottom:-1px;height:2px;background:var(--color-accent)"></i></sc-if></button>
+      <button onClick="{{ goExp }}" style="position:relative;font:inherit;font-size:13px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading);background:none;border:0;padding:6px 10px;cursor:pointer;color:inherit;white-space:nowrap" style-hover="{background:'color-mix(in srgb, var(--color-text) 7%, transparent)'}">Experiments<sc-if value="{{ isExp }}" hint-placeholder-val="{{ false }}"><i style="position:absolute;left:8px;right:8px;bottom:-1px;height:2px;background:var(--color-accent)"></i></sc-if></button>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+      <div style="position:relative">
+        <button onClick="{{ toggleTeams }}" style="{{ teamBtnStyle }}">
+          <span style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">{{ teamLabel }}</span>
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" style="opacity:.7"><path d="M213.7 101.7 133.7 181.7a8 8 0 0 1-11.4 0l-80-80A8 8 0 0 1 53.7 90.3L128 164.7l74.3-74.4a8 8 0 0 1 11.4 11.4Z"></path></svg>
+        </button>
+        <sc-if value="{{ teamsOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;right:0;top:calc(100% + 6px);min-width:196px;z-index:80;padding:5px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ teams }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.onClick }}" style="{{ t.style }}">
+                <span style="display:flex;flex-direction:column;gap:1px;text-align:left">
+                  <span style="font-size:13px;font-weight:500">{{ t.name }}</span>
+                  <span style="font-size:10.5px;color:var(--color-neutral-400)">{{ t.meta }}</span>
+                </span>
+                <sc-if value="{{ t.current }}" hint-placeholder-val="{{ false }}">
+                  <svg width="13" height="13" viewBox="0 0 256 256" fill="var(--color-accent-300)" style="margin-left:auto;flex:none"><path d="M229.7 78.6 105.7 202.6a8 8 0 0 1-11.4 0l-56-56a8 8 0 0 1 11.4-11.3L100 185.7 218.3 67.3a8 8 0 0 1 11.4 11.3Z"></path></svg>
+                </sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+      <div style="display:flex">
+        <sc-for list="{{ members }}" as="m" hint-placeholder-count="3">
+          <span style="width:26px;height:26px;border:1px solid var(--color-neutral-800);border-radius:var(--radius-sm);display:grid;place-items:center;font-size:10px;letter-spacing:.06em;margin-left:-1px;background:var(--color-surface)">{{ m.initials }}</span>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ isCanvas }}" hint-placeholder-val="{{ true }}">
+  <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+
+    <div style="display:flex;align-items:center;gap:14px;padding:9px 16px;flex:none;border-bottom:1px solid var(--color-divider);flex-wrap:wrap">
+      <div style="position:relative">
+        <button onClick="{{ toggleProducts }}" style="{{ productBtnStyle }}">
+          <span style="font-size:13px;font-weight:500;white-space:nowrap">{{ productLabel }}</span>
+          <span style="font-size:11px;color:var(--color-neutral-400);white-space:nowrap">{{ productMeta }}</span>
+          <svg width="12" height="12" viewBox="0 0 256 256" fill="currentColor" style="opacity:.7;margin-left:2px"><path d="M213.7 101.7 133.7 181.7a8 8 0 0 1-11.4 0l-80-80A8 8 0 0 1 53.7 90.3L128 164.7l74.3-74.4a8 8 0 0 1 11.4 11.4Z"></path></svg>
+        </button>
+        <sc-if value="{{ productsOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:0;top:calc(100% + 6px);min-width:232px;z-index:70;padding:5px;background:var(--color-surface);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);box-shadow:var(--shadow-md);display:flex;flex-direction:column;gap:2px">
+            <button onClick="{{ allProducts.onClick }}" style="{{ allProducts.style }}">
+              <span style="{{ allProducts.boxStyle }}">
+                <sc-if value="{{ allProducts.on }}" hint-placeholder-val="{{ false }}">
+                  <svg width="11" height="11" viewBox="0 0 256 256" fill="var(--color-bg)"><path d="M229.7 78.6 105.7 202.6a8 8 0 0 1-11.4 0l-56-56a8 8 0 0 1 11.4-11.3L100 185.7 218.3 67.3a8 8 0 0 1 11.4 11.3Z"></path></svg>
+                </sc-if>
+              </span>
+              <span style="font-size:13px;font-weight:500">All products</span>
+              <span style="margin-left:auto;font-size:11px;color:var(--color-neutral-400)">{{ allProducts.meta }}</span>
+            </button>
+            <i style="height:1px;background:var(--color-neutral-800);margin:3px 8px"></i>
+            <sc-for list="{{ productOpts }}" as="p" hint-placeholder-count="2">
+              <button onClick="{{ p.onClick }}" style="{{ p.style }}">
+                <span style="{{ p.dotStyle }}"></span>
+                <span style="display:flex;flex-direction:column;gap:1px;text-align:left">
+                  <span style="font-size:13px;font-weight:500">{{ p.label }}</span>
+                  <span style="font-size:10.5px;color:var(--color-neutral-400)">{{ p.meta }}</span>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+      <div style="position:relative;display:flex;align-items:center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="position:absolute;left:9px;opacity:.55"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.2-3.2"></path></svg>
+        <input class="input" placeholder="Search nodes" value="{{ query }}" onInput="{{ onQuery }}" style="width:208px;padding-left:28px;font-size:13px;min-height:32px;background:transparent">
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <sc-for list="{{ typeChips }}" as="c" hint-placeholder-count="6">
+          <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}<span style="opacity:.55;margin-left:6px">{{ c.count }}</span></button>
+        </sc-for>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <button class="btn btn-secondary" onClick="{{ zoomOut }}" style="width:30px;height:30px;padding:0;font-size:15px">−</button>
+        <div style="font-size:12px;width:44px;text-align:center;letter-spacing:.04em">{{ zoomLabel }}</div>
+        <button class="btn btn-secondary" onClick="{{ zoomIn }}" style="width:30px;height:30px;padding:0;font-size:15px">+</button>
+        <button class="btn btn-secondary" onClick="{{ fit }}" style="height:30px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-family:var(--font-heading)">Fit</button>
+      </div>
+    </div>
+
+    <div style="flex:1;display:flex;min-height:0">
+      <sc-if value="{{ leftClosed }}" hint-placeholder-val="{{ false }}">
+        <div style="width:34px;flex:none;border-right:1px solid var(--color-divider);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:10px">
+          <button onClick="{{ toggleLeft }}" title="Show node palette" style="width:24px;height:24px;display:grid;place-items:center;border-radius:var(--radius-sm);background:transparent;border:1px solid var(--color-neutral-800);color:var(--color-accent-300);cursor:pointer" style-hover="{borderColor:'var(--color-accent-600)'}">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="m181.7 133.7-80 80a8 8 0 0 1-11.4-11.4L164.7 128 90.3 53.7a8 8 0 0 1 11.4-11.4l80 80a8 8 0 0 1 0 11.4Z"></path></svg>
+          </button>
+          <span style="writing-mode:vertical-rl;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-neutral-500)">Palette</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ leftOpen }}" hint-placeholder-val="{{ true }}">
+      <div style="width:182px;flex:none;border-right:1px solid var(--color-divider);padding:12px 10px 10px;display:flex;flex-direction:column;gap:5px;overflow:auto">
+        <div style="display:flex;align-items:center;gap:6px;padding:0 2px 3px">
+          <span style="font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-400)">Place a node</span>
+          <button onClick="{{ toggleLeft }}" title="Hide palette" style="margin-left:auto;width:20px;height:20px;display:grid;place-items:center;border-radius:var(--radius-sm);background:none;border:0;color:var(--color-neutral-500);cursor:pointer" style-hover="{color:'var(--color-accent-300)'}">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M165.7 202.3a8 8 0 0 1-11.4 11.4l-80-80a8 8 0 0 1 0-11.4l80-80a8 8 0 0 1 11.4 11.3L91.3 128Z"></path></svg>
+          </button>
+        </div>
+        <sc-for list="{{ tools }}" as="t" hint-placeholder-count="6">
+          <button onClick="{{ t.onClick }}" onPointerDown="{{ t.onPointerDown }}" style="{{ t.style }}">
+            <span style="{{ t.swatch }}"></span>
+            <span style="display:flex;flex-direction:column;gap:1px;min-width:0;text-align:left">
+              <span style="font-size:13px;font-weight:500">{{ t.label }}</span>
+              <span style="font-size:10.5px;color:var(--color-neutral-400);line-height:1.25">{{ t.hint }}</span>
+            </span>
+          </button>
+        </sc-for>
+        <div style="margin-top:auto;font-size:10.5px;color:var(--color-neutral-400);line-height:1.4;padding:10px 2px 0">{{ toolHint }}</div>
+        <sc-if value="{{ ghosting }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ ghostStyle }}">{{ ghostLabel }}<span style="color:var(--color-neutral-400);margin-left:7px">{{ ghostNote }}</span></div>
+        </sc-if>
+      </div>
+      </sc-if>
+      <div ref="{{ canvasRef }}" onPointerDown="{{ onBgDown }}" style="position:relative;flex:1;min-width:0;overflow:hidden;cursor:grab;background-image:radial-gradient(circle, color-mix(in srgb, var(--color-text) 9%, transparent) 1px, transparent 1px);background-size:28px 28px">
+        <div style="{{ worldStyle }}">
+          <svg width="4000" height="2600" style="position:absolute;left:-1500px;top:-600px;overflow:visible;pointer-events:none">
+            <g transform="translate(1500,600)">
+              <sc-for list="{{ edges }}" as="e" hint-placeholder-count="0">
+                <path d="{{ e.d }}" fill="none" stroke="{{ e.stroke }}" stroke-width="{{ e.width }}" stroke-dasharray="{{ e.dash }}"></path>
+              </sc-for>
+            </g>
+          </svg>
+          <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="7">
+            <div style="{{ n.box }}" onPointerDown="{{ n.onDown }}" onDoubleClick="{{ n.onRename }}">
+              
+              <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-heading);font-size:9px;letter-spacing:.08em;text-transform:uppercase;opacity:.7">{{ n.kicker }}</div>
+              <sc-if value="{{ n.editing }}" hint-placeholder-val="{{ false }}">
+                <input class="input" value="{{ n.draft }}" onInput="{{ n.onInput }}" onBlur="{{ n.onCommit }}" onKeyDown="{{ n.onKey }}" ref="{{ n.inputRef }}" style="margin-top:6px;font-size:13px;min-height:30px;background:var(--color-bg)">
+              </sc-if>
+              <sc-if value="{{ n.showTitle }}" hint-placeholder-val="{{ true }}">
+                <div style="margin-top:6px;font-family:var(--font-heading);font-weight:600;font-size:15px;line-height:1.18;text-wrap:pretty;overflow:hidden">{{ n.title }}</div>
+              </sc-if>
+              <div style="margin-top:auto;display:flex;align-items:center;gap:5px;padding-top:6px">
+                <sc-if value="{{ n.hasStatus }}" hint-placeholder-val="{{ true }}">
+                  <span style="{{ n.statusStyle }}">{{ n.status }}</span>
+                </sc-if>
+                <sc-if value="{{ n.hasConf }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:10px;letter-spacing:.08em;opacity:.7">{{ n.confLabel }}</span>
+                </sc-if>
+                <sc-if value="{{ n.showValue }}" hint-placeholder-val="{{ true }}">
+                  <span title="Opportunity value" style="font-size:11px;letter-spacing:-.04em;color:var(--color-accent-300)">{{ n.valueFilled }}<span style="color:var(--color-neutral-700)">{{ n.valueRest }}</span></span>
+                </sc-if>
+
+                <button onClick="{{ n.onChat }}" title="Open thread" style="{{ n.chatStyle }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>{{ n.commentCount }}</button>
+              </div>
+              <sc-if value="{{ n.showPri }}" hint-placeholder-val="{{ true }}">
+                <div title="Priority" style="position:absolute;right:6px;top:24px;bottom:9px;display:flex;flex-direction:column;justify-content:center;gap:4px;align-items:center">
+                  <sc-for list="{{ n.pri }}" as="d" hint-placeholder-count="5">
+                    <i style="{{ d.style }}"></i>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ n.addMenuOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;right:-2px;top:20px;z-index:90;min-width:126px;padding:4px;display:flex;flex-direction:column;gap:1px;background:var(--color-surface);border:1px solid var(--color-neutral-700);border-radius:var(--radius-md);box-shadow:var(--shadow-md)">
+                  <div style="font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500);padding:3px 6px 4px">Add child</div>
+                  <sc-for list="{{ n.addOptions }}" as="o" hint-placeholder-count="2">
+                    <button onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:7px;width:100%;padding:6px 7px;font:inherit;font-size:12.5px;text-align:left;color:var(--color-text);background:transparent;border:0;border-radius:var(--radius-sm);cursor:pointer" style-hover="{background:'var(--color-accent-900)'}">
+                      <span style="{{ o.swatch }}"></span>{{ o.label }}
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ n.canAdd }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ n.onAdd }}" title="Add child" style="position:absolute;right:-1px;top:-1px;width:19px;height:19px;display:grid;place-items:center;font:inherit;font-size:13px;line-height:1;border-radius:var(--radius-sm);background:var(--color-surface);border:1px solid var(--color-neutral-700);color:var(--color-accent-300);cursor:pointer" style-hover="{background:'var(--color-accent-800)',color:'var(--color-accent-200)',borderColor:'var(--color-accent-600)'}">+</button>
+              </sc-if>
+              <sc-if value="{{ n.hasKids }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ n.onToggle }}" style="{{ n.toggleStyle }}">{{ n.kidLabel }}</button>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="position:absolute;left:14px;bottom:12px;right:224px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:7px 11px;background:color-mix(in srgb, var(--color-bg) 86%, transparent);border-radius:var(--radius-md);border:1px solid var(--color-divider);font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-family:var(--font-heading)">
+          <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:14px;height:10px;border-radius:3px;background:var(--color-accent-900);border:1px solid var(--color-accent-600)"></i>Outcome</span>
+          <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:14px;height:10px;border-radius:3px;border:1px solid var(--color-accent-500);background:var(--color-surface)"></i>Opportunity</span>
+          <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:14px;height:10px;border-radius:3px;border:1px solid var(--color-neutral-700);background:var(--color-neutral-900)"></i>Solution</span>
+          <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:14px;height:10px;border-radius:3px;border:1px dashed var(--color-accent-500)"></i>Assumption</span>
+        </div>
+        <sc-if value="{{ showReopen }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ toggleRight }}" title="Show details" style="position:absolute;right:0;top:14px;display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:var(--radius-md) 0 0 var(--radius-md);background:var(--color-surface);border:1px solid var(--color-neutral-800);border-right:0;color:var(--color-accent-300);font:inherit;font-size:11.5px;cursor:pointer;box-shadow:var(--shadow-sm)" style-hover="{borderColor:'var(--color-accent-600)'}">
+            <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M165.7 202.3a8 8 0 0 1-11.4 11.4l-80-80a8 8 0 0 1 0-11.4l80-80a8 8 0 0 1 11.4 11.3L91.3 128Z"></path></svg>
+            Details
+          </button>
+        </sc-if>
+        <div onPointerDown="{{ onMiniDown }}" style="position:absolute;right:12px;bottom:12px;width:198px;height:134px;background:color-mix(in srgb, var(--color-bg) 88%, transparent);border:1px solid var(--color-neutral-800);border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow-sm);cursor:crosshair">
+          <div style="position:absolute;left:8px;top:6px;font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500)">Overview</div>
+          <sc-for list="{{ mini }}" as="m" hint-placeholder-count="0">
+            <i style="{{ m.style }}"></i>
+          </sc-for>
+          <i style="{{ miniView }}"></i>
+        </div>
+      </div>
+
+      <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ true }}">
+      <div style="width:346px;flex:none;border-left:1px solid var(--color-divider);display:flex;flex-direction:column;min-height:0;background:var(--color-bg)">
+        <div style="padding:14px 16px 12px;border-bottom:1px solid var(--color-divider)">
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <div style="flex:1;min-width:0">
+              <div style="font-family:var(--font-heading);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-300)">{{ selKicker }}</div>
+              <div style="font-size:11px;opacity:.6;margin-top:3px;text-wrap:pretty">{{ selBreadcrumb }}</div>
+            </div>
+            <button onClick="{{ toggleRight }}" title="Hide panel" class="btn btn-ghost" style="width:26px;height:26px;padding:0">✕</button>
+          </div>
+          <input class="input" value="{{ selTitle }}" onInput="{{ onSelTitle }}" style="margin-top:10px;font-family:var(--font-heading);font-weight:600;font-size:17px;min-height:38px;background:transparent">
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:2px 1px;padding:6px 8px 0;border-bottom:1px solid var(--color-divider)">
+          <sc-for list="{{ panelTabs }}" as="t" hint-placeholder-count="4">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}<sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="{{ t.badgeStyle }}">{{ t.badge }}</span></sc-if></button>
+          </sc-for>
+        </div>
+
+        <div style="flex:1;overflow:auto;padding:14px 16px 20px;display:flex;flex-direction:column;gap:16px">
+          <sc-if value="{{ isTabDetail }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:16px">
+          <sc-if value="{{ selHasStatus }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="font-family:var(--font-heading);font-size:10px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:6px">Status</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">
+              <sc-for list="{{ statusOpts }}" as="s" hint-placeholder-count="4">
+                <button onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ selHasConf }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--font-heading);font-size:10px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:6px"><span>Confidence in this assumption</span><span>{{ selConfLabel }}</span></div>
+            <div style="display:flex;gap:3px">
+              <sc-for list="{{ confOpts }}" as="c" hint-placeholder-count="5">
+                <button onClick="{{ c.onClick }}" title="{{ c.label }}" style="{{ c.style }}"></button>
+              </sc-for>
+            </div>
+            <div style="font-size:10.5px;color:var(--color-neutral-400);margin-top:6px;line-height:1.35">How strong is the evidence that this assumption holds? Move it as test results come back.</div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ selHasRollup }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--font-heading);font-size:10px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:7px"><span>Evidence strength</span><span>{{ rollupPct }}</span></div>
+            <div style="position:relative;height:6px;border-radius:999px;background:var(--color-neutral-900);overflow:hidden">
+              <i style="{{ rollupBarStyle }}"></i>
+            </div>
+            <div style="font-size:10.5px;color:var(--color-neutral-400);margin-top:7px;line-height:1.4">{{ rollupNote }}</div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ selHasPri }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--font-heading);font-size:10px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:7px"><span>Opportunity value</span><span>{{ selValueLabel }}</span></div>
+            <div style="display:flex;gap:4px">
+              <sc-for list="{{ valueOpts }}" as="v" hint-placeholder-count="5">
+                <button onClick="{{ v.onClick }}" style="{{ v.style }}">{{ v.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ selHasPri }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--font-heading);font-size:10px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:8px"><span>Priority</span><span>{{ selPriLabel }}</span></div>
+            <div onPointerDown="{{ onPriDown }}" style="position:relative;height:26px;cursor:ew-resize;touch-action:none">
+              <i style="position:absolute;left:0;right:0;top:50%;height:4px;transform:translateY(-50%);border-radius:999px;background:var(--color-neutral-900);pointer-events:none"></i>
+              <i style="{{ priFillStyle }}"></i>
+              <i style="{{ priHandleStyle }}"></i>
+            </div>
+          </div>
+          </sc-if>
+
+          <div>
+            <div style="font-family:var(--font-heading);font-size:10px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:6px">Notes</div>
+            <textarea class="input" value="{{ selNote }}" onInput="{{ onSelNote }}" placeholder="What did we learn?" style="font-size:13px;min-height:78px;background:transparent"></textarea>
+          </div>
+
+          <div>
+            <div style="font-family:var(--font-heading);font-size:10px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:7px">Children ({{ selChildCount }})</div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <sc-for list="{{ selChildren }}" as="c" hint-placeholder-count="2">
+                <button onClick="{{ c.onClick }}" style="display:flex;gap:8px;align-items:baseline;text-align:left;font:inherit;font-size:13px;padding:7px 9px;background:transparent;border:1px solid var(--color-divider);cursor:pointer;color:inherit" style-hover="{background:'var(--color-accent-900)',borderColor:'var(--color-accent-600)'}">
+                  <span style="font-family:var(--font-heading);font-size:9px;letter-spacing:.07em;text-transform:uppercase;opacity:.6;flex:none;width:44px">{{ c.kicker }}</span>
+                  <span style="text-wrap:pretty">{{ c.title }}</span>
+                </button>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
+              <sc-for list="{{ addOpts }}" as="a" hint-placeholder-count="2">
+                <button onClick="{{ a.onClick }}" class="btn btn-secondary" style="height:28px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading)">+ {{ a.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isTabQuestions }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:10.5px;color:var(--color-neutral-400);line-height:1.4">What do we still need to learn about this opportunity? Delivery work belongs in Jira, under Links.</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <sc-for list="{{ selQuestions }}" as="q" hint-placeholder-count="2">
+                <div style="display:flex;align-items:flex-start;gap:9px">
+                  <button onClick="{{ q.onToggle }}" style="{{ q.boxStyle }}">✓</button>
+                  <div style="{{ q.textStyle }}">{{ q.text }}</div>
+                  <button onClick="{{ q.onRemove }}" title="Remove" style="margin-left:auto;flex:none;width:20px;height:20px;display:grid;place-items:center;font:inherit;font-size:11px;background:none;border:0;cursor:pointer;color:var(--color-neutral-600)" style-hover="{color:'var(--color-accent-300)'}">✕</button>
+                </div>
+              </sc-for>
+            </div>
+            <input class="input" placeholder="Add an open question, then Enter" value="{{ qDraft }}" onInput="{{ onQInput }}" onKeyDown="{{ onQKey }}" style="font-size:13px;background:transparent">
+            <div style="font-size:10.5px;color:var(--color-neutral-500)">{{ qSummary }}</div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isTabLinks }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ selLinks }}" as="l" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:5px;padding:9px 10px;border:1px solid var(--color-neutral-800);border-radius:var(--radius-md)">
+                <div style="display:flex;align-items:center;gap:7px">
+                  <span style="{{ l.dotStyle }}"></span>
+                  <input class="input" value="{{ l.name }}" onInput="{{ l.onName }}" style="flex:1;min-height:26px;padding:2px 6px;font-size:12.5px;font-weight:500;background:transparent;border-color:transparent">
+                  <a href="{{ l.url }}" target="_blank" rel="noreferrer" title="Open" style="display:grid;place-items:center;width:24px;height:24px;border-radius:var(--radius-sm);color:var(--color-accent-300)">
+                    <svg width="13" height="13" viewBox="0 0 256 256" fill="currentColor"><path d="M216 104a8 8 0 0 1-16 0V59.3l-74.3 74.4a8 8 0 0 1-11.4-11.4L188.7 48H144a8 8 0 0 1 0-16h64a8 8 0 0 1 8 8ZM184 136a8 8 0 0 0-8 8v56H56V80h56a8 8 0 0 0 0-16H56a16 16 0 0 0-16 16v120a16 16 0 0 0 16 16h120a16 16 0 0 0 16-16v-56a8 8 0 0 0-8-8Z"></path></svg>
+                  </a>
+                  <button onClick="{{ l.onRemove }}" title="Remove" style="width:24px;height:24px;display:grid;place-items:center;font:inherit;font-size:12px;background:none;border:0;cursor:pointer;color:var(--color-neutral-500)" style-hover="{color:'var(--color-accent-300)'}">✕</button>
+                </div>
+                <input class="input" value="{{ l.url }}" onInput="{{ l.onUrl }}" placeholder="https://" style="min-height:28px;font-size:12px;color:var(--color-neutral-300);background:var(--color-surface)">
+              </div>
+            </sc-for>
+            <sc-if value="{{ showQuickLinks }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px">
+              <span style="width:100%;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-500);margin-bottom:1px">Restore a default link</span>
+              <button onClick="{{ addConfluence.onClick }}" title="{{ addConfluence.title }}" style="{{ addConfluence.style }}">
+                <svg width="14" height="14" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16"><path d="M200 224H56a8 8 0 0 1-8-8V40a8 8 0 0 1 8-8h96l56 56v128a8 8 0 0 1-8 8Z"></path><path d="M152 32v56h56M96 136h64M96 176h64"></path></svg>
+                <span style="font-size:11.5px">Confluence</span>
+              </button>
+              <sc-if value="{{ showInitiativeQuick }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ addInitiative.onClick }}" title="{{ addInitiative.title }}" style="{{ addInitiative.style }}">
+                <svg width="14" height="14" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16"><path d="M48 216V40M48 56h128l-24 40 24 40H48"></path></svg>
+                <span style="font-size:11.5px">Initiative</span>
+              </button>
+              </sc-if>
+              <sc-if value="{{ showJiraQuick }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ addEpic.onClick }}" title="{{ addEpic.title }}" style="{{ addEpic.style }}">
+                <svg width="14" height="14" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round"><path d="M136 32 48 144h64l-8 80 88-112h-64Z"></path></svg>
+                <span style="font-size:11.5px">{{ epicLabel }}</span>
+              </button>
+              </sc-if>
+            </div>
+            </sc-if>
+            <button onClick="{{ addLink }}" class="btn btn-secondary" style="height:30px;font-size:12px">+ Add link</button>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isTabChat }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <sc-for list="{{ chatMsgs }}" as="m" hint-placeholder-count="2">
+              <div style="{{ m.wrapStyle }}">
+                <sc-if value="{{ m.showStamp }}" hint-placeholder-val="{{ true }}">
+                  <div style="align-self:center;font-size:10px;color:var(--color-neutral-500);padding:9px 0 5px">{{ m.stamp }}</div>
+                </sc-if>
+                <sc-if value="{{ m.showWho }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:10px;color:var(--color-neutral-500);padding:0 10px 3px">{{ m.who }}</div>
+                </sc-if>
+                <div style="{{ m.bubbleStyle }}">{{ m.text }}</div>
+                <sc-if value="{{ m.mine }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:10px;padding:3px 6px 0">
+                    <button onClick="{{ m.onEdit }}" style="font:inherit;font-size:10.5px;background:none;border:0;padding:0;cursor:pointer;color:var(--color-neutral-400)" style-hover="{color:'var(--color-accent-300)'}">Edit</button>
+                    <button onClick="{{ m.onDelete }}" style="font:inherit;font-size:10.5px;background:none;border:0;padding:0;cursor:pointer;color:var(--color-neutral-400)" style-hover="{color:'var(--color-accent-300)'}">Delete</button>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{ chatEditing }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--color-neutral-400);margin-top:8px">
+                <span style="padding:2px 8px;border-radius:999px;background:var(--color-accent-900);color:var(--color-accent-200)">Editing message</span>
+                <button onClick="{{ cancelEdit }}" style="font:inherit;font-size:11px;background:none;border:0;padding:0;cursor:pointer;color:var(--color-neutral-400)" style-hover="{color:'var(--color-accent-300)'}">Cancel</button>
+              </div>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:10px">
+              <input class="input" placeholder="Message the trio" value="{{ chatDraft }}" onInput="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" style="flex:1;font-size:13px;border-radius:999px;padding:7px 13px;background:transparent">
+              <button onClick="{{ sendChat }}" title="Send" style="{{ sendStyle }}">
+                <svg width="15" height="15" viewBox="0 0 256 256" fill="currentColor"><path d="M208.5 127.2 71.3 204.2a8 8 0 0 1-11.6-9.2l19.6-63a4 4 0 0 1 3.2-2.8l80-12.1a2 2 0 0 0 0-3.9l-80-12.1a4 4 0 0 1-3.2-2.8L59.7 35.4A8 8 0 0 1 71.3 26l137.2 84a8 8 0 0 1 0 17.2Z"></path></svg>
+              </button>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ isTabHistory }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:0">
+            <sc-for list="{{ selHistory }}" as="h" hint-placeholder-count="3">
+              <div style="display:flex;gap:10px;padding:0 0 14px">
+                <div style="display:flex;flex-direction:column;align-items:center;flex:none;width:16px">
+                  <i style="{{ h.dotStyle }}"></i>
+                  <sc-if value="{{ h.line }}" hint-placeholder-val="{{ true }}">
+                    <i style="flex:1;width:1px;background:var(--color-neutral-800);margin-top:3px"></i>
+                  </sc-if>
+                </div>
+                <div style="min-width:0;padding-bottom:2px">
+                  <div style="font-size:12.5px;line-height:1.3;text-wrap:pretty">{{ h.what }}</div>
+                  <div style="font-size:10.5px;color:var(--color-neutral-500);margin-top:2px">{{ h.meta }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <div style="display:flex;gap:6px;border-top:1px solid var(--color-divider);padding-top:12px">
+            <button onClick="{{ openDetail }}" class="btn btn-primary" style="flex:1;height:32px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading)">Open detail</button>
+            <button onClick="{{ deleteSel }}" class="btn btn-secondary" style="height:32px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading)">Delete</button>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isTrees }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;overflow:auto;padding:34px 40px 60px">
+    <div style="max-width:1080px;margin:0 auto">
+      <div style="display:flex;align-items:flex-end;gap:16px;border-bottom:1px solid var(--color-divider);padding-bottom:14px">
+        <div>
+          <div style="font-family:var(--font-heading);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent-300)">{{ teamKicker }}</div>
+          <h1 style="margin:6px 0 0;font-size:38px;letter-spacing:-.01em">Opportunity solution tree</h1>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-secondary" style="height:34px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading)">Weekly snapshot</button>
+          <button onClick="{{ goCanvas }}" class="btn btn-primary" style="height:34px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading)">Open canvas</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--color-divider);border:1px solid var(--color-divider);margin-top:26px">
+        <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+          <div style="background:var(--color-bg);padding:16px 18px">
+            <div style="font-family:var(--font-heading);font-size:34px;line-height:1">{{ s.value }}</div>
+            <div style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;opacity:.6;margin-top:4px">{{ s.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="font-family:var(--font-heading);font-size:11px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin:34px 0 14px">Products in this tree</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px">
+        <sc-for list="{{ treeCards }}" as="t" hint-placeholder-count="3">
+          <div class="card" style="padding:18px;gap:10px">
+            
+            <div class="card-kicker">{{ t.kicker }}</div>
+            <div class="card-title" style="font-size:21px">{{ t.name }}</div>
+            <p class="card-body" style="font-size:13px">{{ t.outcome }}</p>
+            <div style="display:flex;gap:1px;background:var(--color-divider);border:1px solid var(--color-divider);margin-top:4px">
+              <sc-for list="{{ t.counts }}" as="c" hint-placeholder-count="4">
+                <div style="flex:1;background:var(--color-bg);padding:7px 8px">
+                  <div style="font-family:var(--font-heading);font-size:18px;line-height:1">{{ c.n }}</div>
+                  <div style="font-size:9px;letter-spacing:.07em;text-transform:uppercase;opacity:.55">{{ c.k }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div class="card-meta" style="margin-top:6px">{{ t.updated }}</div>
+            <button onClick="{{ t.onOpen }}" class="btn btn-primary btn-block" style="height:32px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-heading)">Open branch</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isExp }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;overflow:auto;padding:34px 40px 60px">
+    <div style="max-width:1080px;margin:0 auto">
+      <div style="display:flex;align-items:flex-end;border-bottom:1px solid var(--color-divider);padding-bottom:14px">
+        <div>
+          <div style="font-family:var(--font-heading);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent-300)">Assumption tests in flight</div>
+          <h1 style="margin:6px 0 0;font-size:34px">Experiment tracker</h1>
+        </div>
+        <div style="margin-left:auto;font-size:12px;opacity:.6">{{ expSummary }}</div>
+      </div>
+      <table class="table" style="width:100%;margin-top:22px;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:9px 10px;font-family:var(--font-heading);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--color-divider)">Assumption</th>
+            <th style="text-align:left;padding:9px 10px;font-family:var(--font-heading);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--color-divider)">Tests solution</th>
+            <th style="text-align:left;padding:9px 10px;font-family:var(--font-heading);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--color-divider)">Owner</th>
+            <th style="text-align:left;padding:9px 10px;font-family:var(--font-heading);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--color-divider)">Status</th>
+            <th style="text-align:left;padding:9px 10px;font-family:var(--font-heading);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--color-divider)">Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ expRows }}" as="r" hint-placeholder-count="5">
+            <tr onClick="{{ r.onClick }}" style="cursor:pointer" style-hover="{background:'var(--color-accent-900)'}">
+              <td style="padding:11px 10px;border-bottom:1px solid var(--color-divider);text-wrap:pretty">{{ r.title }}</td>
+              <td style="padding:11px 10px;border-bottom:1px solid var(--color-divider);opacity:.75;text-wrap:pretty">{{ r.solution }}</td>
+              <td style="padding:11px 10px;border-bottom:1px solid var(--color-divider);opacity:.75">{{ r.owner }}</td>
+              <td style="padding:11px 10px;border-bottom:1px solid var(--color-divider)"><span style="{{ r.statusStyle }}">{{ r.status }}</span></td>
+              <td style="padding:11px 10px;border-bottom:1px solid var(--color-divider);opacity:.75">{{ r.conf }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;overflow:auto;padding:28px 40px 60px">
+    <div style="max-width:1000px;margin:0 auto">
+      <button onClick="{{ goCanvas }}" class="btn btn-ghost" style="height:28px;font-size:12px;letter-spacing:.06em">← Back to canvas</button>
+      <div style="display:flex;align-items:flex-start;gap:18px;border-bottom:1px solid var(--color-divider);padding:12px 0 16px;margin-top:6px">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--font-heading);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent-300)">{{ selKicker }}</div>
+          <h1 style="margin:7px 0 0;font-size:32px;line-height:1.1;text-wrap:pretty">{{ selTitle }}</h1>
+          <div style="font-size:12px;opacity:.6;margin-top:8px">{{ selBreadcrumb }}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex:none">
+          <span style="{{ selStatusStyle }}">{{ selStatus }}</span>
+          <sc-if value="{{ selHasConf }}" hint-placeholder-val="{{ false }}">
+            <span class="tag tag-neutral">{{ selConfLabel }}</span>
+          </sc-if>
+          <sc-if value="{{ selHasRollup }}" hint-placeholder-val="{{ false }}">
+            <span class="tag tag-neutral">{{ rollupPct }} evidence</span>
+          </sc-if>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:34px;margin-top:24px">
+        <div style="display:flex;flex-direction:column;gap:26px">
+          <div>
+            <div style="font-family:var(--font-heading);font-size:11px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:8px">Notes</div>
+            <textarea class="input" value="{{ selNote }}" onInput="{{ onSelNote }}" placeholder="What did we learn?" style="font-size:14px;min-height:110px;background:transparent"></textarea>
+          </div>
+          <div>
+            <div style="font-family:var(--font-heading);font-size:11px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:10px">Beneath this node ({{ selChildCount }})</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px">
+              <sc-for list="{{ selChildren }}" as="c" hint-placeholder-count="3">
+                <div class="card" style="padding:14px;gap:7px">
+                  
+                  <div class="card-kicker">{{ c.kicker }}</div>
+                  <div class="card-title" style="font-size:16px">{{ c.title }}</div>
+                  <div class="card-meta"><span style="{{ c.statusStyle }}">{{ c.status }}</span></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <div>
+            <div style="font-family:var(--font-heading);font-size:11px;letter-spacing:.09em;text-transform:uppercase;opacity:.6;margin-bottom:10px">Discussion</div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <sc-for list="{{ selComments }}" as="m" hint-placeholder-count="2">
+                <div style="display:flex;gap:9px">
+                  <span style="width:24px;height:24px;flex:none;border:1px solid var(--color-divider);display:grid;place-items:center;font-size:9px">{{ m.who }}</span>
+                  <div style="min-width:0">
+                    <div style="font-size:10px;opacity:.55;letter-spacing:.04em">{{ m.when }}</div>
+                    <div style="font-size:13px;line-height:1.4;text-wrap:pretty">{{ m.text }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <input class="input" placeholder="Add a comment, then Enter" value="{{ commentDraft }}" onInput="{{ onCommentInput }}" onKeyDown="{{ onCommentKey }}" style="margin-top:12px;font-size:13px;background:transparent">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const T = {
+  product:     { label: 'Product',     w: 244, h: 60 },
+  outcome:     { label: 'Outcome',     w: 238, h: 92 },
+  opportunity: { label: 'Opportunity', w: 218, h: 100 },
+  solution:    { label: 'Solution',    w: 206, h: 88 },
+  assumption:  { label: 'Assumption',  w: 198, h: 84 },
+  evidence:    { label: 'Evidence',    w: 206, h: 92 },
+};
+const ALLOWED = {
+  product: ['outcome'],
+  outcome: ['opportunity'],
+  opportunity: ['opportunity', 'solution', 'evidence'],
+  solution: ['assumption', 'evidence'],
+  assumption: [],
+  evidence: [],
+};
+const STATUS = {
+  outcome: [],
+  opportunity: ['unexplored', 'exploring', 'validated', 'parked'],
+  solution: ['candidate', 'building', 'shipped', 'dropped'],
+  assumption: ['untested', 'testing', 'supported', 'refuted'],
+  evidence: [],
+  product: [],
+};
+const GOOD = ['validated', 'supported', 'shipped', 'met'];
+const BAD = ['refuted', 'dropped', 'parked', 'at risk'];
+const GAP_X = 26, ROW = 156;
+
+const TEAMS = [
+  { id: 'meridian', name: 'Team Meridian', meta: 'Discovery Canvas · Insight Library', members: ['KP', 'AR', 'JS'] },
+  { id: 'atlas', name: 'Team Atlas', meta: 'Billing · Admin console', members: ['MO', 'TD'] },
+  { id: 'northstar', name: 'Team Northstar', meta: 'Onboarding · Activation', members: ['LR', 'BK', 'CS', 'DW'] },
+];
+
+const N = (id, type, parent, title, o) => Object.assign(
+  { id, type, parent, title, note: '', status: (STATUS[type] || [])[0] || '', conf: 40, owner: '', priority: 3, comments: [] }, o || {});
+const QUESTIONS = {
+  op1: [
+    { text: 'Does this hold for teams outside the trio model?', done: false },
+    { text: 'Interview two enterprise PMs about procurement', done: true },
+    { text: 'Split recruiting pain into its own opportunity', done: true },
+  ],
+  op3: [
+    { text: 'Which snippets are never reopened, and why?', done: false },
+    { text: 'Ask three teams how they search past research', done: false },
+  ],
+};
+const VAL = { op1: 5, op1a: 4, op2: 3, op3: 5, op3a: 2, op4: 4 };
+const PRI = { op1: 5, op1a: 4, op2: 3, op3: 5, op3a: 2, op4: 4, s1: 5, s2: 2, s3: 3, s5: 4, s6: 3, a1: 5, a2: 2, a3: 3, a4: 4, a5: 4, a6: 2, e1: 2, e2: 2, e3: 3 };
+
+const SEED = [
+  N('p1', 'product', null, 'Discovery Canvas'),
+  N('o1', 'outcome', 'p1', 'Teams running ≥1 interview a week: 34% → 60%', { status: 'at risk', conf: 60, note: 'Outcome owner: Kira. Reviewed fortnightly against the discovery habit metric.' }),
+  N('op1', 'opportunity', 'o1', 'I can never find time to schedule interviews', { status: 'exploring', conf: 60, comments: [
+    { who: 'AR', when: 'Mon 09:12', text: 'Heard this in 7 of 9 interviews — biggest single blocker.' },
+    { who: 'JS', when: 'Mon 09:41', text: 'Same in the enterprise segment, though there it\u2019s procurement, not calendars.' },
+    { who: 'KP', when: 'Mon 10:02', text: 'Splitting the recruiting pain into its own opportunity so we can size it separately.' },
+    { who: 'AR', when: 'Tue 08:30', text: 'Two more interviews booked for Thursday — I\u2019ll test the in-app invite script.' },
+    { who: 'KP', when: 'Tue 16:18', text: 'Nice. Let\u2019s hold the calendar solution until that comes back.' },
+  ] }),
+  N('op1a', 'opportunity', 'op1', 'Recruiting a participant takes me a week', { status: 'validated', conf: 80 }),
+  N('s1', 'solution', 'op1a', 'Auto-recruit from an in-product prompt', { status: 'building', conf: 60 }),
+  N('a1', 'assumption', 's1', 'Users will accept an in-app interview invite', { status: 'testing', conf: 40, owner: 'Kira P.' }),
+  N('a2', 'assumption', 's1', 'Sales won\u2019t block outreach to enterprise accounts', { status: 'untested', conf: 20, owner: 'Jon S.' }),
+  N('s2', 'solution', 'op1', 'Calendar-linked standing interview slots', { status: 'candidate', conf: 40 }),
+  N('a3', 'assumption', 's2', 'Teams keep a shared discovery calendar', { status: 'refuted', conf: 20, owner: 'Ana R.' }),
+  N('e1', 'evidence', 'op1', '“I book interviews at 11pm because that\u2019s when I have a gap.” — PM, Acme'),
+  N('op2', 'opportunity', 'o1', 'I don\u2019t know what to ask once I\u2019m in the room', { status: 'exploring', conf: 40 }),
+  N('s3', 'solution', 'op2', 'Story-based interview prompts in the note pad', { status: 'candidate', conf: 60 }),
+  N('a4', 'assumption', 's3', 'Prompts increase story specificity', { status: 'supported', conf: 80, owner: 'Ana R.' }),
+  N('e2', 'evidence', 'op2', '6 of 9 recorded interviews drifted into solution talk by minute 4'),
+
+  N('p2', 'product', null, 'Insight Library'),
+  N('o2', 'outcome', 'p2', 'Time from interview to shared insight: 9 days → 2', { status: 'on track', conf: 60 }),
+  N('op3', 'opportunity', 'o2', 'My insights get lost in a doc nobody reopens', { status: 'validated', conf: 80, comments: [{ who: 'JS', when: 'Tue 14:40', text: 'Analytics back this: 71% of snippets are never reopened.' }] }),
+  N('s5', 'solution', 'op3', 'Auto-tag snippets onto opportunities', { status: 'building', conf: 60 }),
+  N('a5', 'assumption', 's5', 'Auto-tags are accurate enough to be trusted', { status: 'testing', conf: 40, owner: 'Kira P.' }),
+  N('op3a', 'opportunity', 'op3', 'I can\u2019t tell if a quote is still true six months on', { status: 'unexplored', conf: 20 }),
+  N('e3', 'evidence', 'op3', '71% of saved snippets were never opened a second time'),
+  N('op4', 'opportunity', 'o2', 'I can\u2019t tell which opportunity matters most', { status: 'exploring', conf: 40 }),
+  N('s6', 'solution', 'op4', 'Opportunity sizing from snippet volume + reach', { status: 'candidate', conf: 40 }),
+  N('a6', 'assumption', 's6', 'Snippet volume correlates with customer pain', { status: 'untested', conf: 20, owner: 'Jon S.' }),
+];
+
+class Component extends DCLogic {
+  state = {
+    nodes: SEED.map((n, i) => Object.assign({}, n, {
+      priority: (PRI[n.id] || 3) * 20 - 8,
+      value: VAL[n.id] || 3,
+      status: n.type === 'outcome' ? '' : n.status,
+      questions: n.type === 'opportunity' ? (QUESTIONS[n.id] || [{ text: 'Who else has said this, and in what context?', done: false }, { text: 'Is this sized — how many customers does it touch?', done: false }]) : [],
+      links: n.type === 'product' ? [{ name: 'Product space', url: 'https://ombuto.atlassian.net/wiki/spaces/' + n.id }]
+        : (n.type === 'outcome' || n.type === 'assumption') ? [{ name: 'Confluence', url: 'https://ombuto.atlassian.net/wiki/discovery/' + n.id }]
+        : n.type === 'evidence' ? [
+          { name: 'Confluence', url: 'https://ombuto.atlassian.net/wiki/discovery/' + n.id },
+          { name: 'Jira Ticket', url: 'https://ombuto.atlassian.net/browse/DISC-' + (700 + i) },
+        ] : [
+        { name: 'Confluence', url: 'https://ombuto.atlassian.net/wiki/discovery/' + n.id },
+        { name: 'Jira Initiative', url: 'https://ombuto.atlassian.net/browse/DISC-' + (100 + i) },
+        { name: 'Jira Epic', url: 'https://ombuto.atlassian.net/browse/DISC-' + (400 + i) },
+      ],
+      history: [
+        { who: i % 3 === 0 ? 'AR' : 'KP', when: 'Mon 08:' + String(10 + i).slice(-2), what: 'Node created as ' + T[n.type].label.toLowerCase() },
+        { who: 'KP', when: 'Tue 11:' + String(20 + i).slice(-2), what: (n.status && n.type !== 'outcome') ? 'Status set to ' + n.status : 'Linked to Confluence' },
+      ],
+    })),
+    panelTab: 'detail',
+    view: 'canvas', productId: 'p1', selected: 'op1', editing: null, draft: '',
+    collapsed: {}, query: '', hiddenTypes: {}, commentDraft: '', tool: null,
+    teamId: 'meridian', teamsOpen: false, paletteDrag: null, productsOpen: false, addMenuId: null,
+    chatId: null, chatDraft: '', chatEdit: null, chatAtBottom: true, confirmId: null, qDraft: '',
+    leftOpen: true, rightOpen: true,
+    tx: 120, ty: 40, zoom: 0.82, dragId: null, dragDX: 0, dragDY: 0, dropId: null,
+  };
+
+  bindWheel(el) {
+    this._wheel = (e) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      const z = Math.min(1.6, Math.max(0.35, this.state.zoom * (e.deltaY < 0 ? 1.08 : 0.926)));
+      const k = z / this.state.zoom;
+      this.setState({ zoom: z, tx: mx - (mx - this.state.tx) * k, ty: my - (my - this.state.ty) * k });
+    };
+    el.addEventListener('wheel', this._wheel, { passive: false });
+  }
+  componentDidMount() {
+    if (this.canvasEl && !this._wheel) this.bindWheel(this.canvasEl);
+    setTimeout(() => this.fit(), 60);
+  }
+  componentWillUnmount() { if (this.canvasEl && this._wheel) this.canvasEl.removeEventListener('wheel', this._wheel); }
+
+  /* ---------- tree helpers ---------- */
+  kids(id) { return this.state.nodes.filter(n => n.parent === id); }
+  get(id) { return this.state.nodes.find(n => n.id === id); }
+  isDescendant(id, ofId) {
+    let n = this.get(id);
+    while (n && n.parent) { if (n.parent === ofId) return true; n = this.get(n.parent); }
+    return false;
+  }
+  roots() {
+    const ps = this.state.nodes.filter(n => n.type === 'product');
+    return this.state.productId === 'all' ? ps : ps.filter(p => p.id === this.state.productId);
+  }
+  layout() {
+    const pos = {}; let cursor = 0;
+    const walk = (n, depth) => {
+      const t = T[n.type];
+      const kids = this.state.collapsed[n.id] ? [] : this.kids(n.id);
+      let cx;
+      if (!kids.length) { cx = cursor + t.w / 2; cursor += t.w + GAP_X; }
+      else {
+        const cs = kids.map(k => walk(k, depth + 1));
+        cx = (cs[0] + cs[cs.length - 1]) / 2;
+      }
+      pos[n.id] = { x: cx, y: depth * ROW, w: t.w, h: t.h, depth };
+      return cx;
+    };
+    this.roots().forEach(r => { walk(r, 0); cursor += 80; });
+    return pos;
+  }
+  fit() {
+    const el = this.canvasEl; if (!el) return;
+    const pos = this.layout(); const ids = Object.keys(pos); if (!ids.length) return;
+    let x0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    ids.forEach(id => { const p = pos[id]; x0 = Math.min(x0, p.x - p.w / 2); x1 = Math.max(x1, p.x + p.w / 2); y1 = Math.max(y1, p.y + p.h); });
+    const r = el.getBoundingClientRect();
+    const z = Math.min(1.1, Math.max(0.68, Math.min((r.width - 90) / (x1 - x0), (r.height - 90) / (y1 + 40))));
+    const span = (x1 - x0) * z;
+    const rootsX = this.roots().map(n => pos[n.id].x);
+    const cx = rootsX.reduce((a, b) => a + b, 0) / (rootsX.length || 1);
+    this.setState({ zoom: z, tx: span < r.width ? (r.width - span) / 2 - x0 * z : r.width / 2 - cx * z, ty: 28 });
+  }
+
+  /* ---------- mutation ---------- */
+  stamp() {
+    const d = new Date();
+    return 'Today ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  patch(id, p) {
+    this.setState(s => ({
+      nodes: s.nodes.map(n => {
+        if (n.id !== id) return n;
+        const next = Object.assign({}, n, p);
+        const ev = [];
+        if (p.status && p.status !== n.status) ev.push('Status changed to “' + p.status + '”');
+        if (p.conf !== undefined && p.conf !== n.conf) ev.push('Confidence set to ' + p.conf + '%');
+        if (p.priority !== undefined && Math.round(p.priority / 10) !== Math.round(n.priority / 10)) ev.push('Priority set to ' + this.priLabel(p.priority).toLowerCase());
+        if (p.questions && p.questions.length > (n.questions || []).length) ev.push('Open question added');
+        if (p.value !== undefined && p.value !== n.value) ev.push('Value set to ' + '$'.repeat(p.value));
+        if (p.parent && p.parent !== n.parent) ev.push('Moved under “' + ((this.get(p.parent) || {}).title || '—') + '”');
+        if (p.comments && p.comments.length > (n.comments || []).length) ev.push('Comment added');
+        if (p.comments && p.comments.length < (n.comments || []).length) ev.push('Comment deleted');
+        if (p.links && (p.links.length !== (n.links || []).length)) ev.push(p.links.length > (n.links || []).length ? 'Link added' : 'Link removed');
+        if (ev.length) next.history = (n.history || []).concat(ev.map(w => ({ who: 'KP', when: this.stamp(), what: w })));
+        return next;
+      }),
+    }));
+  }
+  addChild(parentId, type) {
+    const p = this.get(parentId); if (!p) return;
+    const t = type || ALLOWED[p.type][0]; if (!t) return;
+    const id = 'n' + Math.random().toString(36).slice(2, 7);
+    const fresh = N(id, t, parentId, t === 'evidence' ? 'New snippet' : 'New ' + T[t].label.toLowerCase());
+    this.setState(s => ({
+      nodes: s.nodes.concat([fresh]), selected: id, editing: id, draft: fresh.title,
+      collapsed: Object.assign({}, s.collapsed, { [parentId]: false }),
+    }));
+  }
+  removeNode(id) {
+    const doomed = new Set([id]);
+    let grew = true;
+    while (grew) { grew = false; this.state.nodes.forEach(n => { if (n.parent && doomed.has(n.parent) && !doomed.has(n.id)) { doomed.add(n.id); grew = true; } }); }
+    this.setState(s => ({ nodes: s.nodes.filter(n => !doomed.has(n.id)), selected: null }));
+  }
+
+  openChat(id) { this.setState({ chatId: id, chatDraft: '', chatEdit: null, selected: id }); this._chatScroll = true; }
+  chatScrollToEnd(smooth) {
+    const el = this.chatEl; if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }
+  threadId() { return this.state.chatId || (this.state.panelTab === 'chat' ? this.state.selected : null); }
+  sendChat() {
+    const sel = this.get(this.threadId()); if (!sel) return;
+    const text = this.state.chatDraft.trim(); if (!text) return;
+    const list = sel.comments.slice();
+    if (this.state.chatEdit !== null && list[this.state.chatEdit]) {
+      list[this.state.chatEdit] = Object.assign({}, list[this.state.chatEdit], { text, edited: true });
+    } else {
+      const now = new Date();
+      list.push({ who: 'KP', when: 'Today ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), text });
+    }
+    this.patch(sel.id, { comments: list });
+    this.setState({ chatDraft: '', chatEdit: null });
+    this._chatScroll = true;
+  }
+
+  /* ---------- pointer ---------- */
+  onBgDown = (e) => {
+    if (this.state.addMenuId && !e.target.closest('button')) this.setState({ addMenuId: null });
+    if (e.target.closest('[data-node]')) return;
+    const el = this.canvasEl; if (el) el.style.cursor = 'grabbing';
+    const s0 = { x: e.clientX, y: e.clientY, tx: this.state.tx, ty: this.state.ty };
+    const mv = (ev) => this.setState({ tx: s0.tx + ev.clientX - s0.x, ty: s0.ty + ev.clientY - s0.y });
+    const up = () => { if (el) el.style.cursor = 'grab'; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  };
+  nodeDown(e, id) {
+    if (e.target.closest('button') || e.target.closest('input')) return;
+    e.stopPropagation();
+    if (this.state.addMenuId) this.setState({ addMenuId: null });
+    const tool = this.state.tool;
+    if (tool) {
+      const host = this.get(id);
+      if (host && (ALLOWED[host.type] || []).indexOf(tool) >= 0) { this.addChild(id, tool); this.setState({ tool: null }); }
+      return;
+    }
+    const pos = this.layout();
+    const start = { x: e.clientX, y: e.clientY }; let moved = false;
+    const mv = (ev) => {
+      const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+      moved = true;
+      const r = this.canvasEl.getBoundingClientRect();
+      const wx = (ev.clientX - r.left - this.state.tx) / this.state.zoom;
+      const wy = (ev.clientY - r.top - this.state.ty) / this.state.zoom;
+      let drop = null;
+      Object.keys(pos).forEach(pid => {
+        const p = pos[pid];
+        if (wx > p.x - p.w / 2 && wx < p.x + p.w / 2 && wy > p.y && wy < p.y + p.h) drop = pid;
+      });
+      if (drop && !this.canDrop(id, drop)) drop = null;
+      this.setState({ dragId: id, dragDX: dx / this.state.zoom, dragDY: dy / this.state.zoom, dropId: drop });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+      const drop = this.state.dropId;
+      if (!moved) this.setState({ selected: id, rightOpen: true });
+      else if (drop) this.patch(id, { parent: drop });
+      this.setState({ dragId: null, dragDX: 0, dragDY: 0, dropId: null });
+    };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  }
+  paletteDown(e, type) {
+    e.preventDefault();
+    const pos = this.layout();
+    const start = { x: e.clientX, y: e.clientY }; let moved = false;
+    const mv = (ev) => {
+      if (!moved && Math.abs(ev.clientX - start.x) + Math.abs(ev.clientY - start.y) < 5) return;
+      moved = true;
+      let drop = null;
+      const r = this.canvasEl && this.canvasEl.getBoundingClientRect();
+      if (r && ev.clientX > r.left && ev.clientX < r.right && ev.clientY > r.top && ev.clientY < r.bottom) {
+        const wx = (ev.clientX - r.left - this.state.tx) / this.state.zoom;
+        const wy = (ev.clientY - r.top - this.state.ty) / this.state.zoom;
+        Object.keys(pos).forEach(pid => {
+          const p = pos[pid];
+          if (wx > p.x - p.w / 2 && wx < p.x + p.w / 2 && wy > p.y && wy < p.y + p.h) drop = pid;
+        });
+        if (drop && (ALLOWED[(this.get(drop) || {}).type] || []).indexOf(type) < 0) drop = null;
+      }
+      this.setState({ paletteDrag: { type, x: ev.clientX, y: ev.clientY }, dropId: drop });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+      const drop = this.state.dropId;
+      if (moved) {
+        this._dragEndedAt = Date.now();
+        if (drop) this.addChild(drop, type);
+        this.setState({ paletteDrag: null, dropId: null, tool: null });
+      }
+    };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  }
+  canDrop(id, target) {
+    if (id === target) return false;
+    const n = this.get(id), t = this.get(target);
+    if (!n || !t || n.parent === target) return false;
+    if (this.isDescendant(target, id)) return false;
+    return (ALLOWED[t.type] || []).indexOf(n.type) >= 0;
+  }
+
+  /* ---------- styling ---------- */
+  statusStyle(status, big) {
+    const base = {
+      display: 'inline-flex', alignItems: 'center', fontFamily: 'var(--font-heading)',
+      fontSize: big ? '12px' : '10px', letterSpacing: '.06em', textTransform: 'uppercase', borderRadius: 'var(--radius-sm)',
+      padding: big ? '4px 10px' : '2px 7px', border: '1px solid transparent', whiteSpace: 'nowrap',
+    };
+    if (GOOD.indexOf(status) >= 0) return Object.assign(base, { background: 'var(--color-accent-800)', color: 'var(--color-accent-200)' });
+    if (BAD.indexOf(status) >= 0) return Object.assign(base, { background: 'var(--color-neutral-900)', color: 'var(--color-neutral-300)' });
+    return Object.assign(base, { borderColor: 'var(--color-accent-600)', color: 'var(--color-accent-300)' });
+  }
+  priColor(p, l) {
+    const t = Math.max(0, Math.min(100, p)) / 100;
+    return 'oklch(' + (l || 0.74) + ' ' + (0.075 + t * 0.085).toFixed(3) + ' ' + ((250 + t * 135) % 360).toFixed(1) + ')';
+  }
+  priLabel(p) { return p >= 85 ? 'Critical' : p >= 65 ? 'High' : p >= 40 ? 'Medium' : p >= 20 ? 'Low' : 'Lowest'; }
+  evidenceFor(node) {
+    const tests = this.kids(node.id).filter(k => k.type === 'assumption');
+    const supported = tests.filter(t => t.status === 'supported').length;
+    const refuted = tests.filter(t => t.status === 'refuted').length;
+    const score = tests.length
+      ? Math.round(tests.reduce((a, t) => a + (t.status === 'supported' ? 100 : t.status === 'refuted' ? 0 : t.conf), 0) / tests.length)
+      : null;
+    return { tests: tests.length, supported, refuted, score };
+  }
+  confLabel(c) { return c >= 80 ? 'High confidence' : c >= 60 ? 'Med-high' : c >= 40 ? 'Medium' : 'Low'; }
+
+  nodeBox(n, p, flags) {
+    const drag = this.state.dragId === n.id;
+    const s = {
+      position: 'absolute', boxSizing: 'border-box',
+      left: (p.x - p.w / 2 + (drag ? this.state.dragDX : 0)) + 'px',
+      top: (p.y + (drag ? this.state.dragDY : 0)) + 'px',
+      width: p.w + 'px', minHeight: p.h + 'px',
+      display: 'flex', flexDirection: 'column',
+      padding: n.type === 'opportunity' ? '9px 20px 8px 11px' : '9px 11px 8px',
+      background: 'var(--color-surface)', border: '1px solid var(--color-neutral-800)', borderRadius: 'var(--radius-md)',
+      cursor: drag ? 'grabbing' : 'grab', userSelect: 'none',
+      transition: drag ? 'none' : 'left .18s ease, top .18s ease',
+      zIndex: drag ? 60 : (flags.selected ? 40 : 10),
+      opacity: flags.dim ? 0.24 : 1,
+      boxShadow: drag ? 'var(--shadow-lg)' : 'none',
+    };
+    if (n.type === 'product') Object.assign(s, { background: 'var(--color-accent-900)', border: '1px solid var(--color-accent-700)', justifyContent: 'center' });
+    if (n.type === 'outcome') Object.assign(s, { background: 'var(--color-accent-900)', border: '1px solid var(--color-accent-600)' });
+    if (n.type === 'opportunity') Object.assign(s, { border: '1px solid var(--color-accent-500)' });
+    if (n.type === 'solution') Object.assign(s, { background: 'var(--color-neutral-900)', border: '1px solid var(--color-neutral-700)' });
+    if (n.type === 'assumption') Object.assign(s, { background: 'transparent', border: '1px dashed var(--color-accent-500)' });
+    if (n.type === 'evidence') Object.assign(s, { background: 'transparent', border: '1px solid var(--color-neutral-800)', fontStyle: 'italic' });
+    if (flags.match) Object.assign(s, { border: '1px solid var(--color-accent)', boxShadow: '0 0 0 3px var(--color-accent-800)' });
+    if (flags.target) Object.assign(s, { outline: '1px dashed var(--color-accent-400)', outlineOffset: '3px', cursor: 'copy' });
+    if (flags.selected) Object.assign(s, { outline: '2px solid var(--color-accent)', outlineOffset: '2px' });
+    if (this.state.dropId === n.id) Object.assign(s, { outline: '2px dashed var(--color-accent)', outlineOffset: '4px', background: 'var(--color-accent-800)' });
+    return s;
+  }
+  chipStyle(on) {
+    return {
+      font: 'inherit', fontFamily: 'var(--font-heading)', fontSize: '11px', letterSpacing: '.06em',
+      textTransform: 'uppercase', padding: '5px 9px', cursor: 'pointer', borderRadius: 'var(--radius-sm)',
+      border: '1px solid ' + (on ? 'var(--color-accent-600)' : 'var(--color-neutral-800)'),
+      background: on ? 'var(--color-accent-900)' : 'transparent',
+      color: on ? 'var(--color-accent-200)' : 'var(--color-neutral-400)',
+    };
+  }
+  tabStyle(on) {
+    return {
+      font: 'inherit', fontFamily: 'var(--font-heading)', fontSize: '12px', letterSpacing: '.06em',
+      textTransform: 'uppercase', padding: '6px 12px', cursor: 'pointer', border: 0,
+      borderRight: '1px solid var(--color-neutral-800)',
+      background: on ? 'var(--color-accent-900)' : 'transparent',
+      color: on ? 'var(--color-accent-200)' : 'var(--color-neutral-400)',
+    };
+  }
+
+  /* ---------- render values ---------- */
+  renderVals() {
+    const st = this.state;
+    const pos = this.layout();
+    const q = st.query.trim().toLowerCase();
+    const sel = st.selected ? this.get(st.selected) : null;
+    const chatNode = st.chatId ? this.get(st.chatId) : null;
+    const threadNode = chatNode || (st.panelTab === 'chat' ? sel : null);
+    let panelTab = st.panelTab;
+    if (sel && sel.type === 'product' && (panelTab === 'chat' || panelTab === 'history')) panelTab = 'detail';
+    if (panelTab === 'questions' && !(sel && sel.type === 'opportunity')) panelTab = 'detail';
+    const rollup = sel ? this.evidenceFor(sel) : null;
+    const victim = st.confirmId ? this.get(st.confirmId) : null;
+    const victimKids = victim ? st.nodes.filter(n => this.isDescendant(n.id, victim.id)).length : 0;
+
+    const visible = [];
+    const isHidden = (n) => { let p = n.parent; while (p) { if (st.collapsed[p]) return true; p = (this.get(p) || {}).parent; } return false; };
+    const rootIds = new Set(this.roots().map(r => r.id));
+    const inScope = (n) => { let c = n; while (c.parent) c = this.get(c.parent) || {}; return rootIds.has(c.id); };
+    st.nodes.forEach(n => { if (pos[n.id] && inScope(n) && !isHidden(n)) visible.push(n); });
+
+    const armedType = st.tool || (st.paletteDrag && st.paletteDrag.type) || null;
+    const nodes = visible.map(n => {
+      const p = pos[n.id];
+      const match = q ? (n.title + ' ' + n.note).toLowerCase().indexOf(q) >= 0 : false;
+      const dim = (q && !match) || !!st.hiddenTypes[n.type];
+      const kidCount = this.kids(n.id).length;
+      const ev = this.evidenceFor(n);
+      const collapsed = !!st.collapsed[n.id];
+      return {
+        id: n.id,
+        box: this.nodeBox(n, p, { selected: st.selected === n.id, match, dim, target: !!armedType && (ALLOWED[n.type] || []).indexOf(armedType) >= 0 }),
+        kicker: T[n.type].label,
+        title: n.title,
+        editing: st.editing === n.id,
+        showTitle: st.editing !== n.id,
+        draft: st.draft,
+        hasStatus: !!n.status,
+        status: n.status,
+        statusStyle: this.statusStyle(n.status),
+        hasConf: n.type === 'assumption',
+        confLabel: n.conf + '% confidence',
+        hasEvidence: n.type === 'solution' && ev.tests > 0,
+        evidenceLabel: ev.score === null ? '' : ev.tests + ' test' + (ev.tests === 1 ? '' : 's') + ' · ' + ev.score + '% evidence',
+        showPri: n.type === 'opportunity',
+        showValue: n.type === 'opportunity',
+        valueFilled: '$'.repeat(n.value || 0),
+        valueRest: '$'.repeat(5 - (n.value || 0)),
+        pri: [5, 4, 3, 2, 1].map(step => {
+          const fill = Math.max(0, Math.min(1, (n.priority - (step - 1) * 20) / 20));
+          const size = (4.5 + fill * 2.5).toFixed(1);
+          return {
+            step, style: {
+              width: size + 'px', height: size + 'px', borderRadius: '50%',
+              background: fill > 0 ? this.priColor(n.priority) : 'var(--color-neutral-800)',
+              opacity: fill > 0 ? (0.35 + fill * 0.65) : 1,
+            },
+          };
+        }),
+        commentCount: n.comments.length,
+        onChat: (e) => { e.stopPropagation(); this.openChat(n.id); },
+        chatStyle: {
+          marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '3px',
+          font: 'inherit', fontSize: '10px', padding: '2px 6px', cursor: 'pointer',
+          borderRadius: '999px', border: '1px solid ' + (n.comments.length ? 'var(--color-neutral-700)' : 'transparent'),
+          background: 'transparent', color: n.comments.length ? 'var(--color-accent-300)' : 'var(--color-neutral-500)',
+        },
+        hasKids: kidCount > 0,
+        canAdd: (ALLOWED[n.type] || []).length > 0,
+        kidLabel: collapsed ? '+' + kidCount : '–',
+        toggleStyle: {
+          position: 'absolute', left: '50%', bottom: '-11px', transform: 'translateX(-50%)',
+          minWidth: '24px', height: '20px', padding: '0 6px', font: 'inherit', fontSize: '11px',
+          fontFamily: 'var(--font-heading)', letterSpacing: '.04em', lineHeight: 1, borderRadius: 'var(--radius-sm)',
+          background: collapsed ? 'var(--color-accent-800)' : 'var(--color-surface)',
+          color: collapsed ? 'var(--color-accent-200)' : 'var(--color-text)',
+          border: '1px solid ' + (collapsed ? 'var(--color-accent-600)' : 'var(--color-neutral-800)'),
+          cursor: 'pointer', zIndex: 20,
+        },
+        onDown: (e) => this.nodeDown(e, n.id),
+        onRename: () => this.setState({ editing: n.id, draft: n.title, selected: n.id }),
+        onInput: (e) => this.setState({ draft: e.target.value }),
+        onCommit: () => { if (st.editing === n.id) { this.patch(n.id, { title: this.state.draft || n.title }); this.setState({ editing: null }); } },
+        onKey: (e) => {
+          if (e.key === 'Enter') { this.patch(n.id, { title: this.state.draft || n.title }); this.setState({ editing: null }); }
+          if (e.key === 'Escape') this.setState({ editing: null });
+        },
+        inputRef: (el) => { if (el && st.editing === n.id && document.activeElement !== el) { el.focus(); el.select(); } },
+        addMenuOpen: st.addMenuId === n.id,
+        addOptions: (ALLOWED[n.type] || []).map(t => ({
+          label: T[t].label,
+          onClick: (e) => { e.stopPropagation(); this.setState({ addMenuId: null }); this.addChild(n.id, t); },
+          swatch: {
+            width: '10px', height: '10px', flex: 'none', borderRadius: '2px',
+            background: t === 'outcome' ? 'var(--color-accent-900)' : t === 'solution' ? 'var(--color-neutral-900)' : 'transparent',
+            border: '1px ' + (t === 'assumption' ? 'dashed' : 'solid') + ' ' + (t === 'evidence' || t === 'solution' ? 'var(--color-neutral-600)' : 'var(--color-accent-500)'),
+          },
+        })),
+        onAdd: (e) => { e.stopPropagation(); this.setState(s => ({ addMenuId: s.addMenuId === n.id ? null : n.id, selected: n.id })); },
+        onToggle: (e) => { e.stopPropagation(); this.setState(s => ({ collapsed: Object.assign({}, s.collapsed, { [n.id]: !s.collapsed[n.id] }) })); },
+      };
+    });
+
+    const edges = visible.filter(n => n.parent && pos[n.parent]).map(n => {
+      const a = pos[n.parent], b = pos[n.id];
+      const y0 = a.y + a.h, midY = y0 + (b.y - y0) / 2;
+      return {
+        id: n.id,
+        d: 'M ' + a.x + ' ' + y0 + ' V ' + midY + ' H ' + b.x + ' V ' + b.y,
+        stroke: n.type === 'evidence' ? 'var(--color-neutral-700)' : 'var(--color-accent-600)',
+        width: n.type === 'opportunity' || n.type === 'outcome' ? 1.6 : 1.1,
+        dash: n.type === 'assumption' || n.type === 'evidence' ? '4 4' : 'none',
+      };
+    });
+
+    const products = st.nodes.filter(n => n.type === 'product');
+    const pickProduct = (id) => this.setState({ productId: id, productsOpen: false }, () => setTimeout(() => this.fit(), 30));
+    const rowStyle = (on) => ({
+      display: 'flex', alignItems: 'center', gap: '9px', width: '100%', padding: '7px 9px',
+      font: 'inherit', color: 'var(--color-text)', cursor: 'pointer', textAlign: 'left',
+      borderRadius: 'var(--radius-sm)', border: '1px solid transparent',
+      background: on ? 'var(--color-accent-900)' : 'transparent',
+    });
+    const countUnder = (rootId) => st.nodes.filter(n => {
+      let c = n; while (c.parent) c = this.get(c.parent) || {};
+      return c.id === rootId;
+    }).length - 1;
+    const allProducts = {
+      on: st.productId === 'all',
+      meta: products.length + ' branches',
+      onClick: () => pickProduct('all'),
+      style: rowStyle(st.productId === 'all'),
+      boxStyle: {
+        width: '15px', height: '15px', flex: 'none', display: 'grid', placeItems: 'center',
+        borderRadius: '4px',
+        border: '1px solid ' + (st.productId === 'all' ? 'var(--color-accent-400)' : 'var(--color-neutral-600)'),
+        background: st.productId === 'all' ? 'var(--color-accent-400)' : 'transparent',
+      },
+    };
+    const productOpts = products.map(p => ({
+      id: p.id, label: p.title, meta: countUnder(p.id) + ' nodes',
+      onClick: () => pickProduct(p.id), style: rowStyle(st.productId === p.id),
+      dotStyle: {
+        width: '15px', height: '15px', flex: 'none', borderRadius: '50%',
+        border: '1px solid ' + (st.productId === p.id ? 'var(--color-accent-400)' : 'var(--color-neutral-600)'),
+        boxShadow: st.productId === p.id ? 'inset 0 0 0 3px var(--color-surface), inset 0 0 0 9px var(--color-accent-400)' : 'none',
+      },
+    }));
+    const curProduct = products.find(p => p.id === st.productId);
+
+    const typeChips = ['outcome', 'opportunity', 'solution', 'assumption', 'evidence'].map(t => ({
+      id: t, label: T[t].label, count: st.nodes.filter(n => n.type === t).length,
+      style: this.chipStyle(!st.hiddenTypes[t]),
+      onClick: () => this.setState(s => ({ hiddenTypes: Object.assign({}, s.hiddenTypes, { [t]: !s.hiddenTypes[t] }) })),
+    }));
+
+    const TOOL_HINT = {
+      outcome: 'under a product', opportunity: 'under an outcome or opportunity',
+      solution: 'under an opportunity', assumption: 'under a solution',
+      evidence: 'under an opportunity or solution',
+    };
+    const MINI_INK = {
+      product: 'var(--color-accent-500)', outcome: 'var(--color-accent-500)',
+      opportunity: 'var(--color-accent-400)', solution: 'var(--color-neutral-400)',
+      assumption: 'var(--color-neutral-600)', evidence: 'var(--color-neutral-700)',
+    };
+    const tools = ['outcome', 'opportunity', 'solution', 'assumption', 'evidence'].map(t => {
+      const on = st.tool === t;
+      return {
+        id: t, label: T[t].label, hint: TOOL_HINT[t],
+        onPointerDown: (e) => this.paletteDown(e, t),
+        onClick: () => {
+          if (this._dragEndedAt && Date.now() - this._dragEndedAt < 200) return;
+          this.setState(s => ({ tool: s.tool === t ? null : t }));
+        },
+        style: {
+          display: 'flex', alignItems: 'flex-start', gap: '8px', width: '100%', padding: '7px 8px',
+          font: 'inherit', color: 'var(--color-text)', cursor: 'pointer', textAlign: 'left',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid ' + (on ? 'var(--color-accent-600)' : 'var(--color-neutral-800)'),
+          background: on ? 'var(--color-accent-900)' : 'transparent',
+        },
+        swatch: {
+          width: '13px', height: '13px', flex: 'none', marginTop: '2px', borderRadius: '3px',
+          background: t === 'outcome' ? 'var(--color-accent-900)' : t === 'solution' ? 'var(--color-neutral-900)' : 'transparent',
+          border: '1px ' + (t === 'assumption' ? 'dashed' : 'solid') + ' ' +
+            (t === 'evidence' || t === 'solution' ? 'var(--color-neutral-700)' : 'var(--color-accent-500)'),
+        },
+      };
+    });
+
+    const MW = 198, MH = 134;
+    let mini = [], miniView = { display: 'none' };
+    const rect = this.canvasEl ? this.canvasEl.getBoundingClientRect() : null;
+    const ids = Object.keys(pos).filter(id => visible.some(v => v.id === id));
+    if (ids.length) {
+      let x0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      ids.forEach(id => { const p = pos[id]; x0 = Math.min(x0, p.x - p.w / 2); x1 = Math.max(x1, p.x + p.w / 2); y1 = Math.max(y1, p.y + p.h); });
+      const s = Math.min((MW - 18) / Math.max(1, x1 - x0), (MH - 30) / Math.max(1, y1));
+      const ox = 9 - x0 * s, oy = 20;
+      this._mini = { s, ox, oy };
+      mini = ids.map(id => {
+        const p = pos[id], n = this.get(id);
+        return {
+          id, style: {
+            position: 'absolute', left: (ox + (p.x - p.w / 2) * s) + 'px', top: (oy + p.y * s) + 'px',
+            width: Math.max(3, p.w * s) + 'px', height: Math.max(2, p.h * s) + 'px', borderRadius: '1px',
+            background: st.selected === id ? 'var(--color-accent-200)' : MINI_INK[n.type],
+            opacity: st.selected === id ? 1 : 0.8,
+          },
+        };
+      });
+      if (rect) {
+        miniView = {
+          position: 'absolute', pointerEvents: 'none', borderRadius: '2px',
+          border: '1px solid var(--color-accent-300)', background: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+          left: (ox + (-st.tx / st.zoom) * s) + 'px', top: (oy + (-st.ty / st.zoom) * s) + 'px',
+          width: (rect.width / st.zoom) * s + 'px', height: (rect.height / st.zoom) * s + 'px',
+        };
+      }
+    }
+    const onMiniDown = (e) => {
+      e.stopPropagation();
+      const box = e.currentTarget.getBoundingClientRect();
+      const m = this._mini; if (!m || !this.canvasEl) return;
+      const r = this.canvasEl.getBoundingClientRect();
+      const go = (ev) => {
+        const wx = (ev.clientX - box.left - m.ox) / m.s, wy = (ev.clientY - box.top - m.oy) / m.s;
+        this.setState({ tx: r.width / 2 - wx * this.state.zoom, ty: r.height / 2 - wy * this.state.zoom });
+      };
+      go(e);
+      const up = () => { window.removeEventListener('pointermove', go); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', go); window.addEventListener('pointerup', up);
+    };
+
+    const breadcrumb = (n) => {
+      const parts = []; let c = n;
+      while (c && c.parent) { c = this.get(c.parent); if (c) parts.unshift(c.title); }
+      return parts.join('  ›  ');
+    };
+
+    const selChildren = sel ? this.kids(sel.id).map(c => ({
+      id: c.id, kicker: T[c.type].label, title: c.title, status: c.status,
+      statusStyle: this.statusStyle(c.status), onClick: () => this.setState({ selected: c.id }),
+    })) : [];
+
+    const assumptions = st.nodes.filter(n => n.type === 'assumption');
+    const expRows = assumptions.map(a => {
+      const s = this.get(a.parent) || {};
+      return {
+        id: a.id, title: a.title, solution: s.title || '—', owner: a.owner || 'Unassigned',
+        status: a.status, statusStyle: this.statusStyle(a.status), conf: a.conf + '%',
+        onClick: () => this.setState({ view: 'canvas', selected: a.id }),
+      };
+    });
+
+    const countIn = (rootId, type) => st.nodes.filter(n => {
+      if (n.type !== type) return false;
+      let c = n; while (c.parent) c = this.get(c.parent) || {};
+      return c.id === rootId;
+    }).length;
+
+    const treeCards = products.map((p, i) => ({
+      id: p.id, kicker: 'Product branch 0' + (i + 1), name: p.title,
+      outcome: (this.kids(p.id)[0] || {}).title || 'No outcome set',
+      counts: [
+        { k: 'Opps', n: countIn(p.id, 'opportunity') },
+        { k: 'Sols', n: countIn(p.id, 'solution') },
+        { k: 'Tests', n: countIn(p.id, 'assumption') },
+        { k: 'Evid', n: countIn(p.id, 'evidence') },
+      ],
+      updated: i === 0 ? 'Last edited 2h ago by Kira P.' : 'Last edited yesterday by Ana R.',
+      onOpen: () => this.setState({ view: 'canvas', productId: p.id }, () => setTimeout(() => this.fit(), 30)),
+    }));
+
+    const stats = [
+      { label: 'Opportunities', value: st.nodes.filter(n => n.type === 'opportunity').length },
+      { label: 'Solutions live', value: st.nodes.filter(n => n.type === 'solution').length },
+      { label: 'Tests running', value: assumptions.filter(a => a.status === 'testing').length },
+      { label: 'Interviews this month', value: 14 },
+    ];
+
+    const quickLink = (name, base) => {
+      const list = (sel && sel.links) || [];
+      const present = list.some(l => l.name.toLowerCase() === name.toLowerCase());
+      const suffix = name === 'Confluence' ? (sel ? sel.id : '') : (name === 'Jira Epic' ? 'DISC-' : 'INIT-') + Math.floor(100 + Math.random() * 800);
+      return {
+        title: present ? name + ' already linked' : 'Add a ' + name + ' link',
+        onClick: () => {
+          if (!sel || present) return;
+          this.patch(sel.id, { links: list.concat([{ name, url: base.replace(/DISC-$/, '') + suffix }]) });
+        },
+        style: {
+          display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 9px',
+          font: 'inherit', borderRadius: 'var(--radius-md)',
+          cursor: present ? 'default' : 'pointer', opacity: present ? 0.45 : 1,
+          border: '1px solid ' + (present ? 'var(--color-neutral-800)' : 'var(--color-accent-600)'),
+          background: 'transparent',
+          color: present ? 'var(--color-neutral-500)' : 'var(--color-accent-300)',
+        },
+      };
+    };
+
+    return {
+      isCanvas: st.view === 'canvas', isTrees: st.view === 'trees', isExp: st.view === 'experiments', isDetail: st.view === 'detail',
+      goCanvas: () => this.setState({ view: 'canvas' }), goTrees: () => this.setState({ view: 'trees' }),
+      goExp: () => this.setState({ view: 'experiments' }), openDetail: () => this.setState({ view: 'detail' }),
+      canvasRef: (el) => {
+        if (el === this.canvasEl) return;
+        if (this.canvasEl && this._wheel) this.canvasEl.removeEventListener('wheel', this._wheel);
+        this.canvasEl = el;
+        if (el) {
+          this.bindWheel(el);
+          if (!this._fitted) { this._fitted = true; setTimeout(() => this.fit(), 40); }
+        }
+      },
+      worldStyle: { position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: 'translate(' + st.tx + 'px,' + st.ty + 'px) scale(' + st.zoom + ')' },
+      nodes, edges, typeChips, treeCards, stats, expRows,
+      allProducts, productOpts,
+      productsOpen: st.productsOpen,
+      productLabel: curProduct ? curProduct.title : 'All products',
+      productMeta: curProduct ? countUnder(curProduct.id) + ' nodes' : products.length + ' branches',
+      toggleProducts: () => this.setState(s => ({ productsOpen: !s.productsOpen })),
+      productBtnStyle: {
+        display: 'flex', alignItems: 'center', gap: '8px', font: 'inherit', cursor: 'pointer',
+        padding: '6px 10px', borderRadius: 'var(--radius-md)', color: 'var(--color-text)',
+        border: '1px solid ' + (st.productsOpen ? 'var(--color-accent-600)' : 'var(--color-neutral-800)'),
+        background: st.productsOpen ? 'var(--color-accent-900)' : 'transparent',
+      },
+      tools, mini, miniView, onMiniDown,
+      ghosting: !!st.paletteDrag,
+      ghostLabel: st.paletteDrag ? T[st.paletteDrag.type].label : '',
+      ghostStyle: st.paletteDrag ? {
+        position: 'fixed', zIndex: 200, pointerEvents: 'none',
+        left: (st.paletteDrag.x + 14) + 'px', top: (st.paletteDrag.y + 12) + 'px',
+        padding: '6px 10px', fontSize: '12px', fontWeight: 500, borderRadius: 'var(--radius-md)',
+        background: 'var(--color-surface)', color: 'var(--color-text)',
+        border: '1px solid ' + (st.dropId ? 'var(--color-accent-400)' : 'var(--color-neutral-700)'),
+        boxShadow: 'var(--shadow-md)', opacity: 0.96,
+      } : {},
+      ghostNote: st.dropId ? 'Attach here' : 'Drop on a highlighted node',
+      chatOpen: !!chatNode,
+      chatTitle: chatNode ? chatNode.title : '',
+      chatSub: chatNode ? T[chatNode.type].label + ' · ' + (chatNode.comments.length || 'no') + ' message' + (chatNode.comments.length === 1 ? '' : 's') : '',
+      chatPeople: chatNode ? Array.from(new Set(chatNode.comments.map(c => c.who).concat(['KP']))).slice(0, 3).map(i => ({ initials: i })) : [],
+      chatMsgs: threadNode ? threadNode.comments.map((c, i) => {
+        const prev = threadNode.comments[i - 1];
+        const mine = c.who === 'KP';
+        return {
+          i, text: c.text + (c.edited ? ' (edited)' : ''), who: c.who,
+          mine, stamp: c.when, showStamp: !prev || prev.when !== c.when,
+          showWho: !mine && (!prev || prev.who !== c.who),
+          wrapStyle: { display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start', maxWidth: '100%' },
+          bubbleStyle: {
+            maxWidth: '78%', padding: '8px 12px', fontSize: '13px', lineHeight: 1.35, textWrap: 'pretty',
+            borderRadius: mine ? '17px 17px 5px 17px' : '17px 17px 17px 5px',
+            background: mine ? 'var(--color-accent-600)' : 'var(--color-neutral-900)',
+            color: mine ? 'var(--color-neutral-100)' : 'var(--color-text)',
+            border: mine ? '1px solid var(--color-accent-500)' : '1px solid var(--color-neutral-800)',
+          },
+          onEdit: () => this.setState({ chatEdit: i, chatDraft: c.text }),
+          onDelete: () => {
+            const list = threadNode.comments.slice(); list.splice(i, 1);
+            this.patch(threadNode.id, { comments: list });
+            this.setState(s => ({ chatEdit: null, chatDraft: s.chatEdit === i ? '' : s.chatDraft }));
+          },
+        };
+      }) : [],
+      chatDraft: st.chatDraft,
+      chatEditing: st.chatEdit !== null,
+      cancelEdit: () => this.setState({ chatEdit: null, chatDraft: '' }),
+      closeChat: () => this.setState({ chatId: null, chatEdit: null, chatDraft: '' }),
+      stopClick: (e) => e.stopPropagation(),
+      onChatInput: (e) => this.setState({ chatDraft: e.target.value }),
+      onChatKey: (e) => { if (e.key === 'Enter') this.sendChat(); if (e.key === 'Escape') this.setState({ chatId: null }); },
+      sendChat: () => this.sendChat(),
+      sendStyle: {
+        width: '32px', height: '32px', flex: 'none', display: 'grid', placeItems: 'center',
+        borderRadius: '50%', cursor: st.chatDraft.trim() ? 'pointer' : 'not-allowed',
+        border: '1px solid ' + (st.chatDraft.trim() ? 'var(--color-accent-500)' : 'var(--color-neutral-800)'),
+        background: st.chatDraft.trim() ? 'var(--color-accent-600)' : 'transparent',
+        color: st.chatDraft.trim() ? 'var(--color-neutral-100)' : 'var(--color-neutral-500)',
+      },
+      chatRef: (el) => {
+        this.chatEl = el;
+        if (el && this._chatScroll) { this._chatScroll = false; setTimeout(() => this.chatScrollToEnd(false), 0); }
+      },
+      onChatScroll: (e) => {
+        const el = e.target;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+        if (atBottom !== this.state.chatAtBottom) this.setState({ chatAtBottom: atBottom });
+      },
+      showScrollBtn: !!chatNode && !st.chatAtBottom,
+      scrollChat: () => this.chatScrollToEnd(true),
+      teamsOpen: st.teamsOpen,
+      teamLabel: (TEAMS.find(t => t.id === st.teamId) || TEAMS[0]).name,
+      teamKicker: (TEAMS.find(t => t.id === st.teamId) || TEAMS[0]).name + ' · continuous discovery',
+      members: (TEAMS.find(t => t.id === st.teamId) || TEAMS[0]).members.map(i => ({ initials: i })),
+      toggleTeams: () => this.setState(s => ({ teamsOpen: !s.teamsOpen })),
+      teamBtnStyle: {
+        display: 'flex', alignItems: 'center', gap: '7px', font: 'inherit', cursor: 'pointer',
+        padding: '5px 9px', borderRadius: 'var(--radius-md)',
+        border: '1px solid ' + (st.teamsOpen ? 'var(--color-accent-600)' : 'var(--color-neutral-800)'),
+        background: st.teamsOpen ? 'var(--color-accent-900)' : 'transparent',
+        color: st.teamsOpen ? 'var(--color-accent-200)' : 'var(--color-neutral-300)',
+      },
+      teams: TEAMS.map(t => ({
+        id: t.id, name: t.name, meta: t.meta, current: t.id === st.teamId,
+        onClick: () => this.setState({ teamId: t.id, teamsOpen: false }),
+        style: {
+          display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '7px 9px',
+          font: 'inherit', color: 'var(--color-text)', cursor: 'pointer', textAlign: 'left',
+          borderRadius: 'var(--radius-sm)', border: '1px solid transparent',
+          background: t.id === st.teamId ? 'var(--color-accent-900)' : 'transparent',
+        },
+      })),
+      toolHint: st.tool
+        ? 'Click a highlighted node to attach the new ' + T[st.tool].label.toLowerCase() + '.'
+        : 'Drag a type onto the node it belongs under — or click to arm it, then click a node. Drag a node onto another to re-parent; double-click to rename.',
+      query: st.query, onQuery: (e) => this.setState({ query: e.target.value }),
+      zoomLabel: Math.round(st.zoom * 100) + '%',
+      zoomIn: () => this.setState(s => ({ zoom: Math.min(1.6, s.zoom * 1.15) })),
+      zoomOut: () => this.setState(s => ({ zoom: Math.max(0.35, s.zoom / 1.15) })),
+      fit: () => this.fit(),
+      onBgDown: this.onBgDown,
+      hasSelection: !!sel && st.rightOpen,
+      showReopen: !!sel && !st.rightOpen,
+      leftOpen: st.leftOpen, leftClosed: !st.leftOpen,
+      toggleLeft: () => this.setState(s => ({ leftOpen: !s.leftOpen })),
+      toggleRight: () => this.setState(s => ({ rightOpen: !s.rightOpen })),
+      clearSel: () => this.setState({ selected: null }),
+      selKicker: sel ? T[sel.type].label : '',
+      selTitle: sel ? sel.title : '',
+      selBreadcrumb: sel ? (breadcrumb(sel) || 'Top of the tree') : '',
+      selNote: sel ? sel.note : '',
+      selStatus: sel ? sel.status : '',
+      selStatusStyle: sel ? this.statusStyle(sel.status, true) : {},
+      selConfLabel: sel ? this.confLabel(sel.conf) : '',
+      selChildren, selChildCount: selChildren.length,
+      showQuickLinks: !!sel && sel.type !== 'product',
+      showJiraQuick: !!sel && ['product', 'outcome', 'assumption'].indexOf(sel.type) < 0,
+      showInitiativeQuick: !!sel && ['product', 'outcome', 'assumption', 'evidence'].indexOf(sel.type) < 0,
+      epicLabel: sel && sel.type === 'evidence' ? 'Ticket' : 'Epic',
+      selHasStatus: !!sel && (STATUS[sel.type] || []).length > 0,
+      selHasConf: !!sel && sel.type === 'assumption',
+      selHasPri: !!sel && sel.type === 'opportunity',
+      selValueLabel: sel ? ['—', 'Marginal', 'Modest', 'Solid', 'Strong', 'Outsized'][sel.value || 3] : '',
+      valueOpts: sel ? [1, 2, 3, 4, 5].map(v => ({
+        v, label: '$'.repeat(v),
+        onClick: () => this.patch(sel.id, { value: v }),
+        style: {
+          flex: 1, height: '30px', font: 'inherit', fontSize: '13px', cursor: 'pointer',
+          borderRadius: 'var(--radius-sm)', letterSpacing: '-.04em',
+          border: '1px solid ' + (v <= (sel.value || 0) ? 'var(--color-accent-600)' : 'var(--color-neutral-800)'),
+          background: v <= (sel.value || 0) ? 'var(--color-accent-900)' : 'transparent',
+          color: v <= (sel.value || 0) ? 'var(--color-accent-200)' : 'var(--color-neutral-500)',
+        },
+      })) : [],
+      selHasRollup: !!sel && sel.type === 'solution',
+      rollupPct: rollup ? (rollup.score === null ? 'untested' : rollup.score + '%') : '',
+      rollupBarStyle: {
+        position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: '999px',
+        width: (rollup && rollup.score !== null ? rollup.score : 0) + '%',
+        background: 'var(--color-accent-500)',
+      },
+      rollupNote: rollup
+        ? (rollup.tests === 0
+          ? 'No assumption tests under this solution yet — add the assumptions you would have to believe for it to work.'
+          : rollup.tests + ' assumption test' + (rollup.tests === 1 ? '' : 's') + ' · ' + rollup.supported + ' supported · ' + rollup.refuted + ' refuted. Rolled up from the tests below, not set by hand.')
+        : '',
+      selHasMeta: !!sel && sel.type !== 'product',
+      panelTabs: [['detail', 'Detail'], ['links', 'Links'], ['chat', 'Chat'], ['questions', 'Open Qs'], ['history', 'History']]
+        .filter(([id]) => !(sel && sel.type === 'product' && (id === 'chat' || id === 'history')))
+        .filter(([id]) => id !== 'questions' || (sel && sel.type === 'opportunity'))
+        .map(([id, label]) => {
+        const on = panelTab === id;
+        const badge = id === 'links' ? (sel && sel.links ? sel.links.length : 0)
+          : id === 'chat' ? (sel ? sel.comments.length : 0)
+          : id === 'questions' ? (sel ? (sel.questions || []).filter(q => !q.done).length : 0) : 0;
+        return {
+          id, label, hasBadge: badge > 0, badge,
+          onClick: () => this.setState({ panelTab: id }),
+          style: {
+            position: 'relative', display: 'flex', alignItems: 'center', gap: '5px',
+            font: 'inherit', fontSize: '12px', padding: '7px 6px 8px', cursor: 'pointer', whiteSpace: 'nowrap',
+            background: 'transparent', border: 0, borderBottom: '2px solid ' + (on ? 'var(--color-accent)' : 'transparent'),
+            color: on ? 'var(--color-text)' : 'var(--color-neutral-400)', fontWeight: on ? 500 : 400,
+          },
+          badgeStyle: {
+            fontSize: '9.5px', padding: '1px 5px', borderRadius: '999px',
+            background: on ? 'var(--color-accent-800)' : 'var(--color-neutral-900)',
+            color: on ? 'var(--color-accent-200)' : 'var(--color-neutral-400)',
+          },
+        };
+      }),
+      isTabQuestions: panelTab === 'questions',
+      selQuestions: sel ? (sel.questions || []).map((q, i) => ({
+        i, text: q.text, done: q.done,
+        boxStyle: {
+          width: '16px', height: '16px', flex: 'none', marginTop: '1px', display: 'grid', placeItems: 'center',
+          borderRadius: '4px', cursor: 'pointer', background: q.done ? 'var(--color-accent-600)' : 'transparent',
+          border: '1px solid ' + (q.done ? 'var(--color-accent-500)' : 'var(--color-neutral-600)'),
+          color: 'var(--color-neutral-100)', font: 'inherit', fontSize: '10px', lineHeight: 1, padding: 0,
+        },
+        textStyle: {
+          fontSize: '13px', lineHeight: 1.35, textWrap: 'pretty',
+          color: q.done ? 'var(--color-neutral-500)' : 'var(--color-text)',
+          textDecoration: q.done ? 'line-through' : 'none',
+        },
+        onToggle: () => { const l = sel.questions.slice(); l[i] = Object.assign({}, q, { done: !q.done }); this.patch(sel.id, { questions: l }); },
+        onRemove: () => { const l = sel.questions.slice(); l.splice(i, 1); this.patch(sel.id, { questions: l }); },
+      })) : [],
+      qDraft: st.qDraft,
+      onQInput: (e) => this.setState({ qDraft: e.target.value }),
+      onQKey: (e) => {
+        if (e.key !== 'Enter' || !sel || !this.state.qDraft.trim()) return;
+        this.patch(sel.id, { questions: (sel.questions || []).concat([{ text: this.state.qDraft.trim(), done: false }]) });
+        this.setState({ qDraft: '' });
+      },
+      qSummary: sel ? ((sel.questions || []).filter(q => !q.done).length + ' open · ' + (sel.questions || []).filter(q => q.done).length + ' answered') : '',
+      isTabDetail: panelTab === 'detail', isTabLinks: panelTab === 'links',
+      isTabChat: panelTab === 'chat', isTabHistory: panelTab === 'history',
+      selLinks: sel ? (sel.links || []).map((l, i) => ({
+        i, name: l.name, url: l.url,
+        dotStyle: {
+          width: '7px', height: '7px', flex: 'none', borderRadius: '50%',
+          background: /confluence|wiki/i.test(l.url) ? 'var(--color-accent-400)' : 'var(--color-neutral-500)',
+        },
+        onName: (e) => { const list = sel.links.slice(); list[i] = Object.assign({}, l, { name: e.target.value }); this.patch(sel.id, { links: list }); },
+        onUrl: (e) => { const list = sel.links.slice(); list[i] = Object.assign({}, l, { url: e.target.value }); this.patch(sel.id, { links: list }); },
+        onRemove: () => { const list = sel.links.slice(); list.splice(i, 1); this.patch(sel.id, { links: list }); },
+      })) : [],
+      addLink: () => sel && this.patch(sel.id, { links: (sel.links || []).concat([{ name: 'New link', url: 'https://' }]) }),
+      addConfluence: quickLink('Confluence', 'https://ombuto.atlassian.net/wiki/discovery/'),
+      addInitiative: quickLink('Jira Initiative', 'https://ombuto.atlassian.net/browse/DISC-'),
+      addEpic: quickLink(sel && sel.type === 'evidence' ? 'Jira Ticket' : 'Jira Epic', 'https://ombuto.atlassian.net/browse/DISC-'),
+      selHistory: sel ? (sel.history || []).slice().reverse().map((h, i, arr) => ({
+        what: h.what, meta: h.who + ' · ' + h.when, line: i < arr.length - 1,
+        dotStyle: {
+          width: '7px', height: '7px', flex: 'none', borderRadius: '50%', marginTop: '5px',
+          background: i === 0 ? 'var(--color-accent-400)' : 'var(--color-neutral-600)',
+        },
+      })) : [],
+      selComments: sel ? sel.comments : [],
+      selCommentCount: sel ? sel.comments.length : 0,
+      statusOpts: sel ? (STATUS[sel.type] || []).map(s => ({
+        label: s, style: Object.assign(this.chipStyle(sel.status === s), { fontSize: '11px' }),
+        onClick: () => this.patch(sel.id, { status: s }),
+      })) : [],
+      confOpts: sel ? [20, 40, 60, 80, 100].map(v => ({
+        label: v + '%',
+        style: {
+          flex: 1, height: '22px', cursor: 'pointer', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-neutral-800)',
+          background: sel.conf >= v ? 'var(--color-accent-600)' : 'transparent',
+        },
+        onClick: () => this.patch(sel.id, { conf: v }),
+      })) : [],
+      selPriLabel: sel ? this.priLabel(sel.priority) + ' · ' + Math.round(sel.priority) : '',
+      priFillStyle: sel ? {
+        position: 'absolute', left: '2px', top: '50%', transform: 'translateY(-50%)', height: '4px',
+        width: 'calc(' + sel.priority + '% - ' + (sel.priority / 100 * 4) + 'px)', borderRadius: '999px',
+        pointerEvents: 'none',
+        background: 'linear-gradient(90deg, ' + this.priColor(Math.max(6, sel.priority * 0.15)) + ', ' + this.priColor(sel.priority) + ')',
+      } : {},
+      priHandleStyle: sel ? {
+        position: 'absolute', top: '50%', left: sel.priority + '%', width: '15px', height: '15px',
+        transform: 'translate(-50%,-50%)', borderRadius: '50%', pointerEvents: 'none',
+        background: this.priColor(sel.priority),
+        boxShadow: '0 0 0 4px color-mix(in srgb, ' + this.priColor(sel.priority) + ' 22%, transparent)',
+      } : {},
+      onPriDown: (e) => {
+        if (!sel) return;
+        const track = e.currentTarget.getBoundingClientRect();
+        const set = (ev) => {
+          const t = Math.max(0, Math.min(1, (ev.clientX - track.left) / track.width));
+          this.patch(sel.id, { priority: Math.max(2, Math.round(t * 100)) });
+        };
+        set(e);
+        const up = () => { window.removeEventListener('pointermove', set); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', set); window.addEventListener('pointerup', up);
+      },
+      addOpts: sel ? (ALLOWED[sel.type] || []).map(t => ({
+        label: T[t].label, onClick: () => this.addChild(sel.id, t),
+      })) : [],
+      onSelTitle: (e) => sel && this.patch(sel.id, { title: e.target.value }),
+      onSelNote: (e) => sel && this.patch(sel.id, { note: e.target.value }),
+      deleteSel: () => sel && this.setState({ confirmId: sel.id }),
+      confirmOpen: !!victim,
+      confirmKind: victim ? T[victim.type].label.toLowerCase() : '',
+      confirmTitle: victim ? victim.title : '',
+      confirmExtra: victimKids ? ' and its ' + victimKids + ' descendant' + (victimKids === 1 ? '' : 's') : '',
+      cancelDelete: () => this.setState({ confirmId: null }),
+      confirmDelete: () => { if (victim) this.removeNode(victim.id); this.setState({ confirmId: null }); },
+      commentDraft: st.commentDraft,
+      onCommentInput: (e) => this.setState({ commentDraft: e.target.value }),
+      onCommentKey: (e) => {
+        if (e.key !== 'Enter' || !sel || !this.state.commentDraft.trim()) return;
+        const c = { who: 'KP', when: 'Just now', text: this.state.commentDraft.trim() };
+        this.patch(sel.id, { comments: sel.comments.concat([c]) });
+        this.setState({ commentDraft: '' });
+      },
+      expSummary: assumptions.filter(a => a.status === 'testing').length + ' running · ' + assumptions.filter(a => a.status === 'untested').length + ' queued · ' + assumptions.filter(a => a.status === 'supported' || a.status === 'refuted').length + ' settled',
+    };
+  }
+}
+
+</script>
+</body>
+</html>
