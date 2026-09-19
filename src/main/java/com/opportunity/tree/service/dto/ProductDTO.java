@@ -27,7 +27,6 @@ public class ProductDTO implements Serializable {
     @NotNull
     private Boolean archived;
 
-    @NotNull
     private Instant createdDate;
 
     @NotNull

@@ -19,7 +19,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const teamsService = inject('teamsService', () => new TeamsService(), true);
+    const teamsService = inject('teamsService', () => new TeamsService());
     const alertService = inject('alertService', () => useAlertService(), true);
     const teamsStore = useTeamsStore();
 
@@ -53,7 +53,8 @@ export default defineComponent({
     const translateError = (err: any, fallback = 'Something went wrong'): string => {
       const status = err?.response?.status;
       const data = err?.response?.data ?? {};
-      const key: string | undefined = data.errorKey ?? data.message;
+      // BadRequestAlertException sends the key as message: 'error.<key>'
+      const key: string | undefined = (data.errorKey ?? data.message)?.replace(/^error\./, '');
       if (key === 'lastowner' || (typeof data.detail === 'string' && data.detail.includes('lastowner'))) {
         return LAST_OWNER_ERROR;
       }
@@ -66,7 +67,11 @@ export default defineComponent({
       if (status === 403) {
         return 'You do not have permission to perform this action.';
       }
-      return data.detail ?? data.title ?? fallback;
+      // The server's detail for these errors is a raw ProblemDetail dump — never show that
+      if (typeof data.detail === 'string' && !data.detail.includes('ProblemDetail')) {
+        return data.detail;
+      }
+      return fallback;
     };
 
     const loadMembers = async () => {

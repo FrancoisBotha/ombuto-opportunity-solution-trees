@@ -41,10 +41,8 @@ public class OutcomeDTO implements Serializable {
 
     private LocalDate targetDate;
 
-    @NotNull
     private Integer sortOrder;
 
-    @NotNull
     private Instant createdDate;
 
     private Instant lastModifiedDate;

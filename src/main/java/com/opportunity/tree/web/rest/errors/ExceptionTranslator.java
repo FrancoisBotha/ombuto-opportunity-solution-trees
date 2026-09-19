@@ -2,6 +2,7 @@ package com.opportunity.tree.web.rest.errors;
 
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
 
+import com.opportunity.tree.service.NodeWriteRuleException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Arrays;
@@ -67,6 +68,12 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
         LOG.debug("Converting Exception to Problem Details:", ex);
         ProblemDetailWithCause pdCause = wrapAndCustomizeProblem(ex, request);
         return handleExceptionInternal((Exception) ex, pdCause, buildHeaders(ex), HttpStatusCode.valueOf(pdCause.getStatus()), request);
+    }
+
+    /** Tree node write-rule violations raised by the service layer are reported as a 400 (TREE-002). */
+    @ExceptionHandler
+    public ResponseEntity<Object> handleNodeWriteRuleException(NodeWriteRuleException ex, NativeWebRequest request) {
+        return handleAnyException(new BadRequestAlertException(ex.getMessage(), ex.getEntityName(), ex.getErrorKey()), request);
     }
 
     @SuppressWarnings("java:S2638")

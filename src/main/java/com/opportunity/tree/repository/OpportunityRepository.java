@@ -49,4 +49,10 @@ public interface OpportunityRepository
         "select opportunity from Opportunity opportunity left join fetch opportunity.outcome left join fetch opportunity.parent left join fetch opportunity.owner where opportunity.id =:id"
     )
     Optional<Opportunity> findOneWithToOneRelationships(@Param("id") Long id);
+
+    @Query("select coalesce(max(o.sortOrder), -1) from Opportunity o where o.parent is null and o.outcome.id = :outcomeId")
+    Integer findMaxSortOrderByOutcomeIdRoot(@Param("outcomeId") Long outcomeId);
+
+    @Query("select coalesce(max(o.sortOrder), -1) from Opportunity o where o.parent.id = :parentId")
+    Integer findMaxSortOrderByParentId(@Param("parentId") Long parentId);
 }

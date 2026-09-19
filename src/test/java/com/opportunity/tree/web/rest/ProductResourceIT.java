@@ -279,19 +279,41 @@ class ProductResourceIT {
 
     @Test
     @Transactional
-    void checkCreatedDateIsRequired() throws Exception {
-        long databaseSizeBeforeTest = getRepositoryCount();
-        // set the field null
+    void createProductSetsCreatedDateServerSide() throws Exception {
+        // createdDate is server-set (TREE-002): a missing value is fine and a
+        // client-supplied one is ignored.
         product.setCreatedDate(null);
-
-        // Create the Product, which fails.
         ProductDTO productDTO = productMapper.toDto(product);
 
-        restProductMockMvc
-            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(productDTO)))
-            .andExpect(status().isBadRequest());
+        var returnedProductDTO = om.readValue(
+            restProductMockMvc
+                .perform(
+                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(productDTO))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            ProductDTO.class
+        );
+        assertThat(productRepository.findById(returnedProductDTO.getId()).orElseThrow().getCreatedDate()).isAfter(DEFAULT_CREATED_DATE);
 
-        assertSameRepositoryCount(databaseSizeBeforeTest);
+        product.setCreatedDate(DEFAULT_CREATED_DATE);
+        returnedProductDTO = om.readValue(
+            restProductMockMvc
+                .perform(
+                    post(ENTITY_API_URL)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsBytes(productMapper.toDto(product)))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString(),
+            ProductDTO.class
+        );
+        assertThat(productRepository.findById(returnedProductDTO.getId()).orElseThrow().getCreatedDate()).isAfter(DEFAULT_CREATED_DATE);
     }
 
     @Test
@@ -387,6 +409,8 @@ class ProductResourceIT {
 
         // Validate the Product in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
+        // createdDate is server-owned: the client-supplied value is ignored (TREE-002)
+        updatedProduct.createdDate(DEFAULT_CREATED_DATE);
         assertPersistedProductToMatchAllProperties(updatedProduct);
     }
 
@@ -481,6 +505,8 @@ class ProductResourceIT {
         // Validate the Product in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
+        // createdDate is server-owned: the client-supplied value is ignored (TREE-002)
+        partialUpdatedProduct.createdDate(DEFAULT_CREATED_DATE);
         assertProductUpdatableFieldsEquals(createUpdateProxyForBean(partialUpdatedProduct, product), getPersistedProduct(product));
     }
 
@@ -515,6 +541,8 @@ class ProductResourceIT {
         // Validate the Product in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
+        // createdDate is server-owned: the client-supplied value is ignored (TREE-002)
+        partialUpdatedProduct.createdDate(DEFAULT_CREATED_DATE);
         assertProductUpdatableFieldsEquals(partialUpdatedProduct, getPersistedProduct(partialUpdatedProduct));
     }
 
