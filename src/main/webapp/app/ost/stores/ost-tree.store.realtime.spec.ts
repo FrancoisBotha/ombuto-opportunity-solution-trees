@@ -166,8 +166,91 @@ describe('OST tree store — realtime event application (RTC-005)', () => {
     expect(service.addComment.firstCall.args[3]).toEqual(expect.any(String));
   });
 
-  it('the request id header is exposed as a stable constant', () => {
-    expect(REQUEST_ID_HEADER).toBe('X-OST-Request-Id');
+  it('the request id header matches the server (X-Client-Request-Id) so echoes are recognised', () => {
+    expect(REQUEST_ID_HEADER).toBe('X-Client-Request-Id');
+  });
+
+  // ---- criterion 5: normalize the real wire shape (payload + server field names) ---------------
+  it('applies a wire-shape TreeChangeEvent (payload + server field names) verbatim', async () => {
+    // Comment thread must be loaded so the wire COMMENT_ADDED is inserted into it.
+    service.listComments.resolves([]);
+    await tree.loadComments('solution-1');
+
+    // Exact broadcast shape: {type, teamId, actingUserLogin, at, seq, epoch, requestId, payload}.
+    const now = new Date().toISOString();
+    tree.applyEvents([
+      {
+        type: 'NODE_UPDATED',
+        teamId: 7,
+        actingUserLogin: 'admin',
+        at: now,
+        seq: 1,
+        epoch: 'e1',
+        requestId: null,
+        payload: dto('opportunity-1', 'outcome-1', { priority: 55, valueRating: 4 }),
+      } as any,
+      {
+        type: 'NODE_MOVED',
+        teamId: 7,
+        actingUserLogin: 'admin',
+        at: now,
+        seq: 2,
+        epoch: 'e1',
+        requestId: null,
+        payload: {
+          node: dto('solution-1', 'opportunity-2', { sortOrder: 0 }),
+          siblings: [{ key: 'opportunity-1', sortOrder: 5 }],
+        },
+      } as any,
+      {
+        type: 'LINK_ADDED',
+        teamId: 7,
+        actingUserLogin: 'admin',
+        at: now,
+        seq: 3,
+        epoch: 'e1',
+        requestId: null,
+        payload: { nodeKey: 'opportunity-2', link: { id: 42, name: 'Doc', url: 'https://x.test/doc', sortOrder: 0 } },
+      } as any,
+      {
+        type: 'COMMENT_ADDED',
+        teamId: 7,
+        actingUserLogin: 'admin',
+        at: now,
+        seq: 4,
+        epoch: 'e1',
+        requestId: null,
+        payload: {
+          nodeKey: 'solution-1',
+          comment: {
+            id: 501,
+            body: 'hi',
+            authorLogin: 'admin',
+            authorInitials: 'A',
+            authorName: 'Admin',
+            createdDate: now,
+            editedDate: null,
+            mine: false,
+          },
+          commentCount: 1,
+        },
+      } as any,
+      {
+        type: 'NODE_DELETED',
+        teamId: 7,
+        actingUserLogin: 'admin',
+        at: now,
+        seq: 5,
+        epoch: 'e1',
+        requestId: null,
+        payload: { key: 'opportunity-1', cascadedKeys: [] },
+      } as any,
+    ]);
+
+    expect(tree.byId('opportunity-1')).toBeUndefined(); // NODE_DELETED via payload.key applied
+    expect(tree.byId('solution-1')?.parent).toBe('opportunity-2'); // NODE_MOVED via payload.node
+    expect(tree.byId('opportunity-2')?.links).toEqual([{ id: 42, name: 'Doc', url: 'https://x.test/doc' }]);
+    expect(tree.byId('solution-1')?.commentCount).toBe(1);
   });
 
   it('drops the echo of its own write (actingUserLogin + request id) and does not double-apply', async () => {

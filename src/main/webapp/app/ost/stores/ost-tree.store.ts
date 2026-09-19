@@ -60,6 +60,90 @@ export type OstTreeEvent =
       commentCount?: number;
     };
 
+/** Wire-shape event as broadcast by TreeChangePublisher / TreeChangeBroadcaster. */
+interface WireTreeEvent {
+  type: string;
+  actingUserLogin?: string;
+  requestId?: string;
+  payload?: unknown;
+  // The flat variant (still accepted for internal test/utility callers) uses these directly:
+  node?: TreeNodeDTO;
+  key?: string;
+  link?: NodeLinkDTO;
+  linkId?: number;
+  question?: OpenQuestionDTO;
+  questionId?: number;
+  comment?: CommentDTO;
+  commentId?: number;
+  commentCount?: number;
+  siblings?: { key: string; sortOrder: number }[];
+  descendantKeys?: string[];
+}
+
+/**
+ * Turns a wire {@code TreeChangeEvent} (whose body lives under {@code payload}, with the server's
+ * field names) into the flat {@link OstTreeEvent} shape the store applies. If the incoming record
+ * already has the flat fields at the top level, it is returned unchanged.
+ */
+function normalizeEvent(raw: WireTreeEvent): OstTreeEvent | null {
+  const meta = { actingUserLogin: raw.actingUserLogin, requestId: raw.requestId };
+  const p: any = raw.payload ?? {};
+  switch (raw.type) {
+    case 'NODE_CREATED':
+    case 'NODE_UPDATED': {
+      const node = raw.node ?? (p as TreeNodeDTO);
+      return node ? ({ type: raw.type, ...meta, node } as OstTreeEvent) : null;
+    }
+    case 'NODE_MOVED': {
+      const node = raw.node ?? (p.node as TreeNodeDTO);
+      const siblings = (raw.siblings ?? p.siblings ?? []) as { key: string; sortOrder: number }[];
+      return node ? ({ type: 'NODE_MOVED', ...meta, node, siblings } as OstTreeEvent) : null;
+    }
+    case 'NODE_DELETED': {
+      const key = raw.key ?? (p.key as string);
+      const descendantKeys = (raw.descendantKeys ?? p.cascadedKeys ?? []) as string[];
+      return key ? ({ type: 'NODE_DELETED', ...meta, key, descendantKeys } as OstTreeEvent) : null;
+    }
+    case 'LINK_ADDED':
+    case 'LINK_UPDATED': {
+      const key = raw.key ?? (p.nodeKey as string);
+      const link = raw.link ?? (p.link as NodeLinkDTO);
+      return key && link ? ({ type: raw.type, ...meta, key, link } as OstTreeEvent) : null;
+    }
+    case 'LINK_REMOVED': {
+      const key = raw.key ?? (p.nodeKey as string);
+      const linkId = raw.linkId ?? (p.linkId as number);
+      return key && linkId != null ? ({ type: 'LINK_REMOVED', ...meta, key, linkId } as OstTreeEvent) : null;
+    }
+    case 'QUESTION_ADDED':
+    case 'QUESTION_UPDATED': {
+      const key = raw.key ?? (p.nodeKey as string);
+      const question = raw.question ?? (p.question as OpenQuestionDTO);
+      return key && question ? ({ type: raw.type, ...meta, key, question } as OstTreeEvent) : null;
+    }
+    case 'QUESTION_REMOVED': {
+      const key = raw.key ?? (p.nodeKey as string);
+      const questionId = raw.questionId ?? (p.questionId as number);
+      return key && questionId != null ? ({ type: 'QUESTION_REMOVED', ...meta, key, questionId } as OstTreeEvent) : null;
+    }
+    case 'COMMENT_ADDED':
+    case 'COMMENT_UPDATED': {
+      const key = raw.key ?? (p.nodeKey as string);
+      const comment = raw.comment ?? (p.comment as CommentDTO);
+      const commentCount = raw.commentCount ?? (typeof p.commentCount === 'number' ? p.commentCount : undefined);
+      return key && comment ? ({ type: raw.type, ...meta, key, comment, commentCount } as OstTreeEvent) : null;
+    }
+    case 'COMMENT_DELETED': {
+      const key = raw.key ?? (p.nodeKey as string);
+      const commentId = raw.commentId ?? (p.commentId as number);
+      const commentCount = raw.commentCount ?? (typeof p.commentCount === 'number' ? p.commentCount : undefined);
+      return key && commentId != null ? ({ type: 'COMMENT_DELETED', ...meta, key, commentId, commentCount } as OstTreeEvent) : null;
+    }
+    default:
+      return null;
+  }
+}
+
 const RECENT_REQUEST_ID_CAP = 200;
 let requestIdCounter = 0;
 const generateRequestId = (): string =>
@@ -887,8 +971,10 @@ export const useOstTreeStore = defineStore('ostTree', () => {
    * A remote delete of a node with a local edit in flight reuses the "deleted by someone else"
    * message that the store already shows after a rejected write.
    */
-  function applyEvents(events: OstTreeEvent[]): void {
-    for (const event of events) {
+  function applyEvents(events: readonly (OstTreeEvent | WireTreeEvent)[]): void {
+    for (const raw of events) {
+      const event = normalizeEvent(raw as WireTreeEvent);
+      if (!event) continue;
       if (isOwnEcho(event)) continue;
       switch (event.type) {
         case 'NODE_CREATED':

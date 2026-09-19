@@ -20,7 +20,7 @@ const treeApi = 'api/tree';
 const seg = (type: string) => type.toLowerCase();
 
 /** Header the server echoes on the resulting change event so a client can drop its own echo (RTC-005). */
-export const REQUEST_ID_HEADER = 'X-OST-Request-Id';
+export const REQUEST_ID_HEADER = 'X-Client-Request-Id';
 
 const withRequestId = (requestId: string | undefined): AxiosRequestConfig | undefined =>
   requestId ? { headers: { [REQUEST_ID_HEADER]: requestId } } : undefined;

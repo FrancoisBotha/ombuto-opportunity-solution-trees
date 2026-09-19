@@ -113,9 +113,7 @@ async function load() {
   const loaded = await tree.loadTree(id);
   if (!loaded || teamId.value !== id) return;
   realtime.openTeam(id, {
-    // Event application is owned by the tree-store integration ticket. The transport still
-    // validates, sequences and batches every event before handing it across this boundary.
-    applyEvents: () => undefined,
+    applyEvents: events => tree.applyEvents(events),
     reloadTree: () => tree.loadTree(id),
   });
 }
