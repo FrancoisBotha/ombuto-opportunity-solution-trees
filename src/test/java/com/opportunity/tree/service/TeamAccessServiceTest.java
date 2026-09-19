@@ -15,12 +15,14 @@ import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.TeamRole;
+import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.AssumptionRepository;
 import com.opportunity.tree.repository.OpportunityRepository;
 import com.opportunity.tree.repository.OutcomeRepository;
 import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.repository.SolutionRepository;
 import com.opportunity.tree.repository.TeamMemberRepository;
+import com.opportunity.tree.repository.TreeAccessLookupRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -72,6 +74,9 @@ class TeamAccessServiceTest {
     @Mock
     private AssumptionRepository assumptionRepository;
 
+    @Mock
+    private TreeAccessLookupRepository treeAccessLookupRepository;
+
     private TeamAccessService service;
 
     private Team teamA;
@@ -92,7 +97,8 @@ class TeamAccessServiceTest {
             outcomeRepository,
             opportunityRepository,
             solutionRepository,
-            assumptionRepository
+            assumptionRepository,
+            treeAccessLookupRepository
         );
 
         teamA = team(TEAM_A);
@@ -373,6 +379,166 @@ class TeamAccessServiceTest {
         stubNoMemberships();
 
         assertThat(service.getCurrentUserRole(TEAM_A)).isEmpty();
+    }
+
+    // ---------------------------------------------------------------------
+    // Generic node checks (all six node types) + link / question / comment
+    // ---------------------------------------------------------------------
+
+    private static final Long EVIDENCE_A = 60L;
+    private static final Long LINK_A = 70L;
+    private static final Long QUESTION_A = 80L;
+    private static final Long COMMENT_A = 90L;
+    private static final Long MISSING = 424242L;
+
+    private void stubAllNodesInTeamA() {
+        lenient().when(treeAccessLookupRepository.findTeamIdOfProduct(PRODUCT_A)).thenReturn(Optional.of(TEAM_A));
+        lenient().when(treeAccessLookupRepository.findTeamIdOfOutcome(OUTCOME_A)).thenReturn(Optional.of(TEAM_A));
+        lenient().when(treeAccessLookupRepository.findTeamIdOfOpportunity(OPPORTUNITY_A)).thenReturn(Optional.of(TEAM_A));
+        lenient().when(treeAccessLookupRepository.findTeamIdOfSolution(SOLUTION_A)).thenReturn(Optional.of(TEAM_A));
+        lenient().when(treeAccessLookupRepository.findTeamIdOfAssumption(ASSUMPTION_A)).thenReturn(Optional.of(TEAM_A));
+        lenient().when(treeAccessLookupRepository.findTeamIdOfEvidence(EVIDENCE_A)).thenReturn(Optional.of(TEAM_A));
+    }
+
+    private Long idOf(TreeNodeType type) {
+        return switch (type) {
+            case PRODUCT -> PRODUCT_A;
+            case OUTCOME -> OUTCOME_A;
+            case OPPORTUNITY -> OPPORTUNITY_A;
+            case SOLUTION -> SOLUTION_A;
+            case ASSUMPTION -> ASSUMPTION_A;
+            case EVIDENCE -> EVIDENCE_A;
+        };
+    }
+
+    @Test
+    void genericNodeChecksAllowEditorToReadAndEditEveryType() {
+        authenticate();
+        stubMembership(TeamRole.EDITOR, teamA);
+        stubAllNodesInTeamA();
+
+        for (TreeNodeType type : TreeNodeType.values()) {
+            assertThat(service.canReadNode(type, idOf(type))).as("read %s", type).isTrue();
+            assertThat(service.canEditNode(type, idOf(type))).as("edit %s", type).isTrue();
+            assertThat(service.requireReadNode(type, idOf(type))).isEqualTo(TEAM_A);
+            assertThat(service.requireEditNode(type, idOf(type))).isEqualTo(TEAM_A);
+        }
+    }
+
+    @Test
+    void genericNodeChecksLetViewerReadButNotEditEveryType() {
+        authenticate();
+        stubMembership(TeamRole.VIEWER, teamA);
+        stubAllNodesInTeamA();
+
+        for (TreeNodeType type : TreeNodeType.values()) {
+            assertThat(service.requireReadNode(type, idOf(type))).isEqualTo(TEAM_A);
+            assertThatThrownBy(() -> service.requireEditNode(type, idOf(type)))
+                .as("edit %s", type)
+                .isInstanceOf(TeamAccessDeniedException.class);
+        }
+    }
+
+    @Test
+    void genericNodeChecksDenyNonMemberForEveryType() {
+        authenticate();
+        stubNoMemberships();
+        stubAllNodesInTeamA();
+
+        for (TreeNodeType type : TreeNodeType.values()) {
+            assertThat(service.canReadNode(type, idOf(type))).isFalse();
+            assertThatThrownBy(() -> service.requireReadNode(type, idOf(type))).isInstanceOf(TeamAccessDeniedException.class);
+            assertThatThrownBy(() -> service.requireEditNode(type, idOf(type))).isInstanceOf(TeamAccessDeniedException.class);
+        }
+    }
+
+    @Test
+    void missingNodeIsIndistinguishableFromNonMembership() {
+        authenticate();
+        lenient().when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(List.of(membership(TeamRole.OWNER, teamA)));
+        when(treeAccessLookupRepository.findTeamIdOfEvidence(MISSING)).thenReturn(Optional.empty());
+        when(treeAccessLookupRepository.findTeamIdOfOpportunity(OPPORTUNITY_A)).thenReturn(Optional.of(OTHER_TEAM));
+
+        Throwable missing = org.assertj.core.api.Assertions.catchThrowable(() -> service.requireReadNode(TreeNodeType.EVIDENCE, MISSING));
+        Throwable foreign = org.assertj.core.api.Assertions.catchThrowable(() ->
+            service.requireReadNode(TreeNodeType.OPPORTUNITY, OPPORTUNITY_A)
+        );
+        assertThat(missing).isInstanceOf(TeamAccessDeniedException.class);
+        assertThat(foreign).isInstanceOf(TeamAccessDeniedException.class);
+        assertThat(missing.getMessage()).isEqualTo(foreign.getMessage());
+        assertThatThrownBy(() -> service.requireEditNode(null, 1L)).isInstanceOf(TeamAccessDeniedException.class);
+        assertThatThrownBy(() -> service.requireEditNode(TreeNodeType.PRODUCT, null)).isInstanceOf(TeamAccessDeniedException.class);
+    }
+
+    @Test
+    void adminAuthorityGrantsNoImplicitNodeAccess() {
+        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+        ctx.setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                LOGIN,
+                "n/a",
+                List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))
+            )
+        );
+        SecurityContextHolder.setContext(ctx);
+        stubNoMemberships();
+        stubAllNodesInTeamA();
+
+        assertThatThrownBy(() -> service.requireReadNode(TreeNodeType.PRODUCT, PRODUCT_A)).isInstanceOf(TeamAccessDeniedException.class);
+        assertThatThrownBy(() -> service.requireReadTeam(TEAM_A)).isInstanceOf(TeamAccessDeniedException.class);
+    }
+
+    @Test
+    void linkQuestionAndCommentResolveToTheirNode() {
+        authenticate();
+        stubMembership(TeamRole.EDITOR, teamA);
+        stubAllNodesInTeamA();
+        when(treeAccessLookupRepository.findNodeIdsOfLink(LINK_A)).thenReturn(
+            List.<Object[]>of(new Object[] { null, null, null, null, ASSUMPTION_A, null })
+        );
+        when(treeAccessLookupRepository.findOpportunityIdOfQuestion(QUESTION_A)).thenReturn(Optional.of(OPPORTUNITY_A));
+        when(treeAccessLookupRepository.findNodeIdsOfComment(COMMENT_A)).thenReturn(
+            List.<Object[]>of(new Object[] { null, null, null, null, EVIDENCE_A })
+        );
+
+        assertThat(service.requireEditLink(LINK_A)).isEqualTo(new TreeNodeRef(TreeNodeType.ASSUMPTION, ASSUMPTION_A));
+        assertThat(service.requireEditQuestion(QUESTION_A)).isEqualTo(new TreeNodeRef(TreeNodeType.OPPORTUNITY, OPPORTUNITY_A));
+        assertThat(service.requireEditComment(COMMENT_A)).isEqualTo(new TreeNodeRef(TreeNodeType.EVIDENCE, EVIDENCE_A));
+        assertThat(service.requireReadComment(COMMENT_A).key()).isEqualTo("evidence-" + EVIDENCE_A);
+    }
+
+    @Test
+    void viewerCanReadButNotEditLinksQuestionsAndComments() {
+        authenticate();
+        stubMembership(TeamRole.VIEWER, teamA);
+        stubAllNodesInTeamA();
+        when(treeAccessLookupRepository.findNodeIdsOfLink(LINK_A)).thenReturn(
+            List.<Object[]>of(new Object[] { PRODUCT_A, null, null, null, null, null })
+        );
+        when(treeAccessLookupRepository.findOpportunityIdOfQuestion(QUESTION_A)).thenReturn(Optional.of(OPPORTUNITY_A));
+        when(treeAccessLookupRepository.findNodeIdsOfComment(COMMENT_A)).thenReturn(
+            List.<Object[]>of(new Object[] { OUTCOME_A, null, null, null, null })
+        );
+
+        assertThat(service.requireReadLink(LINK_A).type()).isEqualTo(TreeNodeType.PRODUCT);
+        assertThat(service.requireReadQuestion(QUESTION_A).type()).isEqualTo(TreeNodeType.OPPORTUNITY);
+        assertThat(service.requireReadComment(COMMENT_A).type()).isEqualTo(TreeNodeType.OUTCOME);
+        assertThatThrownBy(() -> service.requireEditLink(LINK_A)).isInstanceOf(TeamAccessDeniedException.class);
+        assertThatThrownBy(() -> service.requireEditQuestion(QUESTION_A)).isInstanceOf(TeamAccessDeniedException.class);
+        assertThatThrownBy(() -> service.requireEditComment(COMMENT_A)).isInstanceOf(TeamAccessDeniedException.class);
+    }
+
+    @Test
+    void missingLinkQuestionOrCommentIsDenied() {
+        authenticate();
+        lenient().when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(List.of(membership(TeamRole.OWNER, teamA)));
+        when(treeAccessLookupRepository.findNodeIdsOfLink(MISSING)).thenReturn(List.of());
+        when(treeAccessLookupRepository.findOpportunityIdOfQuestion(MISSING)).thenReturn(Optional.empty());
+        when(treeAccessLookupRepository.findNodeIdsOfComment(MISSING)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.requireReadLink(MISSING)).isInstanceOf(TeamAccessDeniedException.class);
+        assertThatThrownBy(() -> service.requireReadQuestion(MISSING)).isInstanceOf(TeamAccessDeniedException.class);
+        assertThatThrownBy(() -> service.requireReadComment(MISSING)).isInstanceOf(TeamAccessDeniedException.class);
     }
 
     // ---------------------------------------------------------------------

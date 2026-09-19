@@ -59,4 +59,18 @@ public class TreeNodeCascadeResource {
         treeNodeCascadeService.deleteSolution(id);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/assumptions/{id}")
+    public ResponseEntity<Void> deleteAssumption(@PathVariable("id") Long id) {
+        LOG.debug("REST request to cascade-delete Assumption {}", id);
+        treeNodeCascadeService.deleteAssumption(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/evidence/{id}")
+    public ResponseEntity<Void> deleteEvidence(@PathVariable("id") Long id) {
+        LOG.debug("REST request to cascade-delete Evidence {}", id);
+        treeNodeCascadeService.deleteEvidence(id);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -2,17 +2,15 @@ package com.opportunity.tree.service.dto.tree;
 
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import java.io.Serializable;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Root document returned by {@code GET /api/teams/{teamId}/tree} (TREE-001).
+ * Root document returned by {@code GET /api/teams/{teamId}/tree}.
  *
- * <p>Wraps the team's own fields together with its full tree of products,
- * outcomes, opportunities (nested to arbitrary depth) and solutions. Also
- * carries the caller's effective role and a {@link #canEdit} flag so the
- * frontend can disable editing for viewers without a second request.
+ * <p>A flat, pre-ordered list of every node in the team (products, outcomes,
+ * opportunities, solutions, assumptions, evidence) plus the team's members and
+ * the caller's own role, so the tree builder needs a single request.
  */
 public class TeamTreeDTO implements Serializable {
 
@@ -21,12 +19,12 @@ public class TeamTreeDTO implements Serializable {
     private Long id;
     private String name;
     private String description;
-    private Instant createdDate;
+    private String currentUserLogin;
     private TeamRole currentUserRole;
     private boolean canEdit;
-    private List<ProductTreeNodeDTO> products = new ArrayList<>();
-
-    public TeamTreeDTO() {}
+    private long evidenceThisMonth;
+    private List<TeamTreeMemberDTO> members = new ArrayList<>();
+    private List<TreeNodeDTO> nodes = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -52,12 +50,12 @@ public class TeamTreeDTO implements Serializable {
         this.description = description;
     }
 
-    public Instant getCreatedDate() {
-        return createdDate;
+    public String getCurrentUserLogin() {
+        return currentUserLogin;
     }
 
-    public void setCreatedDate(Instant createdDate) {
-        this.createdDate = createdDate;
+    public void setCurrentUserLogin(String currentUserLogin) {
+        this.currentUserLogin = currentUserLogin;
     }
 
     public TeamRole getCurrentUserRole() {
@@ -76,11 +74,46 @@ public class TeamTreeDTO implements Serializable {
         this.canEdit = canEdit;
     }
 
-    public List<ProductTreeNodeDTO> getProducts() {
-        return products;
+    public long getEvidenceThisMonth() {
+        return evidenceThisMonth;
     }
 
-    public void setProducts(List<ProductTreeNodeDTO> products) {
-        this.products = products;
+    public void setEvidenceThisMonth(long evidenceThisMonth) {
+        this.evidenceThisMonth = evidenceThisMonth;
+    }
+
+    public List<TeamTreeMemberDTO> getMembers() {
+        return members;
+    }
+
+    public void setMembers(List<TeamTreeMemberDTO> members) {
+        this.members = members;
+    }
+
+    public List<TreeNodeDTO> getNodes() {
+        return nodes;
+    }
+
+    public void setNodes(List<TreeNodeDTO> nodes) {
+        this.nodes = nodes;
+    }
+
+    @Override
+    public String toString() {
+        return (
+            "TeamTreeDTO{id=" +
+            id +
+            ", name='" +
+            name +
+            "', currentUserRole=" +
+            currentUserRole +
+            ", canEdit=" +
+            canEdit +
+            ", members=" +
+            members.size() +
+            ", nodes=" +
+            nodes.size() +
+            "}"
+        );
     }
 }

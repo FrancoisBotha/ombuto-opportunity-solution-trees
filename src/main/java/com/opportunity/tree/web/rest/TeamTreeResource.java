@@ -12,8 +12,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST controller exposing the whole-tree read endpoint (TREE-001, FR-010).
  *
- * <p>Returns a team's team, products, outcomes, opportunities and solutions in
- * a single JSON document. Authorised through {@code TeamAccessService}: any
+ * <p>Returns a team's whole tree (all six node types, flat and pre-ordered),
+ * its members and the caller's role in a single JSON document
+ * ({@code TeamTreeDTO}). Authorised through {@code TeamAccessService}: any
  * member (owner, editor, viewer) gets 200; non-members get 403; unauthenticated
  * callers get 401 from the security filter chain.
  */
