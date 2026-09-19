@@ -2,7 +2,10 @@
  * Ombuto Opportunity Solution Tree
  * Collaborative (WebSocket) OST tool following Teresa Torres' continuous discovery model.
  *
- * Tree shape:  Product -> Outcome -> Opportunity (nested) -> Solution -> Assumption -> Experiment
+ * Tree shape:  Product -> Outcome -> Opportunity (nested) -> Solution -> Assumption
+ *              Evidence hangs off an Opportunity or an Assumption.
+ * Any node can carry NodeLinks; opportunities carry OpenQuestions; NodeHistory is a
+ * server-written, append-only changelog per node.
  */
 
 application {
@@ -38,32 +41,25 @@ enum TeamRole {
   OWNER, EDITOR, VIEWER
 }
 
-enum OutcomeStatus {
-  DRAFT, ACTIVE, ACHIEVED, ABANDONED
-}
-
 enum OpportunityStatus {
-  IDENTIFIED, EXPLORING, PRIORITISED, IN_PROGRESS, ADDRESSED, PARKED, DISCARDED
+  UNEXPLORED, EXPLORING, VALIDATED, PARKED
 }
 
 enum SolutionStatus {
-  IDEA, ASSUMPTION_MAPPING, TESTING, VALIDATED, INVALIDATED, SHIPPED, DROPPED
+  CANDIDATE, BUILDING, SHIPPED, DROPPED
 }
 
-enum AssumptionCategory {
-  DESIRABILITY, VIABILITY, FEASIBILITY, USABILITY, ETHICAL
+enum AssumptionStatus {
+  UNTESTED, TESTING, SUPPORTED, REFUTED
 }
 
-enum ExperimentStatus {
-  PLANNED, RUNNING, COMPLETED, CANCELLED
+enum TreeNodeType {
+  PRODUCT, OUTCOME, OPPORTUNITY, SOLUTION, ASSUMPTION, EVIDENCE
 }
 
-enum ExperimentResult {
-  SUPPORTED, REFUTED, INCONCLUSIVE
-}
-
-enum LinkType {
-  PROTOTYPE, TICKET, DOCUMENT, INTERVIEW, ANALYTICS, DESIGN, OTHER
+enum HistoryEventType {
+  CREATED, STATUS_CHANGED, CONFIDENCE_CHANGED, PRIORITY_CHANGED, VALUE_CHANGED,
+  MOVED, COMMENT_ADDED, COMMENT_DELETED, LINK_ADDED, LINK_REMOVED, QUESTION_ADDED
 }
 
 /* ------------------------------------------------------------------ */
@@ -87,6 +83,7 @@ entity Product {
   description TextBlob
   vision TextBlob
   archived Boolean required
+  sortOrder Integer required
   createdDate Instant required
 }
 
@@ -98,12 +95,6 @@ entity Product {
 entity Outcome {
   title String required minlength(2) maxlength(200)
   description TextBlob
-  metric String maxlength(200)
-  targetValue String maxlength(100)
-  currentValue String maxlength(100)
-  status OutcomeStatus required
-  startDate LocalDate
-  targetDate LocalDate
   sortOrder Integer required
   createdDate Instant required
   lastModifiedDate Instant
@@ -115,36 +106,19 @@ entity Opportunity {
   description TextBlob
   status OpportunityStatus required
   valuerating Integer required min(1) max(5)
-  complexity Integer required min(1) max(5)
+  priority Integer required min(1) max(100)
   sortOrder Integer required
   createdDate Instant required
   lastModifiedDate Instant
-}
-
-/** Named external URL attached to an opportunity, e.g. "Customer Interview" pointing at a call recording. */
-entity OpportunityLink {
-  name String required minlength(1) maxlength(100)
-  url String required maxlength(2000) pattern(/^https?:\/\/.+/)
-  type LinkType required
-  sortOrder Integer required
 }
 
 entity Solution {
   title String required minlength(2) maxlength(200)
   description TextBlob
   status SolutionStatus required
-  effort Integer min(1) max(5)
   sortOrder Integer required
   createdDate Instant required
   lastModifiedDate Instant
-}
-
-/** Named external URL attached to a solution (prototype, ticket, design). */
-entity SolutionLink {
-  name String required minlength(1) maxlength(100)
-  url String required maxlength(2000) pattern(/^https?:\/\/.+/)
-  type LinkType required
-  sortOrder Integer required
 }
 
 /* ------------------------------------------------------------------ */
@@ -154,25 +128,21 @@ entity SolutionLink {
 /** Something that must be true for a solution to work (assumption mapping). */
 entity Assumption {
   statement String required minlength(2) maxlength(500)
-  category AssumptionCategory required
-  importance Integer required min(1) max(5)
-  evidence Integer required min(1) max(5)
-  validated Boolean
+  description TextBlob
+  status AssumptionStatus required
+  confidence Integer required min(0) max(100)
+  sortOrder Integer required
   createdDate Instant required
+  lastModifiedDate Instant
 }
 
-/** A test run against one or more assumptions. */
-entity Experiment {
-  title String required minlength(2) maxlength(200)
-  hypothesis TextBlob
-  method String maxlength(200)
-  successCriteria TextBlob
-  status ExperimentStatus required
-  result ExperimentResult
-  learnings TextBlob
-  startDate LocalDate
-  endDate LocalDate
+/** Interview snippet / test result. Exactly one parent: an Opportunity or an Assumption. */
+entity Evidence {
+  title String required minlength(2) maxlength(500)
+  description TextBlob
+  sortOrder Integer required
   createdDate Instant required
+  lastModifiedDate Instant
 }
 
 /** Weekly customer interview or other evidence source; opportunities are mined from these. */
@@ -194,6 +164,31 @@ entity Comment {
   body TextBlob required
   createdDate Instant required
   editedDate Instant
+}
+
+/** Name + URL link on any tree node. Exactly one node relationship is set. */
+entity NodeLink {
+  name String required minlength(1) maxlength(100)
+  url String required maxlength(2000) pattern(/^https?:\/\/.+/)
+  sortOrder Integer required
+  createdDate Instant required
+}
+
+/** Checklist item on an opportunity. */
+entity OpenQuestion {
+  questionText String required minlength(1) maxlength(500)
+  done Boolean required
+  sortOrder Integer required
+  createdDate Instant required
+}
+
+/** Append-only per-node changelog, written server-side only. */
+entity NodeHistory {
+  nodeType TreeNodeType required
+  nodeId Long required
+  eventType HistoryEventType required
+  summary String required maxlength(500)
+  createdDate Instant required
 }
 
 /** Tag for cross-cutting labels (persona, segment, theme). */
@@ -219,16 +214,14 @@ relationship ManyToOne {
   Opportunity{parent(title)} to Opportunity
   Opportunity{owner(login)} to User with builtInEntity
 
-  OpportunityLink{opportunity(title) required} to Opportunity
-
   Solution{opportunity(title) required} to Opportunity
   Solution{owner(login)} to User with builtInEntity
 
-  SolutionLink{solution(title) required} to Solution
-
   Assumption{solution(title) required} to Solution
+  Assumption{owner(login)} to User with builtInEntity
 
-  Experiment{solution(title) required} to Solution
+  Evidence{opportunity(title)} to Opportunity
+  Evidence{assumption(statement)} to Assumption
 
   Interview{product(name) required} to Product
   Interview{interviewer(login)} to User with builtInEntity
@@ -238,12 +231,24 @@ relationship ManyToOne {
   Comment{outcome(title)} to Outcome
   Comment{opportunity(title)} to Opportunity
   Comment{solution(title)} to Solution
+  Comment{assumption(statement)} to Assumption
+  Comment{evidence(title)} to Evidence
+
+  NodeLink{product(name)} to Product
+  NodeLink{outcome(title)} to Outcome
+  NodeLink{opportunity(title)} to Opportunity
+  NodeLink{solution(title)} to Solution
+  NodeLink{assumption(statement)} to Assumption
+  NodeLink{evidence(title)} to Evidence
+
+  OpenQuestion{opportunity(title) required} to Opportunity
+
+  NodeHistory{author(login)} to User with builtInEntity
 
   Tag{team(name) required} to Team
 }
 
 relationship ManyToMany {
-  Experiment{assumption(statement)} to Assumption{experiment(title)}
   Opportunity{interview(title)} to Interview{opportunity(title)}
   Opportunity{tag(name)} to Tag{opportunity(title)}
   Solution{tag(name)} to Tag{solution(title)}
@@ -255,5 +260,5 @@ relationship ManyToMany {
 
 dto * with mapstruct
 service * with serviceImpl
-paginate Opportunity, Solution, Interview, Comment, Experiment with pagination
+paginate Opportunity, Solution, Interview, Comment, NodeHistory with pagination
 filter Opportunity, Solution, Outcome, Interview
