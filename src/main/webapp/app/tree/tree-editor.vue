@@ -474,28 +474,29 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+}
 
-  &--product {
-    border-color: #593196;
-  }
-  &--outcome {
-    border-color: #6610f2;
-  }
-  &--opportunity {
-    border-color: #20c997;
-  }
-  &--solution {
-    border-color: #fd7e14;
-  }
-  &--selected {
-    box-shadow: 0 0 0 3px #e83e8c;
-  }
-  &--drop-target {
-    box-shadow: 0 0 0 3px #20c997;
-  }
-  &--dragging-source {
-    opacity: 0.45;
-  }
+// Sass cannot append a BEM suffix to a :deep() selector, so each modifier is spelled out.
+:deep(.tree-node-card--product) {
+  border-color: #593196;
+}
+:deep(.tree-node-card--outcome) {
+  border-color: #6610f2;
+}
+:deep(.tree-node-card--opportunity) {
+  border-color: #20c997;
+}
+:deep(.tree-node-card--solution) {
+  border-color: #fd7e14;
+}
+:deep(.tree-node-card--selected) {
+  box-shadow: 0 0 0 3px #e83e8c;
+}
+:deep(.tree-node-card--drop-target) {
+  box-shadow: 0 0 0 3px #20c997;
+}
+:deep(.tree-node-card--dragging-source) {
+  opacity: 0.45;
 }
 
 :deep(.tree-node-card__type) {
