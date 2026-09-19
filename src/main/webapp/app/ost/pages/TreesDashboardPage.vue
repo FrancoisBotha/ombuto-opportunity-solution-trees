@@ -35,8 +35,8 @@
       <div v-else class="ost-state ost-dashboard__empty" data-cy="ost-dashboard-empty">
         <div class="ost-state__title">No products in this tree yet</div>
         <p class="ost-state__text">
-          Products are created on the team’s page. Each product becomes a branch of the tree with its own outcomes, opportunities and
-          experiments.
+          Products are created on the team’s page. Each product becomes a branch of the tree with its own outcomes, opportunities, solutions
+          and assumptions.
         </p>
         <router-link class="ost-btn ost-btn--primary" :to="`/teams/${teamId}`" data-cy="ost-dashboard-go-to-team"
           >Go to the team</router-link

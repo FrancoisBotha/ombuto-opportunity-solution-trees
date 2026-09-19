@@ -48,7 +48,7 @@
           @add-choose="createChild(id, $event)"
           @add-close="closeAddMenu(id)"
           @toggle="toggleCollapse(id)"
-          @chat="ui.openChat(id)"
+          @chat="openChat(id)"
           @activate="activate(id)"
           @rename="startRename(id)"
           @rename-commit="commitRename(id, $event)"
@@ -62,8 +62,8 @@
       <div class="ost-state" data-cy="ost-canvas-empty">
         <div class="ost-state__title">No products in this tree yet</div>
         <p class="ost-state__text">
-          Products are created on the team’s page. Each product becomes a branch of the tree with its own outcomes, opportunities and
-          experiments.
+          Products are created on the team’s page. Each product becomes a branch of the tree with its own outcomes, opportunities, solutions
+          and assumptions.
         </p>
         <router-link
           v-if="tree.canEdit && tree.team"
@@ -253,6 +253,12 @@ function activate(key: string) {
     return;
   }
   emit('select', key);
+}
+
+/** The node's chat chip: select the node (prototype openChat) and open its thread in the modal. */
+function openChat(key: string) {
+  ui.select(key, { openPanel: false });
+  ui.openChat(key);
 }
 
 // ---- + menu / create -----------------------------------------------------------------------------
