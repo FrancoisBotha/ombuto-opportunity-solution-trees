@@ -1,19 +1,40 @@
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef, toRaw } from 'vue';
 
 import { defineStore } from 'pinia';
 
-import { breadcrumb, descendantIds, orderTree } from '../domain/derive';
+import { breadcrumb, descendantIds, evidenceThisMonth as countEvidenceThisMonth, orderTree } from '../domain/derive';
 import { layoutTree } from '../domain/layout';
-import { type NodePatch, fromDto, parseKey, pickPatchFields, toApiType, toPatchBody } from '../domain/mapping';
+import { type NodePatch, fromDto, parseKey, toApiType, toPatchBody } from '../domain/mapping';
 import { ALLOWED, canReparent, defaultLinks } from '../domain/rules';
 import type { NodeType, OstNode } from '../domain/types';
 import { type LoadFailure, describeError, loadFailure } from '../ost-errors';
-import type { CommentDTO, HistoryEntryDTO, MyTeamDTO, TeamMemberDTO, TeamTreeDTO, TreeNodeDTO } from '../ost.model';
+import type { CommentDTO, HistoryEntryDTO, MyTeamDTO, TeamMemberDTO, TeamTreeDTO } from '../ost.model';
 import OstService from '../ost.service';
 
 import { useOstUiStore, writeLastTeam } from './ost-ui.store';
 
 export type OstServiceFactory = () => OstService;
+
+type PatchField = keyof NodePatch;
+const PATCH_FIELDS: PatchField[] = ['title', 'note', 'status', 'conf', 'priority', 'value', 'owner', 'archived'];
+
+/** In-flight bookkeeping for one editable field of one node (see patchNode). */
+interface FieldTrack {
+  /** optimistic value of every patch of this field still waiting for the server, by write seq */
+  pending: Map<number, unknown>;
+  /** newest value the server has confirmed (the rollback target) and the seq that confirmed it */
+  confirmed: unknown;
+  confirmedSeq: number;
+  /** seq of the newest response whose value for this field is on screen */
+  appliedSeq: number;
+}
+
+interface NodeTrack {
+  fields: Partial<Record<PatchField, FieldTrack>>;
+  /** seq of the newest patch response applied to this node */
+  appliedSeq: number;
+  inflight: number;
+}
 
 export interface TeamMeta {
   id: number;
@@ -22,7 +43,6 @@ export interface TeamMeta {
   currentUserLogin: string;
   currentUserRole: TeamTreeDTO['currentUserRole'];
   canEdit: boolean;
-  evidenceThisMonth: number;
   members: TeamMemberDTO[];
 }
 
@@ -33,7 +53,6 @@ const toTeamMeta = (dto: TeamTreeDTO): TeamMeta => ({
   currentUserLogin: dto.currentUserLogin,
   currentUserRole: dto.currentUserRole,
   canEdit: !!dto.canEdit,
-  evidenceThisMonth: dto.evidenceThisMonth ?? 0,
   members: dto.members ?? [],
 });
 
@@ -62,6 +81,11 @@ export const useOstTreeStore = defineStore('ostTree', () => {
   const history = ref<Record<string, HistoryEntryDTO[]>>({});
   /** Guards against an older tree response overwriting a newer team switch. */
   const loadSeq = shallowRef(0);
+  /** Orders optimistic writes (patches and moves) so late responses never undo newer edits. */
+  let writeSeq = 0;
+  const patchTracks = new Map<string, NodeTrack>();
+  /** Newest move seq per node key, while that move is in flight. */
+  const moveSeqs = new Map<string, number>();
 
   // ---- getters -----------------------------------------------------------------------------------
   const index = computed(() => new Map(nodes.value.map(n => [n.id, n])));
@@ -75,15 +99,52 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     const ui = useOstUiStore();
     return products.value.filter(p => ui.productId === 'all' || p.id === ui.productId);
   });
-  /** Derived positions (tidy layout) — never stored, never user-set. */
-  const placed = computed(() =>
-    layoutTree(nodes.value, {
+  /**
+   * Derived positions (tidy layout) — never stored, never user-set. Depends only on membership,
+   * order and parent pointers: those are read through the reactive list (so they are tracked),
+   * then the layout runs over the raw objects to keep proxy overhead out of its inner loops.
+   */
+  const placed = computed(() => {
+    const list = nodes.value;
+    for (const n of list) void n.parent;
+    return layoutTree(toRaw(list), {
       roots: roots.value.map(r => r.id),
       collapsed: useOstUiStore().collapsed,
-    }),
-  );
-  const descendantCount = (key: string) => descendantIds(key, nodes.value).length;
+    });
+  });
+  /** Descendant count of every node, computed once per structural change (O(n)). */
+  const descendantCounts = computed(() => {
+    const list = nodes.value;
+    const kids = new Map<string, string[]>();
+    for (const n of list) {
+      if (!n.parent) continue;
+      const bucket = kids.get(n.parent);
+      if (bucket) bucket.push(n.id);
+      else kids.set(n.parent, [n.id]);
+    }
+    const counts = new Map<string, number>();
+    const visiting = new Set<string>();
+    const count = (key: string): number => {
+      const known = counts.get(key);
+      if (known !== undefined) return known;
+      if (visiting.has(key)) return 0; // corrupt (cyclic) data: never loop
+      visiting.add(key);
+      let total = 0;
+      for (const child of kids.get(key) ?? []) total += 1 + count(child);
+      visiting.delete(key);
+      counts.set(key, total);
+      return total;
+    };
+    for (const n of list) count(n.id);
+    return counts;
+  });
+  const descendantCount = (key: string) => descendantCounts.value.get(key) ?? 0;
   const ancestors = (key: string) => breadcrumb(key, nodes.value);
+  /**
+   * A5 counter, derived from the nodes' createdDate (UTC month, as the server computes it) so it
+   * follows creates, deletes and moves; the tree read's snapshot would go stale.
+   */
+  const evidenceThisMonth = computed(() => countEvidenceThisMonth(nodes.value));
   const memberByLogin = (login: string | null | undefined) => (login ? team.value?.members.find(m => m.login === login) : undefined);
 
   // ---- helpers -----------------------------------------------------------------------------------
@@ -97,18 +158,23 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       history.value = next;
     }
   };
-  const replaceNode = (next: OstNode) => {
-    const i = nodes.value.findIndex(n => n.id === next.id);
-    if (i >= 0) nodes.value.splice(i, 1, next);
-    else nodes.value.push(next);
+  /**
+   * Records a successful local write in the branch's product.lastActivity (what the server's next
+   * tree read would report), so the dashboard's "Last edited … by …" follows in-session edits.
+   */
+  const touchBranch = (key: string, at?: string | null) => {
+    const node = byId(key);
+    const product = node?.type === 'product' ? node : breadcrumb(key, nodes.value)[0];
+    if (product?.type !== 'product') return;
+    const stamp = at ?? new Date().toISOString();
+    const previous = product.lastActivity?.at ? Date.parse(product.lastActivity.at) : NaN;
+    if (!Number.isNaN(previous) && previous > Date.parse(stamp)) return;
+    product.lastActivity = { at: stamp, byLogin: team.value?.currentUserLogin ?? null };
   };
-  const applyServerNode = (dto: TreeNodeDTO) => {
-    const fresh = fromDto(dto);
-    const current = byId(fresh.id);
-    // Products carry lastActivity only on the tree read; keep ours when the write returns null.
-    if (current && !fresh.lastActivity) fresh.lastActivity = current.lastActivity;
-    replaceNode(fresh);
-    return fresh;
+  /** A write the server recorded in the node's history: drop the cached history, touch the branch. */
+  const recordWrite = (key: string, at?: string | null) => {
+    invalidateHistory(key);
+    touchBranch(key, at);
   };
 
   // ---- actions: configuration ----------------------------------------------------------------
@@ -127,6 +193,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     error.value = null;
     comments.value = {};
     history.value = {};
+    patchTracks.clear();
+    moveSeqs.clear();
   }
 
   // ---- actions: read -------------------------------------------------------------------------
@@ -173,23 +241,95 @@ export const useOstTreeStore = defineStore('ostTree', () => {
   }
 
   // ---- actions: nodes ------------------------------------------------------------------------
-  /** Optimistic field patch; rolls back and surfaces an error when the server refuses. */
+  /**
+   * Optimistic field patch; rolls back and surfaces an error when the server refuses.
+   *
+   * Patches are sequenced per node and field, so quick successive edits may resolve in any order:
+   * a response or rollback only touches a field when no newer patch of that field is pending and
+   * no newer response for it has been applied; a failed patch rolls back to the newest value still
+   * pending, else to the last server-confirmed value.
+   */
   async function patchNode(key: string, patch: NodePatch): Promise<boolean> {
     const node = byId(key);
     const parsed = parseKey(key);
-    if (!node || !parsed || !Object.keys(patch).length) return false;
-    const snapshot = pickPatchFields(node, patch);
+    const fields = (Object.keys(patch) as PatchField[]).filter(f => PATCH_FIELDS.includes(f));
+    if (!node || !parsed || !fields.length) return false;
+    const seq = ++writeSeq;
+    let track = patchTracks.get(key);
+    if (!track) {
+      track = { fields: {}, appliedSeq: 0, inflight: 0 };
+      patchTracks.set(key, track);
+    }
+    track.inflight += 1;
+    for (const f of fields) {
+      let ft = track.fields[f];
+      if (!ft?.pending.size) {
+        // nothing of this field is in flight, so what is on screen is what the server has
+        ft = { pending: new Map(), confirmed: node[f], confirmedSeq: ft?.confirmedSeq ?? 0, appliedSeq: ft?.appliedSeq ?? 0 };
+        track.fields[f] = ft;
+      }
+      ft.pending.set(seq, patch[f]);
+    }
     Object.assign(node, patch);
+    const ownTrack = track;
+    const live = () => patchTracks.get(key) === ownTrack;
     try {
       const dto = await api().patchNode(parsed.type, parsed.id, toPatchBody(patch));
-      applyServerNode(dto);
-      invalidateHistory(key);
+      if (live()) settlePatch(key, ownTrack, seq, fields, fromDto(dto));
+      recordWrite(key, dto.lastModifiedDate);
       return true;
     } catch (err) {
-      const current = byId(key);
-      if (current) Object.assign(current, snapshot);
+      if (live()) rollbackPatch(key, ownTrack, seq, fields);
       fail(err);
       return false;
+    } finally {
+      if (live() && --ownTrack.inflight === 0) patchTracks.delete(key);
+    }
+  }
+
+  const newerPending = (ft: FieldTrack, seq: number) => [...ft.pending.keys()].some(s => s > seq);
+
+  function settlePatch(key: string, track: NodeTrack, seq: number, fields: PatchField[], fresh: OstNode) {
+    const newest = seq > track.appliedSeq;
+    const changes: Partial<OstNode> = {};
+    for (const f of PATCH_FIELDS) {
+      const ft = track.fields[f];
+      if (ft && fields.includes(f)) {
+        ft.pending.delete(seq);
+        if (seq > ft.confirmedSeq) {
+          ft.confirmed = fresh[f];
+          ft.confirmedSeq = seq;
+        }
+        if (!newerPending(ft, seq) && seq > ft.appliedSeq) {
+          (changes as any)[f] = fresh[f];
+          ft.appliedSeq = seq;
+        }
+      } else if (newest && (!ft || (!ft.pending.size && seq > ft.appliedSeq))) {
+        // a field this patch did not send, with nothing of it in flight: the server copy wins
+        (changes as any)[f] = fresh[f];
+      }
+    }
+    if (newest) {
+      track.appliedSeq = seq;
+      changes.lastModifiedDate = fresh.lastModifiedDate;
+      // Products carry lastActivity only on the tree read; keep ours when the write returns null.
+      if (fresh.lastActivity) changes.lastActivity = fresh.lastActivity;
+    }
+    // parent/sortOrder (moveNode), links, questions and the comment count belong to their own
+    // actions; a field patch does not change them, so they are left alone.
+    const current = byId(key);
+    if (current) Object.assign(current, changes);
+  }
+
+  function rollbackPatch(key: string, track: NodeTrack, seq: number, fields: PatchField[]) {
+    const current = byId(key);
+    for (const f of fields) {
+      const ft = track.fields[f];
+      if (!ft) continue;
+      ft.pending.delete(seq);
+      if (newerPending(ft, seq) || seq < ft.appliedSeq) continue;
+      const older = [...ft.pending.keys()].sort((a, b) => b - a)[0];
+      if (current) (current as any)[f] = older !== undefined ? ft.pending.get(older) : ft.confirmed;
     }
   }
 
@@ -219,7 +359,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       if (ui.collapsed[parentKey]) ui.setCollapsed(parentKey, false);
       ui.select(created.id);
       ui.startEditing(created.id);
-      invalidateHistory(parentKey);
+      // The server writes history for the new node only (the parent's history is unchanged).
+      touchBranch(created.id, created.createdDate);
       return created.id;
     } catch (err) {
       fail(err, 'The node could not be created.');
@@ -247,8 +388,10 @@ export const useOstTreeStore = defineStore('ostTree', () => {
         return false;
       }
     }
-    const before = nodes.value.map(n => ({ id: n.id, parent: n.parent, sortOrder: n.sortOrder }));
-    const beforeOrder = nodes.value.slice();
+    const before = { parent: node.parent, sortOrder: node.sortOrder };
+    const seq = ++writeSeq;
+    moveSeqs.set(key, seq);
+    const latest = () => moveSeqs.get(key) === seq;
     // Optimistic placement: `position` is a zero-based index among the new parent's same-type children.
     const newParent = target ? target.id : null;
     const siblings = nodes.value
@@ -269,7 +412,14 @@ export const useOstTreeStore = defineStore('ostTree', () => {
         parentId: target ? target.dbId : null,
         ...(position !== undefined ? { position } : {}),
       });
-      applyServerNode(res.node);
+      const fresh = fromDto(res.node);
+      const current = byId(key);
+      if (current && latest()) {
+        // Only the placement: a concurrent patch owns the editable fields.
+        current.parent = fresh.parent;
+        current.sortOrder = fresh.sortOrder;
+        current.lastModifiedDate = fresh.lastModifiedDate;
+      }
       for (const s of res.siblings ?? []) {
         const sib = byId(s.key);
         if (sib) sib.sortOrder = s.sortOrder;
@@ -279,20 +429,21 @@ export const useOstTreeStore = defineStore('ostTree', () => {
         const ui = useOstUiStore();
         if (ui.collapsed[target.id]) ui.setCollapsed(target.id, false);
       }
-      invalidateHistory(key);
+      recordWrite(key, fresh.lastModifiedDate);
       return true;
     } catch (err) {
-      const byKey = new Map(before.map(b => [b.id, b]));
-      for (const n of beforeOrder) {
-        const b = byKey.get(n.id);
-        if (b) {
-          n.parent = b.parent;
-          n.sortOrder = b.sortOrder;
-        }
+      // Undo only this move's placement, on the current node objects (never a stale snapshot,
+      // which could undo a patch that succeeded meanwhile), unless a newer move superseded it.
+      const current = byId(key);
+      if (current && latest()) {
+        current.parent = before.parent;
+        current.sortOrder = before.sortOrder;
+        nodes.value = orderTree(nodes.value);
       }
-      nodes.value = beforeOrder;
       fail(err, 'The node could not be moved.');
       return false;
+    } finally {
+      if (latest()) moveSeqs.delete(key);
     }
   }
 
@@ -307,6 +458,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       fail(err, 'The node could not be deleted.');
       return false;
     }
+    if (node.type !== 'product') touchBranch(key);
     const doomed = new Set([key, ...descendantIds(key, nodes.value)]);
     nodes.value = nodes.value.filter(n => !doomed.has(n.id));
     const nextComments = { ...comments.value };
@@ -329,7 +481,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     try {
       const dto = await api().addLink(parsed.type, parsed.id, link);
       byId(key)?.links.push({ id: dto.id, name: dto.name, url: dto.url });
-      invalidateHistory(key);
+      recordWrite(key);
       return true;
     } catch (err) {
       fail(err, 'The link could not be added.');
@@ -360,7 +512,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     const [removed] = node.links.splice(i, 1);
     try {
       await api().deleteLink(linkId);
-      invalidateHistory(key);
+      recordWrite(key);
       return true;
     } catch (err) {
       node.links.splice(i, 0, removed);
@@ -388,7 +540,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     try {
       const dto = await api().addQuestion(node.dbId, text);
       byId(key)?.questions.push({ id: dto.id, text: dto.text, done: !!dto.done });
-      invalidateHistory(key);
+      recordWrite(key);
       return true;
     } catch (err) {
       fail(err, 'The question could not be added.');
@@ -451,7 +603,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       comments.value = { ...comments.value, [key]: [...(comments.value[key] ?? []), dto] };
       const node = byId(key);
       if (node) node.commentCount += 1;
-      invalidateHistory(key);
+      recordWrite(key);
       return dto;
     } catch (err) {
       fail(err, 'The message could not be sent.');
@@ -487,7 +639,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     if (node) node.commentCount = Math.max(0, node.commentCount - 1);
     try {
       await api().deleteComment(commentId);
-      invalidateHistory(key);
+      recordWrite(key);
       return true;
     } catch (err) {
       (comments.value[key] ?? []).splice(i, 0, removed);
@@ -534,6 +686,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     placed,
     descendantCount,
     ancestors,
+    evidenceThisMonth,
     memberByLogin,
     // actions
     setServiceFactory,

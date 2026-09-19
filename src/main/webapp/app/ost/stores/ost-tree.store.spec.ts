@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import sinon, { type SinonStubbedInstance } from 'sinon';
 
-import { dto, treeDto } from '../domain/fixtures.test-util';
+import { bigTreeDtos, dto, treeDto } from '../domain/fixtures.test-util';
 import OstService from '../ost.service';
 
 import { useOstTreeStore } from './ost-tree.store';
@@ -117,6 +117,132 @@ describe('OST tree store', () => {
       tree.clearError();
       expect(tree.error).toBeNull();
     });
+
+    describe('overlapping patches', () => {
+      const OPP = 'opportunity-1';
+      /** Server copy of opportunity-1 after the given edits (original: EXPLORING, priority 50, title "Title opportunity-1"). */
+      const server = (extra: Parameters<typeof dto>[2] = {}) =>
+        dto(OPP, 'outcome-1', { status: 'EXPLORING', priority: 50, valueRating: 3, ...extra });
+
+      it('an earlier failure on another field does not revert a later edit (different fields)', async () => {
+        const first = deferred<any>();
+        const second = deferred<any>();
+        service.patchNode.onFirstCall().returns(first.promise).onSecondCall().returns(second.promise);
+        const a = tree.patchNode(OPP, { title: 'Renamed' });
+        const b = tree.patchNode(OPP, { priority: 90 });
+        expect(tree.byId(OPP)).toMatchObject({ title: 'Renamed', priority: 90 });
+
+        second.resolve(server({ priority: 90 }));
+        expect(await b).toBe(true);
+        expect(tree.byId(OPP)).toMatchObject({ title: 'Renamed', priority: 90 });
+
+        first.reject(apiError(400, 'error.invalidtitle'));
+        expect(await a).toBe(false);
+        expect(tree.byId(OPP)).toMatchObject({ title: 'Title opportunity-1', priority: 90 });
+      });
+
+      it('an earlier success does not overwrite a pending later edit of another field', async () => {
+        const first = deferred<any>();
+        const second = deferred<any>();
+        service.patchNode.onFirstCall().returns(first.promise).onSecondCall().returns(second.promise);
+        const a = tree.patchNode(OPP, { title: 'Renamed' });
+        const b = tree.patchNode(OPP, { priority: 90 });
+
+        // The first response predates the second patch on the server: priority is still 50 there.
+        first.resolve(server({ title: 'Renamed' }));
+        expect(await a).toBe(true);
+        expect(tree.byId(OPP)).toMatchObject({ title: 'Renamed', priority: 90 });
+
+        second.reject(apiError(500));
+        expect(await b).toBe(false);
+        expect(tree.byId(OPP)).toMatchObject({ title: 'Renamed', priority: 50 });
+      });
+
+      it('same field: an earlier failure after a later success keeps the later value', async () => {
+        const first = deferred<any>();
+        const second = deferred<any>();
+        service.patchNode.onFirstCall().returns(first.promise).onSecondCall().returns(second.promise);
+        const a = tree.patchNode(OPP, { priority: 70 });
+        const b = tree.patchNode(OPP, { priority: 90 });
+        second.resolve(server({ priority: 90 }));
+        expect(await b).toBe(true);
+        first.reject(apiError(500));
+        expect(await a).toBe(false);
+        expect(tree.byId(OPP)?.priority).toBe(90);
+        expect(tree.error).toBeTruthy();
+      });
+
+      it('same field: a late earlier success does not overwrite the later value', async () => {
+        const first = deferred<any>();
+        const second = deferred<any>();
+        service.patchNode.onFirstCall().returns(first.promise).onSecondCall().returns(second.promise);
+        const a = tree.patchNode(OPP, { priority: 70 });
+        const b = tree.patchNode(OPP, { priority: 90 });
+        second.resolve(server({ priority: 90 }));
+        await b;
+        first.resolve(server({ priority: 70 }));
+        await a;
+        expect(tree.byId(OPP)?.priority).toBe(90);
+      });
+
+      it('same field: first fails while the second is pending, then the second succeeds', async () => {
+        const first = deferred<any>();
+        const second = deferred<any>();
+        service.patchNode.onFirstCall().returns(first.promise).onSecondCall().returns(second.promise);
+        const a = tree.patchNode(OPP, { priority: 70 });
+        const b = tree.patchNode(OPP, { priority: 90 });
+        first.reject(apiError(500));
+        expect(await a).toBe(false);
+        expect(tree.byId(OPP)?.priority).toBe(90);
+        second.resolve(server({ priority: 90 }));
+        expect(await b).toBe(true);
+        expect(tree.byId(OPP)?.priority).toBe(90);
+      });
+
+      it('same field: the later fails first, then the earlier succeeds — the earlier value stands', async () => {
+        const first = deferred<any>();
+        const second = deferred<any>();
+        service.patchNode.onFirstCall().returns(first.promise).onSecondCall().returns(second.promise);
+        const a = tree.patchNode(OPP, { priority: 70 });
+        const b = tree.patchNode(OPP, { priority: 90 });
+        second.reject(apiError(500));
+        expect(await b).toBe(false);
+        expect(tree.byId(OPP)?.priority).toBe(70);
+        first.resolve(server({ priority: 70 }));
+        expect(await a).toBe(true);
+        expect(tree.byId(OPP)?.priority).toBe(70);
+      });
+
+      it('same field: both fail in either order — back to the original value', async () => {
+        const first = deferred<any>();
+        const second = deferred<any>();
+        service.patchNode.onFirstCall().returns(first.promise).onSecondCall().returns(second.promise);
+        const a = tree.patchNode(OPP, { priority: 70 });
+        const b = tree.patchNode(OPP, { priority: 90 });
+        second.reject(apiError(500));
+        await b;
+        first.reject(apiError(500));
+        await a;
+        expect(tree.byId(OPP)?.priority).toBe(50);
+      });
+
+      it('takes server-side changes to fields the patch did not send when nothing else is pending', async () => {
+        service.patchNode.resolves(server({ status: 'VALIDATED', priority: 61 }));
+        await tree.patchNode(OPP, { status: 'validated' });
+        expect(tree.byId(OPP)).toMatchObject({ status: 'validated', priority: 61 });
+      });
+
+      it('ignores responses that arrive after a team switch', async () => {
+        const pending = deferred<any>();
+        service.patchNode.returns(pending.promise);
+        const done = tree.patchNode(OPP, { priority: 70 });
+        service.getTree.resolves(treeDto(TREE, { id: 8 }));
+        await tree.loadTree(8);
+        pending.resolve(server({ priority: 70, title: 'Stale' }));
+        await done;
+        expect(tree.byId(OPP)).toMatchObject({ priority: 50, title: 'Title opportunity-1' });
+      });
+    });
   });
 
   describe('createNode', () => {
@@ -137,6 +263,16 @@ describe('OST tree store', () => {
       expect(await tree.createNode('solution-1', 'evidence')).toBeNull();
       expect(service.createNode.called).toBe(false);
       expect(tree.error).toBeTruthy();
+    });
+
+    it('keeps the parent’s cached history (the server writes history for the new node only)', async () => {
+      service.listHistory.resolves([
+        { id: 1, eventType: 'CREATED', summary: 'Created', authorLogin: null, authorInitials: null, createdDate: '' },
+      ]);
+      await tree.loadHistory('solution-1');
+      service.createNode.resolves(dto('assumption-9', 'solution-1', { status: 'UNTESTED' }));
+      await tree.createNode('solution-1');
+      expect(tree.history['solution-1']).toHaveLength(1);
     });
 
     it('leaves the tree untouched when the server fails', async () => {
@@ -180,6 +316,39 @@ describe('OST tree store', () => {
       expect(tree.byId('solution-1')?.parent).toBe('opportunity-1');
       expect(tree.nodes.map(n => n.id)).toEqual(TREE.map(d => d.key));
       expect(tree.error).toBe('A node cannot move under its own descendant.');
+    });
+
+    it('a failed move does not undo a patch that succeeded meanwhile', async () => {
+      const move = deferred<any>();
+      service.moveNode.returns(move.promise);
+      const moving = tree.moveNode('solution-1', 'opportunity-2');
+      expect(tree.byId('solution-1')?.parent).toBe('opportunity-2');
+
+      service.patchNode.resolves(dto('solution-1', 'opportunity-1', { status: 'BUILDING', title: 'Renamed' }));
+      expect(await tree.patchNode('solution-1', { title: 'Renamed', status: 'building' })).toBe(true);
+      // The patch response carries the server's (old) parent; the in-flight move keeps its placement.
+      expect(tree.byId('solution-1')).toMatchObject({ parent: 'opportunity-2', title: 'Renamed', status: 'building' });
+
+      move.reject(apiError(409, 'error.concurrencyFailure'));
+      expect(await moving).toBe(false);
+      expect(tree.byId('solution-1')).toMatchObject({ parent: 'opportunity-1', title: 'Renamed', status: 'building' });
+      expect(tree.nodes.map(n => n.id)).toEqual(TREE.map(d => d.key));
+      expect(tree.error).toBe('Someone else changed this tree at the same moment — please try again.');
+    });
+
+    it('a successful move does not revert a pending patch', async () => {
+      const patch = deferred<any>();
+      service.patchNode.returns(patch.promise);
+      const patching = tree.patchNode('solution-1', { title: 'Renamed' });
+      service.moveNode.resolves({
+        node: dto('solution-1', 'opportunity-2', { status: 'CANDIDATE', sortOrder: 0 }),
+        siblings: [{ key: 'solution-1', sortOrder: 0 }],
+      });
+      expect(await tree.moveNode('solution-1', 'opportunity-2')).toBe(true);
+      expect(tree.byId('solution-1')).toMatchObject({ parent: 'opportunity-2', title: 'Renamed' });
+      patch.resolve(dto('solution-1', 'opportunity-2', { status: 'CANDIDATE', title: 'Renamed' }));
+      expect(await patching).toBe(true);
+      expect(tree.byId('solution-1')).toMatchObject({ parent: 'opportunity-2', title: 'Renamed' });
     });
 
     it('rejects illegal targets locally', async () => {
@@ -274,6 +443,63 @@ describe('OST tree store', () => {
       service.patchNode.resolves(dto('opportunity-1', 'outcome-1', { status: 'PARKED' }));
       await tree.patchNode('opportunity-1', { status: 'parked' });
       expect(tree.history['opportunity-1']).toBeUndefined();
+    });
+  });
+
+  describe('dashboard figures follow local writes', () => {
+    it('recounts evidence this month after creating and deleting evidence', async () => {
+      const now = new Date().toISOString();
+      const lastMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 10)).toISOString();
+      service.getTree.resolves(
+        treeDto([...TREE.slice(0, 5), dto('evidence-1', 'assumption-1', { createdDate: lastMonth })], { evidenceThisMonth: 7 }),
+      );
+      await tree.loadTree(7);
+      expect(tree.evidenceThisMonth).toBe(0);
+
+      service.createNode.resolves(dto('evidence-5', 'assumption-1', { createdDate: now }));
+      await tree.createNode('assumption-1', 'evidence');
+      expect(tree.evidenceThisMonth).toBe(1);
+
+      service.deleteNode.resolves();
+      await tree.deleteNode('evidence-5');
+      expect(tree.evidenceThisMonth).toBe(0);
+    });
+
+    it('records local edits as the branch’s last activity by the current user', async () => {
+      expect(tree.byId('product-1')?.lastActivity).toBeNull();
+      service.patchNode.resolves(dto('opportunity-1', 'outcome-1', { status: 'PARKED', lastModifiedDate: '2099-01-01T00:00:00Z' }));
+      await tree.patchNode('opportunity-1', { status: 'parked' });
+      expect(tree.byId('product-1')?.lastActivity).toEqual({ at: '2099-01-01T00:00:00Z', byLogin: 'user' });
+
+      // An older stamp never moves it backwards.
+      service.createNode.resolves(dto('evidence-9', 'assumption-1', { createdDate: '2026-01-01T00:00:00Z' }));
+      await tree.createNode('assumption-1', 'evidence');
+      expect(tree.byId('product-1')?.lastActivity?.at).toBe('2099-01-01T00:00:00Z');
+    });
+  });
+
+  describe('derived layout at scale', () => {
+    it('keeps placed and descendantCount fast on a 300+ node tree while nodes are edited', async () => {
+      const big = bigTreeDtos(3, 25);
+      expect(big.length).toBeGreaterThan(300);
+      service.getTree.resolves(treeDto(big, { id: 9 }));
+      await tree.loadTree(9);
+      expect(Object.keys(tree.placed)).toHaveLength(big.length);
+      const product = big[0].key;
+      expect(tree.descendantCount(product)).toBe(big.filter((_, i) => i > 0 && i < big.length / 3).length);
+
+      const opportunity = big.find(d => d.type === 'OPPORTUNITY')!;
+      service.patchNode.callsFake(async (_type, _id, body) =>
+        dto(opportunity.key, opportunity.parentKey, { ...opportunity, priority: body.priority }),
+      );
+      const started = performance.now();
+      for (let i = 1; i <= 20; i++) {
+        await tree.patchNode(opportunity.key, { priority: i });
+        void tree.placed;
+        for (const n of tree.nodes) tree.descendantCount(n.id);
+      }
+      expect(performance.now() - started).toBeLessThan(1500);
+      expect(tree.byId(opportunity.key)?.priority).toBe(20);
     });
   });
 });

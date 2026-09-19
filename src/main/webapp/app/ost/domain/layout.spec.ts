@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { node, sampleNodes } from './fixtures.test-util';
-import { GAP_X, ROW_PITCH, edgePath, layoutTree } from './layout';
+import { bigTreeDtos, node, sampleNodes } from './fixtures.test-util';
+import { GAP_X, type Placed, ROW_PITCH, edgePath, layoutTree } from './layout';
+import { fromDto } from './mapping';
 import { TYPE_BOX } from './rules';
+import type { OstNode } from './types';
 
 describe('OST tidy layout', () => {
   const nodes = sampleNodes();
@@ -79,5 +81,52 @@ describe('OST tidy layout', () => {
     const parent = { x: 100, y: 0, w: 200, h: 60, depth: 0 };
     const child = { x: 40, y: 156, w: 200, h: 92, depth: 1 };
     expect(edgePath(parent, child)).toBe('M 100 60 V 108 H 40 V 156');
+  });
+
+  describe('large trees', () => {
+    /** The handoff's original O(n^2) algorithm, kept as the reference the memoised port must match. */
+    function referenceLayout(list: OstNode[], opts: { roots: string[]; collapsed: Record<string, boolean> }) {
+      const pos: Record<string, Placed> = {};
+      const childrenOf = (id: string) => list.filter(n => n.parent === id);
+      let cursor = 0;
+      const walk = (n: OstNode, depth: number): number => {
+        const box = TYPE_BOX[n.type];
+        const kids = opts.collapsed[n.id] ? [] : childrenOf(n.id);
+        let cx: number;
+        if (!kids.length) {
+          cx = cursor + box.w / 2;
+          cursor += box.w + GAP_X;
+        } else {
+          const spans = kids.map(k => walk(k, depth + 1));
+          cx = (spans[0] + spans[spans.length - 1]) / 2;
+        }
+        pos[n.id] = { x: cx, y: depth * ROW_PITCH, w: box.w, h: box.h, depth };
+        return cx;
+      };
+      for (const rootId of opts.roots) {
+        const root = list.find(n => n.id === rootId);
+        if (root) {
+          walk(root, 0);
+          cursor += 80;
+        }
+      }
+      return pos;
+    }
+
+    const big = bigTreeDtos(3, 25).map(fromDto);
+    const roots = big.filter(n => n.type === 'product').map(n => n.id);
+
+    it('matches the reference layout exactly', () => {
+      expect(big.length).toBeGreaterThan(300);
+      const collapsed = { [big.find(n => n.type === 'solution')!.id]: true };
+      expect(layoutTree(big, { roots, collapsed: {} })).toEqual(referenceLayout(big, { roots, collapsed: {} }));
+      expect(layoutTree(big, { roots, collapsed })).toEqual(referenceLayout(big, { roots, collapsed }));
+    });
+
+    it('lays out 300+ nodes quickly', () => {
+      const started = performance.now();
+      for (let i = 0; i < 20; i++) layoutTree(big, { roots, collapsed: {} });
+      expect((performance.now() - started) / 20).toBeLessThan(25);
+    });
   });
 });
