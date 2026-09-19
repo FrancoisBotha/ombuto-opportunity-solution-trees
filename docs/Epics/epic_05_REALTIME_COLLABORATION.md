@@ -170,8 +170,18 @@ epic and a JDL change.
   `config/WebsocketConfiguration` (the `/websocket/tracker` SockJS endpoint and
   the simple `/topic` broker, both keeping their generated names) and
   `config/WebsocketSecurityConfiguration`, which now requires authentication for
-  every `/topic/**` destination and denies everything else. This epic builds the
-  team topic on that infrastructure.
+  every `/topic/**` destination and denies everything else. Also kept for this
+  epic, and unreferenced until it lands: `app/shared/jhipster/encode-csrf-token.ts`
+  and the `@stomp/rx-stomp` and `sockjs-client` dependencies. Do not delete them
+  as dead code. This epic builds the team topic on that infrastructure.
+
+  Two things to settle in this epic's first ticket:
+  - **Rename the endpoint.** `/websocket/tracker` names something that no longer
+    exists. Nothing connects to it yet, so renaming it (e.g. `/websocket/ost`) is
+    free now and a breaking change later.
+  - **Authenticated is not enough.** `/topic/**` currently only requires a signed-in
+    user, so any member of any team could subscribe to another team's topic.
+    FR-034's team-scoped check is therefore mandatory, not a refinement.
 
 ## 10. Acceptance Criteria
 

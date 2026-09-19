@@ -186,6 +186,13 @@ class TreeCommentResourceIT {
 
         assertThat(f.count("select count(c) from Comment c where c.id = ?1", c.getId())).isZero();
         assertThat(f.count("select count(c) from Comment c where c.id = ?1", other.getId())).isEqualTo(1);
+        // The thread is flat: deleting one message leaves exactly the others, in order.
+        mvc
+            .perform(get(COMMENTS, "opportunity", f.opportunity.getId()).with(who(OWNER)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].id").value(other.getId()))
+            .andExpect(jsonPath("$[0].body").value("still here"));
         List<NodeHistory> h = history(TreeNodeType.OPPORTUNITY, f.opportunity.getId());
         assertThat(h).hasSize(1);
         assertThat(h.get(0).getEventType()).isEqualTo(HistoryEventType.COMMENT_DELETED);
