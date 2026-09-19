@@ -130,12 +130,17 @@
                 :y="n.y"
                 :width="n.width"
                 :height="n.height"
+                :has-children="n.hasChildren"
+                :collapsed="n.collapsed"
+                :hidden-descendant-count="n.hiddenDescendantCount"
+                :class="{ 'tree-node-card--collapsed': n.collapsed }"
                 @select="onNodeSelect(n.type, n.id)"
                 @add-child="openAddChildModal($event.parentType, $event.parentId, $event.childType)"
                 @delete="openDeleteModal($event.type, $event.id)"
                 @move-to="openMoveModal($event.type, $event.id)"
                 @move-up="reorderPrev($event.type, $event.id)"
                 @move-down="reorderNext($event.type, $event.id)"
+                @toggle-collapse="onToggleCollapse($event)"
               />
             </div>
           </div>

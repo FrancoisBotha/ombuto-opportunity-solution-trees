@@ -130,6 +130,51 @@ describe('layoutTree', () => {
     expect(s.type).toBe('solution');
   });
 
+  it('skips descendants and connectors under a collapsed subtree, and reports hidden-descendant count', () => {
+    const grand = opp(310);
+    const parent = opp(300, [grand]);
+    const t = emptyTeam();
+    t.products = [product(1, [outcome(10, [parent])])];
+    const collapsedKeys = new Set<string>([nodeKey('outcome', 10)]);
+    const r = layoutTree(t, { collapsedKeys });
+    // The collapsed outcome is still laid out.
+    const o = r.nodes.find(n => n.key === nodeKey('outcome', 10))!;
+    expect(o).toBeDefined();
+    expect(o.collapsed).toBe(true);
+    expect(o.hasChildren).toBe(true);
+    expect(o.hiddenDescendantCount).toBe(2);
+    // Descendants and their connectors disappear.
+    expect(r.nodes.find(n => n.id === 300)).toBeUndefined();
+    expect(r.nodes.find(n => n.id === 310)).toBeUndefined();
+    expect(r.edges.find(e => e.toKey === nodeKey('opportunity', 300))).toBeUndefined();
+  });
+
+  it('a nested collapsed branch stays collapsed when an ancestor is expanded', () => {
+    const grand = opp(310);
+    const parent = opp(300, [grand]);
+    const t = emptyTeam();
+    t.products = [product(1, [outcome(10, [parent])])];
+    const collapsedKeys = new Set<string>([nodeKey('opportunity', 300)]);
+    const r = layoutTree(t, { collapsedKeys });
+    // Outcome is expanded and visible.
+    expect(r.nodes.find(n => n.id === 10)).toBeDefined();
+    // Opportunity 300 is laid out, but its child is hidden.
+    const p = r.nodes.find(n => n.key === nodeKey('opportunity', 300))!;
+    expect(p.collapsed).toBe(true);
+    expect(p.hiddenDescendantCount).toBe(1);
+    expect(r.nodes.find(n => n.id === 310)).toBeUndefined();
+  });
+
+  it('a leaf node has hasChildren=false and no chevron info', () => {
+    const t = emptyTeam();
+    t.products = [product(1, [outcome(10, [opp(300)])])];
+    const r = layoutTree(t);
+    const leaf = r.nodes.find(n => n.id === 300)!;
+    expect(leaf.hasChildren).toBe(false);
+    expect(leaf.collapsed).toBe(false);
+    expect(leaf.hiddenDescendantCount).toBe(0);
+  });
+
   it('lays out a 500-node tree in well under 2 seconds', () => {
     // Build a tree with 1 product, 5 outcomes, each with a chain of nested opportunities + solutions.
     const t = emptyTeam();

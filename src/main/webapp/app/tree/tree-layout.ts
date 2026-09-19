@@ -15,6 +15,11 @@ export interface LayoutOptions {
   vGap?: number;
   productGap?: number;
   focusedProductId?: number | null;
+  /**
+   * Keys (`<type>:<id>`) whose subtree should be hidden. The collapsed node itself
+   * is still laid out — only its descendants and their connectors are skipped.
+   */
+  collapsedKeys?: ReadonlySet<string> | null;
 }
 
 export interface LayoutNode {
@@ -26,6 +31,12 @@ export interface LayoutNode {
   width: number;
   height: number;
   data: TreeNode;
+  /** True when this node has children but they are hidden by the collapse state. */
+  collapsed: boolean;
+  /** True when this node has any children at all (regardless of collapse). */
+  hasChildren: boolean;
+  /** Total descendants across all levels — meaningful only when `collapsed` is true. */
+  hiddenDescendantCount: number;
 }
 
 export interface LayoutEdge {
@@ -48,7 +59,14 @@ interface AbstractNode {
   type: TreeNodeType;
   id: number;
   node: TreeNode;
+  /** Children rendered by the layout (empty when the node is collapsed, even though `originalChildCount > 0`). */
   children: AbstractNode[];
+  /** True when the original tree node has any children — even if `children` is empty because we collapsed it. */
+  hasChildren: boolean;
+  /** Total descendants in the ORIGINAL tree (not the pruned/collapsed one). */
+  totalDescendants: number;
+  /** True when this node was collapsed by the layout. */
+  collapsed: boolean;
 }
 
 const DEFAULTS = {
@@ -61,37 +79,77 @@ const DEFAULTS = {
 
 export const nodeKey = (type: TreeNodeType, id: number): string => `${type}:${id}`;
 
+const isCollapsed = (collapsedKeys: ReadonlySet<string> | null | undefined, type: TreeNodeType, id: number): boolean =>
+  collapsedKeys != null && collapsedKeys.has(nodeKey(type, id));
+
 const solutionToAbstract = (s: ISolutionTreeNode): AbstractNode => ({
   type: 'solution',
   id: s.id,
   node: s,
   children: [],
+  hasChildren: false,
+  totalDescendants: 0,
+  collapsed: false,
 });
 
-const opportunityToAbstract = (op: IOpportunityTreeNode): AbstractNode => ({
-  type: 'opportunity',
-  id: op.id,
-  node: op,
-  children: [...(op.children ?? []).map(opportunityToAbstract), ...(op.solutions ?? []).map(solutionToAbstract)],
-});
+const opportunityToAbstract = (op: IOpportunityTreeNode, collapsedKeys: ReadonlySet<string> | null | undefined): AbstractNode => {
+  const rawChildren = [
+    ...(op.children ?? []).map(c => opportunityToAbstract(c, collapsedKeys)),
+    ...(op.solutions ?? []).map(solutionToAbstract),
+  ];
+  const hasChildren = rawChildren.length > 0;
+  const collapsed = hasChildren && isCollapsed(collapsedKeys, 'opportunity', op.id);
+  const totalDescendants = rawChildren.reduce((sum, c) => sum + 1 + c.totalDescendants, 0);
+  return {
+    type: 'opportunity',
+    id: op.id,
+    node: op,
+    children: collapsed ? [] : rawChildren,
+    hasChildren,
+    totalDescendants,
+    collapsed,
+  };
+};
 
-const outcomeToAbstract = (o: IOutcomeTreeNode): AbstractNode => ({
-  type: 'outcome',
-  id: o.id,
-  node: o,
-  children: (o.opportunities ?? []).map(opportunityToAbstract),
-});
+const outcomeToAbstract = (o: IOutcomeTreeNode, collapsedKeys: ReadonlySet<string> | null | undefined): AbstractNode => {
+  const rawChildren = (o.opportunities ?? []).map(op => opportunityToAbstract(op, collapsedKeys));
+  const hasChildren = rawChildren.length > 0;
+  const collapsed = hasChildren && isCollapsed(collapsedKeys, 'outcome', o.id);
+  const totalDescendants = rawChildren.reduce((sum, c) => sum + 1 + c.totalDescendants, 0);
+  return {
+    type: 'outcome',
+    id: o.id,
+    node: o,
+    children: collapsed ? [] : rawChildren,
+    hasChildren,
+    totalDescendants,
+    collapsed,
+  };
+};
 
-const productToAbstract = (p: IProductTreeNode): AbstractNode => ({
-  type: 'product',
-  id: p.id,
-  node: p,
-  children: (p.outcomes ?? []).map(outcomeToAbstract),
-});
+const productToAbstract = (p: IProductTreeNode, collapsedKeys: ReadonlySet<string> | null | undefined): AbstractNode => {
+  const rawChildren = (p.outcomes ?? []).map(o => outcomeToAbstract(o, collapsedKeys));
+  const hasChildren = rawChildren.length > 0;
+  const collapsed = hasChildren && isCollapsed(collapsedKeys, 'product', p.id);
+  const totalDescendants = rawChildren.reduce((sum, c) => sum + 1 + c.totalDescendants, 0);
+  return {
+    type: 'product',
+    id: p.id,
+    node: p,
+    children: collapsed ? [] : rawChildren,
+    hasChildren,
+    totalDescendants,
+    collapsed,
+  };
+};
 
-const buildRoots = (tree: ITeamTree, focusedProductId: number | null): AbstractNode[] => {
+const buildRoots = (
+  tree: ITeamTree,
+  focusedProductId: number | null,
+  collapsedKeys: ReadonlySet<string> | null | undefined,
+): AbstractNode[] => {
   const list = focusedProductId != null ? tree.products.filter(p => p.id === focusedProductId) : tree.products;
-  return list.map(productToAbstract);
+  return list.map(p => productToAbstract(p, collapsedKeys));
 };
 
 const computeSubtreeWidth = (
@@ -146,6 +204,9 @@ const place = (
     width: opts.nodeWidth,
     height: opts.nodeHeight,
     data: n.node,
+    collapsed: n.collapsed,
+    hasChildren: n.hasChildren,
+    hiddenDescendantCount: n.collapsed ? n.totalDescendants : 0,
   });
   for (const c of n.children) {
     const ck = nodeKey(c.type, c.id);
@@ -171,7 +232,7 @@ export const layoutTree = (tree: ITeamTree | null, options: LayoutOptions = {}):
   };
   const out: LayoutResult = { nodes: [], edges: [], width: 0, height: 0 };
   if (!tree || !tree.products || tree.products.length === 0) return out;
-  const roots = buildRoots(tree, options.focusedProductId ?? null);
+  const roots = buildRoots(tree, options.focusedProductId ?? null, options.collapsedKeys ?? null);
   if (roots.length === 0) return out;
   const cache = new Map<AbstractNode, number>();
   let x = 0;

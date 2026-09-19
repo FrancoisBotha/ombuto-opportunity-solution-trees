@@ -2,6 +2,7 @@ import { computed, defineComponent, inject, nextTick, onBeforeUnmount, onMounted
 import { useRoute } from 'vue-router';
 
 import { useAlertService } from '@/shared/alert/alert.service';
+import { useAccountStore } from '@/shared/config/store/account-store';
 
 import type { TreeNode, TreeNodeType } from './tree.model';
 import { validChildTypes } from './tree.model';
@@ -11,6 +12,7 @@ import TreeService, { type CreateChildInput, type CreateProductInput } from './t
 import { useTreeStore, type MoveToast } from './tree.store';
 import { listValidTargets, type MoveTarget } from './tree-move';
 import { createDragLifecycle, resolveDropTarget, type DropTarget } from './tree-drag';
+import { CollapseState } from './tree-collapse';
 
 const CANVAS_PADDING = 40;
 const MIN_ZOOM = 0.25;
@@ -36,6 +38,10 @@ export default defineComponent({
     const route = useRoute();
     const treeService = inject('treeService', () => new TreeService());
     const treeStore = useTreeStore();
+    const accountStore = useAccountStore();
+    const userLogin = computed<string | null>(() =>
+      accountStore.account && accountStore.account.login ? String(accountStore.account.login) : null,
+    );
 
     // Optional — the bootstrap-vue-next toast plugin may not be provided in
     // some test harnesses; fall back to a no-op so keyboard/reorder handlers
@@ -70,11 +76,72 @@ export default defineComponent({
     const writeError = computed(() => treeStore.writeError);
     const writeErrorMessage = computed(() => treeStore.writeErrorMessage);
 
+    // Per-user, per-team collapse state — a view preference kept in localStorage,
+    // never sent to the server. Rebuilt only once the store has actually loaded the
+    // tree for the *current* teamId, so that switching teams never prunes the new
+    // team's stored ids against the previous team's tree.
+    const collapseState = ref<CollapseState | null>(null);
+    // Bumped whenever collapseState mutates, so the `layout` computed re-runs.
+    const collapseVersion = ref(0);
+    const rebuildCollapseState = () => {
+      collapseState.value = new CollapseState({ userLogin: userLogin.value, teamId: teamId.value, tree: tree.value });
+      collapseVersion.value += 1;
+    };
+    const storeAlignedWithRoute = () =>
+      treeStore.loaded && treeStore.teamId === teamId.value && teamId.value != null && tree.value != null && tree.value.id === teamId.value;
+    watch(
+      [userLogin, teamId, () => treeStore.loaded, () => treeStore.teamId],
+      () => {
+        if (storeAlignedWithRoute()) {
+          rebuildCollapseState();
+        } else if (collapseState.value !== null) {
+          // Route's team has changed but the store hasn't caught up yet — drop
+          // stale state so nothing toggles or reconciles against the old team.
+          collapseState.value = null;
+          collapseVersion.value += 1;
+        }
+      },
+      { immediate: true },
+    );
+    watch(
+      () => tree.value,
+      newTree => {
+        // Only reconcile against a tree that belongs to the currently-tracked team.
+        if (!collapseState.value) return;
+        if (!newTree || treeStore.teamId !== teamId.value || newTree.id !== teamId.value) return;
+        collapseState.value.reconcile(newTree);
+        collapseVersion.value += 1;
+      },
+      { deep: true },
+    );
+
+    const collapsedKeys = computed<Set<string>>(() => {
+      // Depend on collapseVersion so this recomputes on toggle.
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      collapseVersion.value;
+      return collapseState.value ? collapseState.value.keys() : new Set<string>();
+    });
+
     const layout = computed(() =>
       layoutTree(tree.value, {
         focusedProductId: focusedProductId.value,
+        collapsedKeys: collapsedKeys.value,
       }),
     );
+
+    const onToggleCollapse = (payload: { type: TreeNodeType; id: number }) => {
+      if (!collapseState.value) return;
+      collapseState.value.toggle(payload.type, payload.id);
+      collapseVersion.value += 1;
+    };
+
+    const expandIfCollapsed = (type: TreeNodeType, id: number) => {
+      if (!collapseState.value) return;
+      if (collapseState.value.isCollapsed(type, id)) {
+        collapseState.value.expand(type, id);
+        collapseVersion.value += 1;
+      }
+    };
 
     const nodes = computed<LayoutNode[]>(() => layout.value.nodes);
     const edges = computed<LayoutEdge[]>(() => layout.value.edges);
@@ -321,6 +388,8 @@ export default defineComponent({
           },
         });
         if (ok) {
+          // If the destination parent was collapsed, expand it so the moved node stays visible.
+          expandIfCollapsed(target.parentType, target.parentId);
           const type = ctx.type;
           const id = ctx.id;
           moveContext.value = null;
@@ -435,12 +504,13 @@ export default defineComponent({
         cleanupDragUI();
         if (!type || id == null) return;
         if (target.kind === 'reparent') {
-          await treeStore.moveNode(type, id, target.parentType, target.parentId, {
+          const ok = await treeStore.moveNode(type, id, target.parentType, target.parentId, {
             service: treeService(),
             toast: moveToast,
           });
+          if (ok) expandIfCollapsed(target.parentType, target.parentId);
         } else {
-          await treeStore.moveNodeToPosition(
+          const ok = await treeStore.moveNodeToPosition(
             type,
             id,
             target.parentType === 'team' ? null : target.parentType,
@@ -448,6 +518,9 @@ export default defineComponent({
             target.position,
             { service: treeService(), toast: moveToast },
           );
+          if (ok && target.parentType !== 'team' && target.parentId != null) {
+            expandIfCollapsed(target.parentType, target.parentId);
+          }
         }
       },
       onCancel: () => {
@@ -598,6 +671,9 @@ export default defineComponent({
       onNodeMouseDown,
       onNodesClickCapture,
       isDragValidReparentTarget,
+      // collapse
+      onToggleCollapse,
+      collapseState,
     };
   },
 });

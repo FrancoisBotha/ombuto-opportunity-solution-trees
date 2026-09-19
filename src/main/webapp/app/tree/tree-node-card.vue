@@ -16,6 +16,27 @@
     <div v-if="status" class="tree-node-card__status" data-cy="treeNodeStatus">
       <span class="badge">{{ status }}</span>
     </div>
+    <button
+      v-if="hasChildren"
+      type="button"
+      class="tree-node-card__collapse-toggle"
+      :data-cy="`treeNodeCollapse-${type}-${nodeId}`"
+      :aria-expanded="collapsed ? 'false' : 'true'"
+      :aria-label="collapseLabel"
+      :title="collapseLabel"
+      @click="onToggleCollapse($event)"
+      @keydown.enter.stop.prevent="onToggleCollapse($event)"
+      @keydown.space.stop.prevent="onToggleCollapse($event)"
+      @mousedown.stop
+    >
+      <span aria-hidden="true">{{ collapsed ? '▸' : '▾' }}</span>
+      <span
+        v-if="collapsed && hiddenDescendantCount > 0"
+        class="tree-node-card__hidden-count"
+        :data-cy="`treeNodeHiddenCount-${type}-${nodeId}`"
+        >{{ hiddenDescendantCount }}</span
+      >
+    </button>
     <div v-if="canEdit" class="tree-node-card__actions" :data-cy="`treeNodeActions-${type}-${nodeId}`">
       <button
         v-for="ct in validChildren"

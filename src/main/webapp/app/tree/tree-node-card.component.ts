@@ -39,8 +39,11 @@ export default defineComponent({
     y: { type: Number, default: 0 },
     width: { type: Number, default: 200 },
     height: { type: Number, default: 80 },
+    hasChildren: { type: Boolean, default: false },
+    collapsed: { type: Boolean, default: false },
+    hiddenDescendantCount: { type: Number, default: 0 },
   },
-  emits: ['select', 'add-child', 'delete', 'move-to', 'move-up', 'move-down'],
+  emits: ['select', 'add-child', 'delete', 'move-to', 'move-up', 'move-down', 'toggle-collapse'],
   setup(props, { emit }) {
     const nodeId = computed<number>(() => (props.node as { id: number }).id);
     const title = computed<string>(() => {
@@ -109,6 +112,13 @@ export default defineComponent({
       event.stopPropagation();
       emit('move-down', { type: props.type, id: nodeId.value });
     };
+    const onToggleCollapse = (event: Event) => {
+      event.stopPropagation();
+      emit('toggle-collapse', { type: props.type, id: nodeId.value });
+    };
+    const collapseLabel = computed(() =>
+      props.collapsed ? `Expand ${typeLabel.value.toLowerCase()}` : `Collapse ${typeLabel.value.toLowerCase()}`,
+    );
     const childTypeLabel = (t: TreeNodeType) => {
       switch (t) {
         case 'product':
@@ -140,6 +150,8 @@ export default defineComponent({
       onMoveTo,
       onMoveUp,
       onMoveDown,
+      onToggleCollapse,
+      collapseLabel,
       childTypeLabel,
     };
   },
