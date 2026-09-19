@@ -1,12 +1,15 @@
-import { computed, defineComponent, inject, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, inject, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
-import type { TreeNodeType } from './tree.model';
+import { useAlertService } from '@/shared/alert/alert.service';
+
+import type { TreeNode, TreeNodeType } from './tree.model';
 import { validChildTypes } from './tree.model';
 import { layoutTree, type LayoutEdge, type LayoutNode } from './tree-layout';
 import TreeNodeCard from './tree-node-card.vue';
 import TreeService, { type CreateChildInput, type CreateProductInput } from './tree.service';
-import { useTreeStore } from './tree.store';
+import { useTreeStore, type MoveToast } from './tree.store';
+import { listValidTargets, type MoveTarget } from './tree-move';
 
 const CANVAS_PADDING = 40;
 const MIN_ZOOM = 0.25;
@@ -32,6 +35,21 @@ export default defineComponent({
     const route = useRoute();
     const treeService = inject('treeService', () => new TreeService());
     const treeStore = useTreeStore();
+
+    // Optional — the bootstrap-vue-next toast plugin may not be provided in
+    // some test harnesses; fall back to a no-op so keyboard/reorder handlers
+    // still run without crashing.
+    let alertService: ReturnType<typeof useAlertService> | null = null;
+    try {
+      alertService = useAlertService();
+    } catch {
+      alertService = null;
+    }
+    const moveToast: MoveToast = {
+      showError: (msg: string) => {
+        if (alertService) alertService.showError(msg);
+      },
+    };
 
     const teamId = computed(() => {
       const raw = route.params.teamId;
@@ -227,6 +245,132 @@ export default defineComponent({
 
     const dismissWriteError = () => treeStore.clearWriteError();
 
+    // --- Move-to dialog state ---
+    const moveContext = ref<{ type: TreeNodeType; id: number; label: string } | null>(null);
+    const moveTargets = ref<MoveTarget[]>([]);
+    const selectedMoveTarget = ref<MoveTarget | null>(null);
+    const isMovingNode = ref(false);
+    const moveErrorMessage = ref<string | null>(null);
+
+    const returnFocusToNode = (type: TreeNodeType, id: number) => {
+      nextTick(() => {
+        const selector = `[data-cy="treeNode-${type}-${id}"]`;
+        const el = document.querySelector(selector) as HTMLElement | null;
+        if (el) el.focus();
+      });
+    };
+
+    const openMoveModal = (type: TreeNodeType, id: number) => {
+      if (!canEdit.value) return;
+      const node = treeStore.findNode(type, id);
+      if (!node) return;
+      const label = type === 'product' ? (node as any).name : (node as any).title;
+      const parent = treeStore.parentOf(type, id);
+      const targets = listValidTargets({
+        tree: tree.value,
+        nodeType: type,
+        nodeId: id,
+        node: node as TreeNode,
+        currentParentType: parent ? parent.type : 'team',
+        currentParentId: parent ? parent.id : null,
+      });
+      moveContext.value = { type, id, label };
+      moveTargets.value = targets;
+      selectedMoveTarget.value = targets.length > 0 ? targets[0] : null;
+      moveErrorMessage.value = null;
+      // Move focus into the dialog so keyboard users can operate it immediately
+      // (Escape, Tab / arrow through targets, Enter to confirm).
+      nextTick(() => {
+        const dialog = document.querySelector('[data-cy="treeEditorMoveModal"]') as HTMLElement | null;
+        if (!dialog) return;
+        const firstTarget = dialog.querySelector('.tree-editor-move-target, [data-cy="moveCancel"]') as HTMLElement | null;
+        (firstTarget ?? dialog).focus();
+      });
+    };
+    const closeMoveModal = () => {
+      const ctx = moveContext.value;
+      moveContext.value = null;
+      moveTargets.value = [];
+      selectedMoveTarget.value = null;
+      moveErrorMessage.value = null;
+      if (ctx) returnFocusToNode(ctx.type, ctx.id);
+    };
+    const selectMoveTarget = (target: MoveTarget) => {
+      selectedMoveTarget.value = target;
+    };
+    const confirmMove = async () => {
+      const ctx = moveContext.value;
+      const target = selectedMoveTarget.value;
+      if (!ctx || !target) return;
+      isMovingNode.value = true;
+      moveErrorMessage.value = null;
+      try {
+        const ok = await treeStore.moveNode(ctx.type, ctx.id, target.parentType, target.parentId, {
+          service: treeService(),
+          toast: {
+            showError: (msg: string) => {
+              // Keep an inline copy in the dialog so it's visible right where the action was taken,
+              // and also surface it via the app-wide toast service (fulfils the epic's "a toast explains why").
+              moveErrorMessage.value = msg;
+              moveToast.showError(msg);
+            },
+          },
+        });
+        if (ok) {
+          const type = ctx.type;
+          const id = ctx.id;
+          moveContext.value = null;
+          moveTargets.value = [];
+          selectedMoveTarget.value = null;
+          returnFocusToNode(type, id);
+        }
+      } finally {
+        isMovingNode.value = false;
+      }
+    };
+
+    const groupedMoveTargets = computed(() => {
+      const groups: Array<{ productId: number; productName: string; targets: MoveTarget[] }> = [];
+      for (const target of moveTargets.value) {
+        let group = groups.find(g => g.productId === target.productId);
+        if (!group) {
+          group = { productId: target.productId, productName: target.productName, targets: [] };
+          groups.push(group);
+        }
+        group.targets.push(target);
+      }
+      return groups;
+    });
+
+    // --- Reorder ---
+    const canMoveUpOf = (type: TreeNodeType, id: number) => treeStore.canMoveUp(type, id);
+    const canMoveDownOf = (type: TreeNodeType, id: number) => treeStore.canMoveDown(type, id);
+    const canMoveToOf = (type: TreeNodeType, id: number): boolean => {
+      if (!canEdit.value) return false;
+      const node = treeStore.findNode(type, id);
+      if (!node) return false;
+      const parent = treeStore.parentOf(type, id);
+      const targets = listValidTargets({
+        tree: tree.value,
+        nodeType: type,
+        nodeId: id,
+        node: node as TreeNode,
+        currentParentType: parent ? parent.type : 'team',
+        currentParentId: parent ? parent.id : null,
+      });
+      return targets.length > 0;
+    };
+    const reorderPrev = async (type: TreeNodeType, id: number) => {
+      if (!canEdit.value) return;
+      await treeStore.reorderSibling(type, id, -1, { service: treeService(), toast: moveToast });
+      returnFocusToNode(type, id);
+    };
+    const reorderNext = async (type: TreeNodeType, id: number) => {
+      if (!canEdit.value) return;
+      await treeStore.reorderSibling(type, id, 1, { service: treeService(), toast: moveToast });
+      returnFocusToNode(type, id);
+    };
+
     return {
       teamId,
       isLoading,
@@ -283,6 +427,22 @@ export default defineComponent({
       closeDeleteModal,
       confirmDelete,
       dismissWriteError,
+      // move-to / reorder
+      moveContext,
+      moveTargets,
+      groupedMoveTargets,
+      selectedMoveTarget,
+      isMovingNode,
+      moveErrorMessage,
+      openMoveModal,
+      closeMoveModal,
+      selectMoveTarget,
+      confirmMove,
+      canMoveUpOf,
+      canMoveDownOf,
+      canMoveToOf,
+      reorderPrev,
+      reorderNext,
     };
   },
 });

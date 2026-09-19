@@ -15,6 +15,68 @@ const treeProductsApiUrl = 'api/tree/products';
 const treeOutcomesApiUrl = 'api/tree/outcomes';
 const treeOpportunitiesApiUrl = 'api/tree/opportunities';
 const treeSolutionsApiUrl = 'api/tree/solutions';
+const treeNodesMoveApiUrl = 'api/tree/nodes/move';
+
+/**
+ * Store-facing move payload. `parentType`/`parentId` are BOTH null when
+ * repositioning a product along the top row; for every other node kind both
+ * are required. `position` is zero-based and always sent (child count means
+ * "last").
+ */
+export interface MoveNodeRequest {
+  nodeType: TreeNodeType;
+  nodeId: number;
+  parentType: TreeNodeType | null;
+  parentId: number | null;
+  position: number;
+}
+
+export interface MoveSiblingOrder {
+  nodeType: TreeNodeType;
+  id: number;
+  sortOrder: number;
+}
+
+export interface OpportunityOutcomeUpdate {
+  opportunityId: number;
+  outcomeId: number;
+}
+
+export interface MoveNodeResponse {
+  nodeType: TreeNodeType;
+  nodeId: number;
+  parentType: TreeNodeType | null;
+  parentId: number | null;
+  outcomeId: number | null;
+  sortOrder: number | null;
+  oldSiblings: MoveSiblingOrder[];
+  newSiblings: MoveSiblingOrder[];
+  outcomeUpdates: OpportunityOutcomeUpdate[];
+}
+
+const toWireType = (t: TreeNodeType | null): string | null => (t == null ? null : t.toUpperCase());
+const fromWireType = (t: string | null | undefined): TreeNodeType | null => (t == null ? null : (t.toLowerCase() as TreeNodeType));
+
+interface WireSibling {
+  nodeType: string;
+  id: number;
+  sortOrder: number;
+}
+
+interface WireMoveResponse {
+  nodeType: string;
+  nodeId: number;
+  parentType: string | null;
+  parentId: number | null;
+  outcomeId: number | null;
+  sortOrder: number | null;
+  oldSiblings?: WireSibling[] | null;
+  newSiblings?: WireSibling[] | null;
+  outcomeUpdates?: OpportunityOutcomeUpdate[] | null;
+}
+
+const decodeSiblings = (s: WireSibling[] | null | undefined): MoveSiblingOrder[] =>
+  (s ?? []).map(x => ({ nodeType: fromWireType(x.nodeType) as TreeNodeType, id: x.id, sortOrder: x.sortOrder }));
 
 export interface CreateProductInput {
   name: string;
@@ -99,6 +161,30 @@ export default class TreeService {
       opportunity: { id: opportunityId },
     };
     return axios.post<ISolutionTreeNode>(solutionsApiUrl, body).then(res => res.data);
+  }
+
+  moveNode(request: MoveNodeRequest): Promise<MoveNodeResponse> {
+    const wire = {
+      nodeType: toWireType(request.nodeType),
+      nodeId: request.nodeId,
+      parentType: toWireType(request.parentType),
+      parentId: request.parentId,
+      position: request.position,
+    };
+    return axios.post<WireMoveResponse>(treeNodesMoveApiUrl, wire).then(res => {
+      const data = res.data;
+      return {
+        nodeType: fromWireType(data.nodeType) as TreeNodeType,
+        nodeId: data.nodeId,
+        parentType: fromWireType(data.parentType),
+        parentId: data.parentId,
+        outcomeId: data.outcomeId,
+        sortOrder: data.sortOrder,
+        oldSiblings: decodeSiblings(data.oldSiblings),
+        newSiblings: decodeSiblings(data.newSiblings),
+        outcomeUpdates: data.outcomeUpdates ?? [],
+      };
+    });
   }
 
   deleteNode(type: TreeNodeType, id: number): Promise<void> {

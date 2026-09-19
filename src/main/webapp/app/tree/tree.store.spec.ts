@@ -345,6 +345,262 @@ describe('tree.store', () => {
     });
   });
 
+  describe('moveNode', () => {
+    it('re-parents an opportunity from one outcome to another and updates sortOrder', async () => {
+      const store = useTreeStore();
+      const tree = sampleTree();
+      // Add a second outcome under product 100
+      tree.products[0].outcomes.push({
+        id: 210,
+        title: 'Outcome B',
+        description: null,
+        metric: null,
+        targetValue: null,
+        currentValue: null,
+        status: null,
+        startDate: null,
+        targetDate: null,
+        sortOrder: 1,
+        opportunities: [],
+      });
+      store.setTree(tree);
+      const svc = {
+        moveNode: vi.fn().mockResolvedValue({
+          nodeType: 'opportunity',
+          nodeId: 300,
+          parentType: 'outcome',
+          parentId: 210,
+          outcomeId: 210,
+          sortOrder: 0,
+          oldSiblings: [],
+          newSiblings: [{ nodeType: 'opportunity', id: 300, sortOrder: 0 }],
+          outcomeUpdates: [
+            { opportunityId: 300, outcomeId: 210 },
+            { opportunityId: 301, outcomeId: 210 },
+          ],
+        }),
+      } as any;
+      const ok = await store.moveNode('opportunity', 300, 'outcome', 210, { service: svc });
+      expect(ok).toBe(true);
+      expect(svc.moveNode).toHaveBeenCalledWith({
+        nodeType: 'opportunity',
+        nodeId: 300,
+        parentType: 'outcome',
+        parentId: 210,
+        position: 0,
+      });
+      expect(store.childrenOf('outcome', 200).map(n => (n as any).id)).toEqual([]);
+      expect(store.childrenOf('outcome', 210).map(n => (n as any).id)).toEqual([300]);
+      // Whole subtree comes along.
+      expect(store.findNode('opportunity', 301)).not.toBeNull();
+      expect(store.findNode('solution', 400)).not.toBeNull();
+      expect(store.findNode('solution', 401)).not.toBeNull();
+    });
+
+    it('moves an outcome to another product carrying its whole subtree', async () => {
+      const store = useTreeStore();
+      const tree = sampleTree();
+      tree.products.push({
+        id: 101,
+        name: 'Prod B',
+        description: null,
+        vision: null,
+        archived: false,
+        createdDate: null,
+        outcomes: [],
+      });
+      store.setTree(tree);
+      const svc = {
+        moveNode: vi.fn().mockResolvedValue({
+          nodeType: 'outcome',
+          nodeId: 200,
+          parentType: 'product',
+          parentId: 101,
+          outcomeId: null,
+          sortOrder: 0,
+          oldSiblings: [],
+          newSiblings: [{ nodeType: 'outcome', id: 200, sortOrder: 0 }],
+          outcomeUpdates: [],
+        }),
+      } as any;
+      const ok = await store.moveNode('outcome', 200, 'product', 101, { service: svc });
+      expect(ok).toBe(true);
+      expect(store.childrenOf('product', 100)).toEqual([]);
+      expect(store.childrenOf('product', 101).map(n => (n as any).id)).toEqual([200]);
+      // Nested opportunities and solutions still resolvable
+      expect(store.findNode('opportunity', 300)).not.toBeNull();
+      expect(store.findNode('opportunity', 301)).not.toBeNull();
+      expect(store.findNode('solution', 401)).not.toBeNull();
+    });
+
+    it('reconciles sibling sortOrder and outcomeUpdates from the server response', async () => {
+      const store = useTreeStore();
+      const tree = sampleTree();
+      tree.products[0].outcomes.push({
+        id: 210,
+        title: 'Outcome B',
+        description: null,
+        metric: null,
+        targetValue: null,
+        currentValue: null,
+        status: null,
+        startDate: null,
+        targetDate: null,
+        sortOrder: 1,
+        opportunities: [],
+      });
+      store.setTree(tree);
+      const svc = {
+        moveNode: vi.fn().mockResolvedValue({
+          nodeType: 'opportunity',
+          nodeId: 300,
+          parentType: 'outcome',
+          parentId: 210,
+          outcomeId: 210,
+          sortOrder: 5,
+          oldSiblings: [],
+          newSiblings: [{ nodeType: 'opportunity', id: 300, sortOrder: 5 }],
+          outcomeUpdates: [
+            { opportunityId: 300, outcomeId: 210 },
+            { opportunityId: 301, outcomeId: 210 },
+          ],
+        }),
+      } as any;
+      const ok = await store.moveNode('opportunity', 300, 'outcome', 210, { service: svc });
+      expect(ok).toBe(true);
+      // Server-supplied sortOrder is honoured.
+      expect((store.findNode('opportunity', 300) as any).sortOrder).toBe(5);
+      // Outcome reference is rewritten for both the moved node and its nested descendant,
+      // without a full tree refetch (svc.moveNode was called exactly once).
+      expect((store.findNode('opportunity', 300) as any).outcomeId).toBe(210);
+      expect((store.findNode('opportunity', 301) as any).outcomeId).toBe(210);
+      expect(svc.moveNode).toHaveBeenCalledTimes(1);
+    });
+
+    it('rolls back and records writeError when the server rejects the move', async () => {
+      const store = useTreeStore();
+      const tree = sampleTree();
+      tree.products[0].outcomes.push({
+        id: 210,
+        title: 'Outcome B',
+        description: null,
+        metric: null,
+        targetValue: null,
+        currentValue: null,
+        status: null,
+        startDate: null,
+        targetDate: null,
+        sortOrder: 1,
+        opportunities: [],
+      });
+      store.setTree(tree);
+      const svc = {
+        moveNode: vi.fn().mockRejectedValue({ response: { status: 400, data: { detail: 'Cycle detected' } } }),
+      } as any;
+      const toastCalls: string[] = [];
+      const ok = await store.moveNode('opportunity', 300, 'outcome', 210, {
+        service: svc,
+        toast: { showError: (m: string) => toastCalls.push(m) },
+      });
+      expect(ok).toBe(false);
+      expect(store.writeError).toBe('validation');
+      expect(store.writeErrorMessage).toMatch(/cycle detected/i);
+      expect(toastCalls).toEqual(['Cycle detected']);
+      // Rollback — opportunity is still under outcome 200.
+      expect(store.childrenOf('outcome', 200).map(n => (n as any).id)).toEqual([300]);
+      expect(store.childrenOf('outcome', 210)).toEqual([]);
+    });
+  });
+
+  describe('reorderSibling', () => {
+    const twoProductsTree = (): ITeamTree => ({
+      id: 1,
+      name: 'T',
+      description: null,
+      createdDate: null,
+      currentUserRole: TeamRole.EDITOR,
+      canEdit: true,
+      products: [
+        { id: 1, name: 'A', description: null, vision: null, archived: false, createdDate: null, outcomes: [] },
+        { id: 2, name: 'B', description: null, vision: null, archived: false, createdDate: null, outcomes: [] },
+        { id: 3, name: 'C', description: null, vision: null, archived: false, createdDate: null, outcomes: [] },
+      ],
+    });
+
+    it('canMoveUp/canMoveDown reflect first/last position', () => {
+      const store = useTreeStore();
+      store.setTree(twoProductsTree());
+      expect(store.canMoveUp('product', 1)).toBe(false);
+      expect(store.canMoveDown('product', 1)).toBe(true);
+      expect(store.canMoveUp('product', 3)).toBe(true);
+      expect(store.canMoveDown('product', 3)).toBe(false);
+    });
+
+    it('moves a product left along the top row and persists the new order', async () => {
+      const store = useTreeStore();
+      store.setTree(twoProductsTree());
+      const svc = {
+        moveNode: vi.fn().mockResolvedValue({
+          nodeType: 'product',
+          nodeId: 2,
+          parentType: null,
+          parentId: null,
+          outcomeId: null,
+          sortOrder: 0,
+          oldSiblings: [],
+          newSiblings: [
+            { nodeType: 'product', id: 2, sortOrder: 0 },
+            { nodeType: 'product', id: 1, sortOrder: 1 },
+            { nodeType: 'product', id: 3, sortOrder: 2 },
+          ],
+          outcomeUpdates: [],
+        }),
+      } as any;
+      const ok = await store.reorderSibling('product', 2, -1, { service: svc });
+      expect(ok).toBe(true);
+      expect(store.products.map(p => p.id)).toEqual([2, 1, 3]);
+      expect(svc.moveNode).toHaveBeenCalledWith({
+        nodeType: 'product',
+        nodeId: 2,
+        parentType: null,
+        parentId: null,
+        position: 0,
+      });
+    });
+
+    it('rolls back a reorder when the server rejects', async () => {
+      const store = useTreeStore();
+      store.setTree(twoProductsTree());
+      const svc = { moveNode: vi.fn().mockRejectedValue({ response: { status: 400, data: { detail: 'nope' } } }) } as any;
+      const ok = await store.reorderSibling('product', 2, -1, { service: svc });
+      expect(ok).toBe(false);
+      expect(store.products.map(p => p.id)).toEqual([1, 2, 3]);
+      expect(store.writeError).toBe('validation');
+    });
+
+    it('surfaces the server message via the toast callback on reorder failure', async () => {
+      const store = useTreeStore();
+      store.setTree(twoProductsTree());
+      const svc = { moveNode: vi.fn().mockRejectedValue({ response: { status: 400, data: { detail: 'invalid sort order' } } }) } as any;
+      const toastCalls: string[] = [];
+      const ok = await store.reorderSibling('product', 2, -1, {
+        service: svc,
+        toast: { showError: (m: string) => toastCalls.push(m) },
+      });
+      expect(ok).toBe(false);
+      expect(toastCalls).toEqual(['invalid sort order']);
+    });
+
+    it('refuses to move the first sibling further up', async () => {
+      const store = useTreeStore();
+      store.setTree(twoProductsTree());
+      const svc = { moveNode: vi.fn() } as any;
+      const ok = await store.reorderSibling('product', 1, -1, { service: svc });
+      expect(ok).toBe(false);
+      expect(svc.moveNode).not.toHaveBeenCalled();
+    });
+  });
+
   describe('deleteNode', () => {
     it('deletes the node via the API and removes it and its descendants from the store', async () => {
       const store = useTreeStore();

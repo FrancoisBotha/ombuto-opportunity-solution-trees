@@ -2,6 +2,7 @@ import { computed, defineComponent, type PropType } from 'vue';
 
 import type { IOpportunityTreeNode, IOutcomeTreeNode, IProductTreeNode, ISolutionTreeNode, TreeNode, TreeNodeType } from './tree.model';
 import { validChildTypes } from './tree.model';
+import { isMovableType } from './tree-move';
 
 export default defineComponent({
   name: 'TreeNodeCard',
@@ -22,12 +23,24 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    canMoveUp: {
+      type: Boolean,
+      default: false,
+    },
+    canMoveDown: {
+      type: Boolean,
+      default: false,
+    },
+    canMoveTo: {
+      type: Boolean,
+      default: false,
+    },
     x: { type: Number, default: 0 },
     y: { type: Number, default: 0 },
     width: { type: Number, default: 200 },
     height: { type: Number, default: 80 },
   },
-  emits: ['select', 'add-child', 'delete'],
+  emits: ['select', 'add-child', 'delete', 'move-to', 'move-up', 'move-down'],
   setup(props, { emit }) {
     const nodeId = computed<number>(() => (props.node as { id: number }).id);
     const title = computed<string>(() => {
@@ -80,6 +93,22 @@ export default defineComponent({
       event.stopPropagation();
       emit('delete', { type: props.type, id: nodeId.value });
     };
+    const showMoveTo = computed(() => props.canEdit && isMovableType(props.type) && props.canMoveTo);
+    const showReorder = computed(() => props.canEdit);
+    const reorderPrevLabel = computed(() => (props.type === 'product' ? 'Move left' : 'Move up'));
+    const reorderNextLabel = computed(() => (props.type === 'product' ? 'Move right' : 'Move down'));
+    const onMoveTo = (event: Event) => {
+      event.stopPropagation();
+      emit('move-to', { type: props.type, id: nodeId.value });
+    };
+    const onMoveUp = (event: Event) => {
+      event.stopPropagation();
+      emit('move-up', { type: props.type, id: nodeId.value });
+    };
+    const onMoveDown = (event: Event) => {
+      event.stopPropagation();
+      emit('move-down', { type: props.type, id: nodeId.value });
+    };
     const childTypeLabel = (t: TreeNodeType) => {
       switch (t) {
         case 'product':
@@ -104,6 +133,13 @@ export default defineComponent({
       canAddChild,
       onAddChild,
       onDelete,
+      showMoveTo,
+      showReorder,
+      reorderPrevLabel,
+      reorderNextLabel,
+      onMoveTo,
+      onMoveUp,
+      onMoveDown,
       childTypeLabel,
     };
   },
