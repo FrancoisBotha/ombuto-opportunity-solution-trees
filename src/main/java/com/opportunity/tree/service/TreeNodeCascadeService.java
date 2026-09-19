@@ -106,14 +106,19 @@ public class TreeNodeCascadeService {
     /**
      * Delete any node with its whole subtree. The caller must be OWNER or EDITOR
      * of the node's team; otherwise (or when the node does not exist)
-     * {@link TeamAccessDeniedException} is thrown and nothing is deleted.
+     * {@link TeamAccessDeniedException} is thrown and nothing is deleted. A node deleted by a
+     * concurrent request while this one waited for the team's structure lock is a
+     * {@code ConcurrencyFailureException} (409).
      */
     public void deleteNode(TreeNodeType type, Long id) {
         if (type == null) {
             throw new TeamAccessDeniedException();
         }
         // Queue behind concurrent moves/creates in the same team (see TreeStructureLock).
-        structureLock.lockTeam(teamAccessService.requireEditNode(type, id));
+        Long teamId = teamAccessService.requireEditNode(type, id);
+        structureLock.lockTeam(teamId);
+        // Deleted by the previous lock holder while this request waited: 409, not a silent no-op.
+        structureLock.requireNode(type, id, teamId);
         switch (type) {
             case PRODUCT -> deleteProduct(id);
             case OUTCOME -> deleteOutcome(id);

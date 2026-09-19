@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,11 +48,18 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <ul>
  *   <li>two moves between the same two parents, run concurrently, never deadlock into a 500 and
  *   leave dense sort orders (they queue on the team's structure lock);</li>
- *   <li>concurrent creates under one parent (a double-click) get distinct sort orders;</li>
+ *   <li>concurrent creates under one parent (a double-click) get distinct sort orders — likewise
+ *   concurrent product creates in one team, link adds on one node and open-question adds on one
+ *   opportunity;</li>
  *   <li>the generated admin DELETE of a node that still has children is a clean 409 without SQL.</li>
  * </ul>
+ *
+ * <p>{@link ConcurrentConnections} gives the context a real connection pool: under {@code testprod}
+ * the default pool of one connection would serialise the requests and these tests would pass even
+ * without the structure lock.
  */
 @IntegrationTest
+@ConcurrentConnections
 @AutoConfigureMockMvc
 class TreeConcurrencyIT {
 
@@ -73,6 +81,9 @@ class TreeConcurrencyIT {
     @Autowired
     private TreeNodeCascadeService cascadeService;
 
+    @Autowired
+    private DataSource dataSource;
+
     private TransactionTemplate tt;
     private String ownerLogin;
     private String editorLogin;
@@ -84,7 +95,8 @@ class TreeConcurrencyIT {
     private Long oppCId;
 
     @BeforeEach
-    void seed() {
+    void seed() throws Exception {
+        ConcurrentConnections.Guard.assertRealConcurrency(dataSource);
         tt = new TransactionTemplate(txMgr);
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         ownerLogin = "conc-owner-" + suffix;
@@ -118,7 +130,13 @@ class TreeConcurrencyIT {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(ownerLogin, "n/a", List.of()));
         try {
             tt.executeWithoutResult(status -> {
-                cascadeService.deleteNode(TreeNodeType.PRODUCT, productId);
+                // The seeded product plus any created through the API by a test.
+                for (Long id : em
+                    .createQuery("select p.id from Product p where p.team.id = :id", Long.class)
+                    .setParameter("id", teamId)
+                    .getResultList()) {
+                    cascadeService.deleteNode(TreeNodeType.PRODUCT, id);
+                }
                 em.createQuery("delete from TeamMember tm where tm.team.id = :id").setParameter("id", teamId).executeUpdate();
                 em.createQuery("delete from Team t where t.id = :id").setParameter("id", teamId).executeUpdate();
                 em
@@ -179,6 +197,89 @@ class TreeConcurrencyIT {
         List<Integer> sortOrders = tt.execute(status ->
             em
                 .createQuery("select s.sortOrder from Solution s where s.opportunity.id = :id order by s.sortOrder", Integer.class)
+                .setParameter("id", oppBId)
+                .getResultList()
+        );
+        assertThat(sortOrders).containsExactlyElementsOf(IntStream.range(0, PARALLEL_CREATES).boxed().toList());
+    }
+
+    @Test
+    void concurrentProductCreatesInOneTeamGetDistinctSortOrders() throws Exception {
+        Map<String, Object> team = Map.of("id", teamId, "name", "Concurrency Team", "createdDate", "2026-01-01T00:00:00Z");
+        List<MockHttpServletRequestBuilder> requests = new ArrayList<>();
+        for (int i = 0; i < PARALLEL_CREATES; i++) {
+            requests.add(
+                json(
+                    post("/api/products"),
+                    Map.of("name", "Parallel product " + i, "archived", false, "team", team),
+                    i % 2 == 0 ? ownerLogin : editorLogin
+                )
+            );
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(PARALLEL_CREATES);
+        try {
+            assertThat(runTogether(pool, requests)).containsOnly(201);
+        } finally {
+            pool.shutdownNow();
+        }
+        List<Integer> sortOrders = tt.execute(status ->
+            em
+                .createQuery("select p.sortOrder from Product p where p.team.id = :id order by p.sortOrder", Integer.class)
+                .setParameter("id", teamId)
+                .getResultList()
+        );
+        // The seeded product has sortOrder 0; the new ones append after it.
+        assertThat(sortOrders).containsExactlyElementsOf(IntStream.rangeClosed(0, PARALLEL_CREATES).boxed().toList());
+    }
+
+    @Test
+    void concurrentLinkAddsOnOneNodeGetDistinctSortOrders() throws Exception {
+        List<MockHttpServletRequestBuilder> requests = new ArrayList<>();
+        for (int i = 0; i < PARALLEL_CREATES; i++) {
+            requests.add(
+                json(
+                    post("/api/tree/nodes/opportunity/{id}/links", oppBId),
+                    Map.of("name", "Link " + i, "url", "https://example.com/" + i),
+                    i % 2 == 0 ? ownerLogin : editorLogin
+                )
+            );
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(PARALLEL_CREATES);
+        try {
+            assertThat(runTogether(pool, requests)).containsOnly(201);
+        } finally {
+            pool.shutdownNow();
+        }
+        List<Integer> sortOrders = tt.execute(status ->
+            em
+                .createQuery("select l.sortOrder from NodeLink l where l.opportunity.id = :id order by l.sortOrder", Integer.class)
+                .setParameter("id", oppBId)
+                .getResultList()
+        );
+        assertThat(sortOrders).containsExactlyElementsOf(IntStream.range(0, PARALLEL_CREATES).boxed().toList());
+    }
+
+    @Test
+    void concurrentOpenQuestionAddsOnOneOpportunityGetDistinctSortOrders() throws Exception {
+        List<MockHttpServletRequestBuilder> requests = new ArrayList<>();
+        for (int i = 0; i < PARALLEL_CREATES; i++) {
+            requests.add(
+                json(
+                    post("/api/tree/opportunities/{id}/questions", oppBId),
+                    Map.of("text", "Question " + i),
+                    i % 2 == 0 ? ownerLogin : editorLogin
+                )
+            );
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(PARALLEL_CREATES);
+        try {
+            assertThat(runTogether(pool, requests)).containsOnly(201);
+        } finally {
+            pool.shutdownNow();
+        }
+        List<Integer> sortOrders = tt.execute(status ->
+            em
+                .createQuery("select q.sortOrder from OpenQuestion q where q.opportunity.id = :id order by q.sortOrder", Integer.class)
                 .setParameter("id", oppBId)
                 .getResultList()
         );

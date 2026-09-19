@@ -3,12 +3,14 @@ package com.opportunity.tree.service.impl;
 import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.ProductRepository;
+import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.service.DefaultNodeLinks;
 import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.ProductService;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
 import com.opportunity.tree.service.TreeNodeCascadeService;
+import com.opportunity.tree.service.TreeStructureLock;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.mapper.ProductMapper;
@@ -36,6 +38,11 @@ import org.springframework.transaction.annotation.Transactional;
  * the product exists (NFR-002). A product's owning team cannot be changed to
  * a team the caller cannot edit, which blocks moving a product across teams
  * via the payload.
+ *
+ * <p>Create appends the product under the team's {@link TreeStructureLock}, so concurrent creates
+ * get distinct sort orders. Changing a product's team (allowed when the caller can edit both
+ * teams, TEAMS-003) locks both teams, lower id first, re-checks the product is still in its old
+ * team and appends it after the new team's products.
  */
 @Service
 @Transactional
@@ -53,18 +60,26 @@ public class ProductServiceImpl implements ProductService {
 
     private final TreeNodeCascadeService treeNodeCascadeService;
 
+    private final TreeStructureLock structureLock;
+
+    private final TeamRepository teamRepository;
+
     public ProductServiceImpl(
         ProductRepository productRepository,
         ProductMapper productMapper,
         TeamAccessService teamAccessService,
         DefaultNodeLinks defaultNodeLinks,
-        TreeNodeCascadeService treeNodeCascadeService
+        TreeNodeCascadeService treeNodeCascadeService,
+        TreeStructureLock structureLock,
+        TeamRepository teamRepository
     ) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.teamAccessService = teamAccessService;
         this.defaultNodeLinks = defaultNodeLinks;
         this.treeNodeCascadeService = treeNodeCascadeService;
+        this.structureLock = structureLock;
+        this.teamRepository = teamRepository;
     }
 
     @Override
@@ -81,7 +96,9 @@ public class ProductServiceImpl implements ProductService {
             product.setArchived(Boolean.FALSE);
         }
         product.setCreatedDate(Instant.now());
-        // sortOrder is server-set: append after the team's existing products.
+        // sortOrder is server-set: append after the team's existing products — under the team's
+        // structure lock, or concurrent creates (a double-click) get the same sortOrder.
+        structureLock.lockTeam(targetTeamId);
         product.setSortOrder(productRepository.findMaxSortOrderByTeamId(targetTeamId) + 1);
         product = productRepository.save(product);
         // OST: every new product gets its default "Product space" link.
@@ -97,14 +114,17 @@ public class ProductServiceImpl implements ProductService {
         teamAccessService.requireEditNode(TreeNodeType.PRODUCT, existing.getId());
 
         Long targetTeamId = teamIdOf(productDTO);
-        if (!Objects.equals(existingTeamId, targetTeamId)) {
+        boolean teamChanges = !Objects.equals(existingTeamId, targetTeamId);
+        if (teamChanges) {
             // Moving a product to a different team requires edit rights on the target team.
             teamAccessService.requireEditTeam(targetTeamId);
         }
 
         Product product = productMapper.toEntity(productDTO);
         product.setCreatedDate(existing.getCreatedDate());
-        if (product.getSortOrder() == null) {
+        if (teamChanges) {
+            product.setSortOrder(lockTeamChange(existing.getId(), existingTeamId, targetTeamId));
+        } else if (product.getSortOrder() == null) {
             product.setSortOrder(existing.getSortOrder());
         }
         product = productRepository.save(product);
@@ -119,16 +139,33 @@ public class ProductServiceImpl implements ProductService {
 
         Long targetTeamId = teamIdOf(productDTO);
         Long existingTeamId = existing.getTeam() != null ? existing.getTeam().getId() : null;
-        if (targetTeamId != null && !Objects.equals(existingTeamId, targetTeamId)) {
+        boolean teamChanges = targetTeamId != null && !Objects.equals(existingTeamId, targetTeamId);
+        Integer movedSortOrder = null;
+        if (teamChanges) {
             teamAccessService.requireEditTeam(targetTeamId);
+            movedSortOrder = lockTeamChange(existing.getId(), existingTeamId, targetTeamId);
         }
+        Integer appendAt = movedSortOrder;
 
         return productRepository
             .findById(productDTO.getId())
             .map(existingProduct -> {
                 Instant preservedCreatedDate = existingProduct.getCreatedDate();
-                productMapper.partialUpdate(existingProduct, productDTO);
+                // The team is re-pointed by id below, never merged field by field: the generated
+                // partialUpdate would copy the DTO's team id/name into the product's current, managed
+                // Team entity ("identifier of an instance of Team was altered" on flush).
+                TeamDTO requestedTeam = productDTO.getTeam();
+                productDTO.setTeam(null);
+                try {
+                    productMapper.partialUpdate(existingProduct, productDTO);
+                } finally {
+                    productDTO.setTeam(requestedTeam);
+                }
                 existingProduct.setCreatedDate(preservedCreatedDate);
+                if (appendAt != null) {
+                    existingProduct.setTeam(teamRepository.getReferenceById(targetTeamId));
+                    existingProduct.setSortOrder(appendAt);
+                }
                 return existingProduct;
             })
             .map(productRepository::save)
@@ -192,6 +229,18 @@ public class ProductServiceImpl implements ProductService {
         // fails on foreign keys. The cascade service authorises (OWNER/EDITOR of the product's
         // team; 403 for anyone else or an unknown id) and removes the whole subtree.
         treeNodeCascadeService.deleteNode(TreeNodeType.PRODUCT, id);
+    }
+
+    /**
+     * A product changing team touches two teams' product lists: lock both (lower id first, so two
+     * opposite moves cannot deadlock), re-check the product is still in its old team (it may have
+     * been deleted or moved while this request waited) and return the sortOrder that appends it
+     * after the new team's products.
+     */
+    private int lockTeamChange(Long productId, Long fromTeamId, Long toTeamId) {
+        structureLock.lockTeams(fromTeamId, toTeamId);
+        structureLock.requireNode(TreeNodeType.PRODUCT, productId, fromTeamId);
+        return productRepository.findMaxSortOrderByTeamId(toTeamId) + 1;
     }
 
     private static Long teamIdOf(ProductDTO dto) {
