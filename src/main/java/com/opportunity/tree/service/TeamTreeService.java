@@ -112,12 +112,6 @@ public class TeamTreeService {
             on.setId(o.getId());
             on.setTitle(o.getTitle());
             on.setDescription(o.getDescription());
-            on.setMetric(o.getMetric());
-            on.setTargetValue(o.getTargetValue());
-            on.setCurrentValue(o.getCurrentValue());
-            on.setStatus(o.getStatus());
-            on.setStartDate(o.getStartDate());
-            on.setTargetDate(o.getTargetDate());
             on.setSortOrder(o.getSortOrder());
             outcomeById.put(o.getId(), on);
             // outcome.getProduct().getId() returns the FK id from the proxy — no lazy load.
@@ -149,7 +143,6 @@ public class TeamTreeService {
             opn.setDescription(op.getDescription());
             opn.setStatus(op.getStatus());
             opn.setValuerating(op.getValuerating());
-            opn.setComplexity(op.getComplexity());
             opn.setSortOrder(op.getSortOrder());
             // getParent().getId() on a Hibernate proxy is a no-op that reads the FK — no lazy load.
             Opportunity parent = op.getParent();
@@ -193,7 +186,6 @@ public class TeamTreeService {
             sn.setTitle(s.getTitle());
             sn.setDescription(s.getDescription());
             sn.setStatus(s.getStatus());
-            sn.setEffort(s.getEffort());
             sn.setSortOrder(s.getSortOrder());
             Long opportunityId = s.getOpportunity().getId();
             OpportunityTreeNodeDTO opn = opportunityById.get(opportunityId);

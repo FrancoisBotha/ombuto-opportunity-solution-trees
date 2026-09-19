@@ -1,7 +1,6 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.domain.Assumption;
-import com.opportunity.tree.domain.Experiment;
 import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.Outcome;
 import com.opportunity.tree.domain.Product;
@@ -10,7 +9,6 @@ import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.AssumptionRepository;
-import com.opportunity.tree.repository.ExperimentRepository;
 import com.opportunity.tree.repository.OpportunityRepository;
 import com.opportunity.tree.repository.OutcomeRepository;
 import com.opportunity.tree.repository.ProductRepository;
@@ -55,7 +53,6 @@ public class TeamAccessService {
     private final OpportunityRepository opportunityRepository;
     private final SolutionRepository solutionRepository;
     private final AssumptionRepository assumptionRepository;
-    private final ExperimentRepository experimentRepository;
 
     public TeamAccessService(
         TeamMemberRepository teamMemberRepository,
@@ -63,8 +60,7 @@ public class TeamAccessService {
         OutcomeRepository outcomeRepository,
         OpportunityRepository opportunityRepository,
         SolutionRepository solutionRepository,
-        AssumptionRepository assumptionRepository,
-        ExperimentRepository experimentRepository
+        AssumptionRepository assumptionRepository
     ) {
         this.teamMemberRepository = teamMemberRepository;
         this.productRepository = productRepository;
@@ -72,7 +68,6 @@ public class TeamAccessService {
         this.opportunityRepository = opportunityRepository;
         this.solutionRepository = solutionRepository;
         this.assumptionRepository = assumptionRepository;
-        this.experimentRepository = experimentRepository;
     }
 
     // ---------------------------------------------------------------------
@@ -181,7 +176,7 @@ public class TeamAccessService {
     }
 
     // ---------------------------------------------------------------------
-    // Node-level checks (outcome, opportunity, solution, assumption, experiment)
+    // Node-level checks (outcome, opportunity, solution, assumption)
     // ---------------------------------------------------------------------
 
     public boolean canReadOutcome(Long outcomeId) {
@@ -280,30 +275,6 @@ public class TeamAccessService {
         }
     }
 
-    public boolean canReadExperiment(Long experimentId) {
-        return teamIdForExperiment(experimentId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditExperiment(Long experimentId) {
-        return teamIdForExperiment(experimentId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isExperimentOwner(Long experimentId) {
-        return teamIdForExperiment(experimentId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadExperiment(Long experimentId) {
-        if (!canReadExperiment(experimentId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditExperiment(Long experimentId) {
-        if (!canEditExperiment(experimentId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
     // ---------------------------------------------------------------------
     // Internal helpers
     // ---------------------------------------------------------------------
@@ -362,20 +333,6 @@ public class TeamAccessService {
         return assumptionRepository
             .findById(assumptionId)
             .map(Assumption::getSolution)
-            .map(Solution::getOpportunity)
-            .map(Opportunity::getOutcome)
-            .map(Outcome::getProduct)
-            .map(Product::getTeam)
-            .map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForExperiment(Long experimentId) {
-        if (experimentId == null) {
-            return Optional.empty();
-        }
-        return experimentRepository
-            .findById(experimentId)
-            .map(Experiment::getSolution)
             .map(Solution::getOpportunity)
             .map(Opportunity::getOutcome)
             .map(Outcome::getProduct)

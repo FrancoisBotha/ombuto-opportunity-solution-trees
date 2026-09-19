@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Cascade delete for the four tree node types (Product, Outcome, Opportunity,
- * Solution) — see TREE-003 / FR-016.
+ * Solution) — see TREE-003 / FR-016. Assumptions, evidence, node links, open
+ * questions and node comments under a deleted node are removed with it.
+ * TODO(OST step 3): NodeHistory rows and direct assumption/evidence deletes.
  *
  * <p>Lives in its own class (rather than in the JHipster-generated
  * {@code *ServiceImpl} classes) so the logic survives entity regeneration and
@@ -57,6 +59,7 @@ public class TreeNodeCascadeService {
             .setParameter("pid", productId)
             .executeUpdate();
         em.createQuery("delete from Interview i where i.product.id = :pid").setParameter("pid", productId).executeUpdate();
+        em.createQuery("delete from NodeLink l where l.product.id = :pid").setParameter("pid", productId).executeUpdate();
         em.createQuery("delete from Product p where p.id = :id").setParameter("id", productId).executeUpdate();
         em.flush();
     }
@@ -97,6 +100,7 @@ public class TreeNodeCascadeService {
         deleteOpportunitiesInternal(topOpps);
         // Comments hanging off the outcomes themselves.
         deleteCommentsFor("outcome", outcomeIds);
+        em.createQuery("delete from NodeLink l where l.outcome.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
         em.createQuery("delete from Outcome o where o.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
     }
 
@@ -126,13 +130,21 @@ public class TreeNodeCascadeService {
             .getResultList();
         deleteSolutionsInternal(solutionIds);
 
+        // Evidence hanging directly off the collected opportunities.
+        List<Long> evidenceIds = em
+            .createQuery("select e.id from Evidence e where e.opportunity.id in :ids", Long.class)
+            .setParameter("ids", all)
+            .getResultList();
+        deleteEvidenceInternal(evidenceIds);
+
         // Clear dependents that reference opportunities.
         em
             .createNativeQuery("delete from rel_opportunity__interview where opportunity_id in (:ids)")
             .setParameter("ids", all)
             .executeUpdate();
         em.createNativeQuery("delete from rel_opportunity__tag where opportunity_id in (:ids)").setParameter("ids", all).executeUpdate();
-        em.createQuery("delete from OpportunityLink l where l.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
+        em.createQuery("delete from NodeLink l where l.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
+        em.createQuery("delete from OpenQuestion q where q.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
         deleteCommentsFor("opportunity", all);
 
         // Break the self-referential parent link so we can bulk-delete without
@@ -146,31 +158,37 @@ public class TreeNodeCascadeService {
             return;
         }
         em.createNativeQuery("delete from rel_solution__tag where solution_id in (:ids)").setParameter("ids", solutionIds).executeUpdate();
-        em.createQuery("delete from SolutionLink sl where sl.solution.id in :ids").setParameter("ids", solutionIds).executeUpdate();
-        // Experiments and their assumption join rows.
-        List<Long> experimentIds = em
-            .createQuery("select e.id from Experiment e where e.solution.id in :ids", Long.class)
+        em.createQuery("delete from NodeLink l where l.solution.id in :ids").setParameter("ids", solutionIds).executeUpdate();
+        List<Long> assumptionIds = em
+            .createQuery("select a.id from Assumption a where a.solution.id in :ids", Long.class)
             .setParameter("ids", solutionIds)
             .getResultList();
-        if (!experimentIds.isEmpty()) {
-            em
-                .createNativeQuery("delete from rel_experiment__assumption where experiment_id in (:ids)")
-                .setParameter("ids", experimentIds)
-                .executeUpdate();
-            em.createQuery("delete from Experiment e where e.id in :ids").setParameter("ids", experimentIds).executeUpdate();
-        }
-        // Assumptions may also be referenced from experiments belonging to other
-        // solutions (via rel_experiment__assumption). Clear those join rows first
-        // so the assumption bulk-delete does not hit an FK violation.
-        em
-            .createNativeQuery(
-                "delete from rel_experiment__assumption where assumption_id in (select id from assumption where solution_id in (:ids))"
-            )
-            .setParameter("ids", solutionIds)
-            .executeUpdate();
-        em.createQuery("delete from Assumption a where a.solution.id in :ids").setParameter("ids", solutionIds).executeUpdate();
+        deleteAssumptionsInternal(assumptionIds);
         deleteCommentsFor("solution", solutionIds);
         em.createQuery("delete from Solution s where s.id in :ids").setParameter("ids", solutionIds).executeUpdate();
+    }
+
+    private void deleteAssumptionsInternal(List<Long> assumptionIds) {
+        if (assumptionIds.isEmpty()) {
+            return;
+        }
+        List<Long> evidenceIds = em
+            .createQuery("select e.id from Evidence e where e.assumption.id in :ids", Long.class)
+            .setParameter("ids", assumptionIds)
+            .getResultList();
+        deleteEvidenceInternal(evidenceIds);
+        em.createQuery("delete from NodeLink l where l.assumption.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
+        deleteCommentsFor("assumption", assumptionIds);
+        em.createQuery("delete from Assumption a where a.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
+    }
+
+    private void deleteEvidenceInternal(List<Long> evidenceIds) {
+        if (evidenceIds.isEmpty()) {
+            return;
+        }
+        em.createQuery("delete from NodeLink l where l.evidence.id in :ids").setParameter("ids", evidenceIds).executeUpdate();
+        deleteCommentsFor("evidence", evidenceIds);
+        em.createQuery("delete from Evidence e where e.id in :ids").setParameter("ids", evidenceIds).executeUpdate();
     }
 
     /**
@@ -186,6 +204,8 @@ public class TreeNodeCascadeService {
             case "outcome" -> "outcome_id";
             case "opportunity" -> "opportunity_id";
             case "solution" -> "solution_id";
+            case "assumption" -> "assumption_id";
+            case "evidence" -> "evidence_id";
             default -> throw new IllegalArgumentException("Unsupported comment column: " + column);
         };
         // Collect target comment ids first, then null out any comment.parent_id

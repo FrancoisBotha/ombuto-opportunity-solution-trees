@@ -66,6 +66,8 @@ public class ProductServiceImpl implements ProductService {
             product.setArchived(Boolean.FALSE);
         }
         product.setCreatedDate(Instant.now());
+        // sortOrder is server-set: append after the team's existing products.
+        product.setSortOrder(productRepository.findMaxSortOrderByTeamId(targetTeamId) + 1);
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }
@@ -85,6 +87,9 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = productMapper.toEntity(productDTO);
         product.setCreatedDate(existing.getCreatedDate());
+        if (product.getSortOrder() == null) {
+            product.setSortOrder(existing.getSortOrder());
+        }
         product = productRepository.save(product);
         return productMapper.toDto(product);
     }

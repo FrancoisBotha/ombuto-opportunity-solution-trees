@@ -18,7 +18,6 @@ public class OpportunityTreeNodeDTO implements Serializable {
     private String description;
     private OpportunityStatus status;
     private Integer valuerating;
-    private Integer complexity;
     private Integer sortOrder;
     private Long parentId;
     private List<OpportunityTreeNodeDTO> children = new ArrayList<>();
@@ -64,14 +63,6 @@ public class OpportunityTreeNodeDTO implements Serializable {
 
     public void setValuerating(Integer valuerating) {
         this.valuerating = valuerating;
-    }
-
-    public Integer getComplexity() {
-        return complexity;
-    }
-
-    public void setComplexity(Integer complexity) {
-        this.complexity = complexity;
     }
 
     public Integer getSortOrder() {

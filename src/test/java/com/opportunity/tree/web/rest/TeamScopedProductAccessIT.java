@@ -89,10 +89,22 @@ class TeamScopedProductAccessIT {
         persistMembership(team, editorUser, TeamRole.EDITOR);
         persistMembership(team, viewerUser, TeamRole.VIEWER);
 
-        product = new Product().name("Discovery").description("desc").archived(Boolean.FALSE).createdDate(Instant.now()).team(team);
+        product = new Product()
+            .name("Discovery")
+            .description("desc")
+            .archived(Boolean.FALSE)
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .team(team);
         em.persist(product);
 
-        archivedProduct = new Product().name("Legacy").description("old").archived(Boolean.TRUE).createdDate(Instant.now()).team(team);
+        archivedProduct = new Product()
+            .name("Legacy")
+            .description("old")
+            .archived(Boolean.TRUE)
+            .sortOrder(1)
+            .createdDate(Instant.now())
+            .team(team);
         em.persist(archivedProduct);
         em.flush();
     }

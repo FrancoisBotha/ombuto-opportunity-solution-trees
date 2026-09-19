@@ -7,7 +7,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.opportunity.tree.domain.Assumption;
-import com.opportunity.tree.domain.Experiment;
 import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.Outcome;
 import com.opportunity.tree.domain.Product;
@@ -17,7 +16,6 @@ import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.AssumptionRepository;
-import com.opportunity.tree.repository.ExperimentRepository;
 import com.opportunity.tree.repository.OpportunityRepository;
 import com.opportunity.tree.repository.OutcomeRepository;
 import com.opportunity.tree.repository.ProductRepository;
@@ -55,7 +53,6 @@ class TeamAccessServiceTest {
     private static final Long OPPORTUNITY_A = 30L;
     private static final Long SOLUTION_A = 40L;
     private static final Long ASSUMPTION_A = 50L;
-    private static final Long EXPERIMENT_A = 60L;
 
     @Mock
     private TeamMemberRepository teamMemberRepository;
@@ -75,9 +72,6 @@ class TeamAccessServiceTest {
     @Mock
     private AssumptionRepository assumptionRepository;
 
-    @Mock
-    private ExperimentRepository experimentRepository;
-
     private TeamAccessService service;
 
     private Team teamA;
@@ -89,7 +83,6 @@ class TeamAccessServiceTest {
     private Opportunity opportunityA;
     private Solution solutionA;
     private Assumption assumptionA;
-    private Experiment experimentA;
 
     @BeforeEach
     void setUp() {
@@ -99,8 +92,7 @@ class TeamAccessServiceTest {
             outcomeRepository,
             opportunityRepository,
             solutionRepository,
-            assumptionRepository,
-            experimentRepository
+            assumptionRepository
         );
 
         teamA = team(TEAM_A);
@@ -120,8 +112,6 @@ class TeamAccessServiceTest {
         solutionA.setOpportunity(opportunityA);
         assumptionA = new Assumption().id(ASSUMPTION_A);
         assumptionA.setSolution(solutionA);
-        experimentA = new Experiment().id(EXPERIMENT_A);
-        experimentA.setSolution(solutionA);
 
         // Stubbed with lenient() because not every test exercises every lookup.
         lenient().when(productRepository.findById(eq(PRODUCT_A))).thenReturn(Optional.of(productA));
@@ -130,7 +120,6 @@ class TeamAccessServiceTest {
         lenient().when(opportunityRepository.findById(eq(OPPORTUNITY_A))).thenReturn(Optional.of(opportunityA));
         lenient().when(solutionRepository.findById(eq(SOLUTION_A))).thenReturn(Optional.of(solutionA));
         lenient().when(assumptionRepository.findById(eq(ASSUMPTION_A))).thenReturn(Optional.of(assumptionA));
-        lenient().when(experimentRepository.findById(eq(EXPERIMENT_A))).thenReturn(Optional.of(experimentA));
     }
 
     @AfterEach
@@ -244,7 +233,7 @@ class TeamAccessServiceTest {
     }
 
     // ---------------------------------------------------------------------
-    // Node-level checks (outcome, opportunity, solution, assumption, experiment)
+    // Node-level checks (outcome, opportunity, solution, assumption)
     // ---------------------------------------------------------------------
 
     @Test
@@ -256,7 +245,6 @@ class TeamAccessServiceTest {
         assertThat(service.canEditOpportunity(OPPORTUNITY_A)).isTrue();
         assertThat(service.canEditSolution(SOLUTION_A)).isTrue();
         assertThat(service.canEditAssumption(ASSUMPTION_A)).isTrue();
-        assertThat(service.canEditExperiment(EXPERIMENT_A)).isTrue();
     }
 
     @Test
@@ -269,7 +257,6 @@ class TeamAccessServiceTest {
         assertThat(service.canEditOpportunity(OPPORTUNITY_A)).isFalse();
         assertThat(service.canEditSolution(SOLUTION_A)).isFalse();
         assertThat(service.canEditAssumption(ASSUMPTION_A)).isFalse();
-        assertThat(service.canEditExperiment(EXPERIMENT_A)).isFalse();
     }
 
     @Test
@@ -281,7 +268,6 @@ class TeamAccessServiceTest {
         assertThat(service.canReadOpportunity(OPPORTUNITY_A)).isFalse();
         assertThat(service.canReadSolution(SOLUTION_A)).isFalse();
         assertThat(service.canReadAssumption(ASSUMPTION_A)).isFalse();
-        assertThat(service.canReadExperiment(EXPERIMENT_A)).isFalse();
     }
 
     @Test
@@ -293,7 +279,6 @@ class TeamAccessServiceTest {
         assertThat(service.isOpportunityOwner(OPPORTUNITY_A)).isTrue();
         assertThat(service.isSolutionOwner(SOLUTION_A)).isTrue();
         assertThat(service.isAssumptionOwner(ASSUMPTION_A)).isTrue();
-        assertThat(service.isExperimentOwner(EXPERIMENT_A)).isTrue();
     }
 
     // ---------------------------------------------------------------------

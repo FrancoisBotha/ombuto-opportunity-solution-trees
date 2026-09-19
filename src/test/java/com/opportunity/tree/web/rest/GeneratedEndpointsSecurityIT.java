@@ -10,10 +10,17 @@ import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
+import com.opportunity.tree.domain.enumeration.HistoryEventType;
 import com.opportunity.tree.domain.enumeration.TeamRole;
+import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TeamRepository;
+import com.opportunity.tree.service.dto.EvidenceDTO;
+import com.opportunity.tree.service.dto.NodeHistoryDTO;
+import com.opportunity.tree.service.dto.NodeLinkDTO;
+import com.opportunity.tree.service.dto.OpenQuestionDTO;
+import com.opportunity.tree.service.dto.OpportunityDTO;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.dto.TeamMemberDTO;
@@ -43,6 +50,9 @@ import org.springframework.transaction.annotation.Transactional;
  * ProductResource is routed through TeamAccessService and must uniformly deny
  * non-members (403 on writes; empty list on GET-all; 404 on GET-one — matching
  * a non-existent id so existence cannot be probed).
+ *
+ * <p>The OST node entities added in OST-1 (Evidence, NodeLink, OpenQuestion,
+ * NodeHistory) are locked to ROLE_ADMIN the same way as Team and TeamMember.
  */
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -81,6 +91,7 @@ class GeneratedEndpointsSecurityIT {
             .description("d")
             .vision("v")
             .archived(Boolean.FALSE)
+            .sortOrder(0)
             .createdDate(Instant.now());
         otherProduct.setTeam(otherTeam);
         em.persist(otherProduct);
@@ -234,5 +245,75 @@ class GeneratedEndpointsSecurityIT {
 
         // DELETE: another team's product is 403.
         mvc.perform(delete("/api/products/{id}", otherProduct.getId()).with(csrf())).andExpect(status().isForbidden());
+    }
+
+    // ---------------------------------------------------------------------
+    // Evidence, NodeLink, OpenQuestion, NodeHistory — locked to ROLE_ADMIN
+    // ---------------------------------------------------------------------
+
+    @Test
+    @Transactional
+    void evidenceEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        EvidenceDTO body = new EvidenceDTO();
+        body.setId(1L);
+        body.setTitle("valid title");
+        body.setSortOrder(0);
+        body.setCreatedDate(Instant.now());
+        assertAdminOnlyOnEveryVerb("/api/evidences", body);
+    }
+
+    @Test
+    @Transactional
+    void nodeLinkEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        NodeLinkDTO body = new NodeLinkDTO();
+        body.setId(1L);
+        body.setName("Doc");
+        body.setUrl("https://example.com/doc");
+        body.setSortOrder(0);
+        body.setCreatedDate(Instant.now());
+        assertAdminOnlyOnEveryVerb("/api/node-links", body);
+    }
+
+    @Test
+    @Transactional
+    void openQuestionEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        OpportunityDTO opportunityRef = new OpportunityDTO();
+        opportunityRef.setId(1L);
+        OpenQuestionDTO body = new OpenQuestionDTO();
+        body.setId(1L);
+        body.setQuestionText("Why?");
+        body.setDone(Boolean.FALSE);
+        body.setSortOrder(0);
+        body.setCreatedDate(Instant.now());
+        body.setOpportunity(opportunityRef);
+        assertAdminOnlyOnEveryVerb("/api/open-questions", body);
+    }
+
+    @Test
+    @Transactional
+    void nodeHistoryEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        NodeHistoryDTO body = new NodeHistoryDTO();
+        body.setId(1L);
+        body.setNodeType(TreeNodeType.OPPORTUNITY);
+        body.setNodeId(1L);
+        body.setEventType(HistoryEventType.CREATED);
+        body.setSummary("Created");
+        body.setCreatedDate(Instant.now());
+        assertAdminOnlyOnEveryVerb("/api/node-histories", body);
+    }
+
+    /** Every verb on a generated CRUD resource must 403 for a plain ROLE_USER. The body is valid so validation cannot mask it. */
+    private void assertAdminOnlyOnEveryVerb(String baseUrl, Object body) throws Exception {
+        byte[] json = om.writeValueAsBytes(body);
+        mvc.perform(get(baseUrl)).andExpect(status().isForbidden());
+        mvc.perform(get(baseUrl + "/{id}", 1L)).andExpect(status().isForbidden());
+        mvc.perform(post(baseUrl).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().isForbidden());
+        mvc
+            .perform(put(baseUrl + "/{id}", 1L).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(json))
+            .andExpect(status().isForbidden());
+        mvc
+            .perform(patch(baseUrl + "/{id}", 1L).with(csrf()).contentType("application/merge-patch+json").content(json))
+            .andExpect(status().isForbidden());
+        mvc.perform(delete(baseUrl + "/{id}", 1L).with(csrf())).andExpect(status().isForbidden());
     }
 }

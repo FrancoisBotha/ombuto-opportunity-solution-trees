@@ -15,7 +15,6 @@ public class SolutionTreeNodeDTO implements Serializable {
     private String title;
     private String description;
     private SolutionStatus status;
-    private Integer effort;
     private Integer sortOrder;
 
     public SolutionTreeNodeDTO() {}
@@ -50,14 +49,6 @@ public class SolutionTreeNodeDTO implements Serializable {
 
     public void setStatus(SolutionStatus status) {
         this.status = status;
-    }
-
-    public Integer getEffort() {
-        return effort;
-    }
-
-    public void setEffort(Integer effort) {
-        this.effort = effort;
     }
 
     public Integer getSortOrder() {

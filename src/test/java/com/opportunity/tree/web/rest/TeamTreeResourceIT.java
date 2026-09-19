@@ -15,7 +15,6 @@ import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.OpportunityStatus;
-import com.opportunity.tree.domain.enumeration.OutcomeStatus;
 import com.opportunity.tree.domain.enumeration.SolutionStatus;
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.OpportunityRepository;
@@ -277,7 +276,6 @@ class TeamTreeResourceIT {
         ProductTreeNodeDTO pd = tree.getProducts().get(0);
         assertThat(pd.getArchived()).isTrue();
         assertThat(pd.getOutcomes()).hasSize(1);
-        assertThat(pd.getOutcomes().get(0).getStatus()).isNotNull();
         assertThat(pd.getOutcomes().get(0).getOpportunities().get(0).getStatus()).isNotNull();
         assertThat(pd.getOutcomes().get(0).getOpportunities().get(0).getSolutions().get(0).getStatus()).isNotNull();
     }
@@ -414,18 +412,13 @@ class TeamTreeResourceIT {
     }
 
     private Product persistProduct(Team team, String name, boolean archived) {
-        Product p = new Product().name(name).description("d").archived(archived).createdDate(Instant.now()).team(team);
+        Product p = new Product().name(name).description("d").archived(archived).sortOrder(0).createdDate(Instant.now()).team(team);
         em.persist(p);
         return p;
     }
 
     private Outcome persistOutcome(Product product, String title, int sortOrder) {
-        Outcome o = new Outcome()
-            .title(title)
-            .status(OutcomeStatus.ACTIVE)
-            .sortOrder(sortOrder)
-            .createdDate(Instant.now())
-            .product(product);
+        Outcome o = new Outcome().title(title).sortOrder(sortOrder).createdDate(Instant.now()).product(product);
         em.persist(o);
         return o;
     }
@@ -433,9 +426,9 @@ class TeamTreeResourceIT {
     private Opportunity persistOpportunity(Outcome outcome, Opportunity parent, String title, int sortOrder) {
         Opportunity op = new Opportunity()
             .title(title)
-            .status(OpportunityStatus.IDENTIFIED)
+            .status(OpportunityStatus.UNEXPLORED)
             .valuerating(3)
-            .complexity(3)
+            .priority(50)
             .sortOrder(sortOrder)
             .createdDate(Instant.now())
             .outcome(outcome)
@@ -447,7 +440,7 @@ class TeamTreeResourceIT {
     private Solution persistSolution(Opportunity opportunity, String title, int sortOrder) {
         Solution s = new Solution()
             .title(title)
-            .status(SolutionStatus.IDEA)
+            .status(SolutionStatus.CANDIDATE)
             .sortOrder(sortOrder)
             .createdDate(Instant.now())
             .opportunity(opportunity);
