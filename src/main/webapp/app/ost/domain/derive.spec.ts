@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  ancestorOfType,
   breadcrumb,
   childrenOf,
   countByType,
@@ -15,7 +14,6 @@ import {
   orderTree,
   panelTabsFor,
   productCards,
-  productOf,
   statusTone,
 } from './derive';
 import { node, sampleNodes } from './fixtures.test-util';
@@ -46,13 +44,6 @@ describe('OST derived values', () => {
     const cyclic = [node('opportunity-1', 'opportunity-2'), node('opportunity-2', 'opportunity-1')];
     expect(breadcrumb('opportunity-1', cyclic).map(n => n.id)).toEqual(['opportunity-2']);
     expect(descendantIds('opportunity-1', cyclic)).toEqual(['opportunity-2']);
-  });
-
-  it('finds the product and nearest ancestors of a type', () => {
-    expect(productOf('evidence-2', nodes)?.id).toBe('product-1');
-    expect(productOf('product-2', nodes)?.id).toBe('product-2');
-    expect(ancestorOfType('opportunity-2', 'opportunity', nodes)?.id).toBe('opportunity-1');
-    expect(ancestorOfType('outcome-1', 'solution', nodes)).toBeNull();
   });
 
   it('derives solution evidence strength through the rules', () => {

@@ -18,7 +18,9 @@ import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERN
  * an assumption from the Experiments tracker; edits confidence / value / priority on the full-page
  * detail, leaves a typed note by navigating (it is saved) and deletes a product there; deletes a
  * subtree with its descendant count; reloads and finds everything persisted. On a touch screen the
- * small chat / question buttons are 44px. Finally `user` is demoted to VIEWER and a second session
+ * small chat / question buttons are 44px, and every compact control (view tabs, team and product
+ * combos, palette toggle, filter / status chips, breadcrumbs, $ steps, link restore, node chips)
+ * has a 44px+ hit area that no neighbour's covers. Finally `user` is demoted to VIEWER and a second session
  * checks that everything is read-only.
  *
  * Every page / console error fails the test (except the browser's log line for an expected 403).
@@ -650,6 +652,11 @@ test.describe('OST journey (editor, then viewer)', () => {
       // lands on them (an invisible ::before widens the hit area to 44 x 44px).
       const hitArea44 = async (locator: Locator, name: string) => {
         await expect(locator, name).toBeVisible();
+        // Whole hit area on screen (e.g. the restore buttons below the fold of the panel body).
+        await locator.evaluate(el => {
+          const r = el.getBoundingClientRect();
+          if (r.top < 24 || r.bottom > window.innerHeight - 24) el.scrollIntoView({ block: 'center', inline: 'nearest' });
+        });
         const misses = await locator.evaluate(el => {
           const r = el.getBoundingClientRect();
           const cx = r.left + r.width / 2;
@@ -671,9 +678,45 @@ test.describe('OST journey (editor, then viewer)', () => {
       };
       await page.getByTestId('ost-tab-detail').click();
       await hitArea44(page.getByTestId('ost-tab-detail'), 'panel tab');
-      await hitArea44(page.getByTestId('ost-status-validated'), 'status chip');
       await hitArea44(page.getByTestId('ost-filter-outcome'), 'filter chip');
       expect((await box(page.getByTestId('ost-filter-outcome'))).height, 'filter chip look unchanged').toBeLessThan(44);
+
+      // Top nav and toolbar: view tabs, team combo, product combo.
+      for (const cy of ['ostTabTrees', 'ostTabCanvas', 'ostTabExperiments']) await hitArea44(page.getByTestId(cy), `view tab ${cy}`);
+      await hitArea44(page.getByTestId('ostTeamComboButton'), 'team combo');
+      await hitArea44(page.getByTestId('ost-product-combo'), 'product combo');
+      expect((await box(page.getByTestId('ost-product-combo'))).height, 'product combo look unchanged').toBeLessThan(44);
+
+      // Palette hide, then the rail's show button.
+      const paletteToggle = page.getByTestId('ost-palette-toggle');
+      await hitArea44(paletteToggle, 'palette hide');
+      expect((await box(paletteToggle)).width, 'palette hide look unchanged').toBeLessThan(44);
+      await paletteToggle.click();
+      await expect(page.getByTestId('ost-palette')).toHaveAttribute('data-state', 'closed');
+      await hitArea44(paletteToggle, 'palette show');
+      await paletteToggle.click();
+      await expect(page.getByTestId('ost-palette')).toHaveAttribute('data-state', 'open');
+
+      // Panel: breadcrumb, every status chip (a wrapped second row must not cover the first), every $ step.
+      for (const key of [k.p1, k.outcome]) await hitArea44(page.getByTestId(`ost-breadcrumb-${key}`), `panel breadcrumb ${key}`);
+      const chips = await page.getByTestId('ost-panel').locator('[data-cy^="ost-status-"]').all();
+      expect(chips.length, 'opportunity status chips').toBeGreaterThan(3);
+      const chipTops = new Set<number>();
+      for (const chip of chips) {
+        await hitArea44(chip, `status chip ${await chip.getAttribute('data-cy')}`);
+        chipTops.add(Math.round((await box(chip)).y));
+      }
+      expect(chipTops.size, 'the status chips wrap onto a second row').toBeGreaterThan(1);
+      for (let v = 1; v <= 5; v++) await hitArea44(page.getByTestId(`ost-value-${v}`), `value step ${v}`);
+      expect((await box(page.getByTestId('ost-value-1'))).height, 'value step look unchanged').toBeLessThan(44);
+
+      // Links tab: the default-link restore buttons.
+      await page.getByTestId('ost-tab-links').click();
+      const restore = await page.locator('[data-cy^="ost-link-restore-"]').all();
+      expect(restore.length, 'restore buttons').toBe(3);
+      for (const button of restore) await hitArea44(button, `link restore ${await button.getAttribute('data-cy')}`);
+      await page.getByTestId('ost-tab-detail').click();
+
       // Canvas controls scale with the zoom; at 100% their hit area is 44+ screen px.
       const zoomLevel = async () => Number((await page.getByTestId('ost-zoom-level').textContent())!.replace('%', ''));
       for (let i = 0; i < 10 && (await zoomLevel()) < 100; i++) await page.getByTestId('ost-zoom-in').click();
@@ -685,6 +728,15 @@ test.describe('OST journey (editor, then viewer)', () => {
       await hitArea44(page.getByTestId(`ost-node-chat-${k.op1}`), 'chat chip');
       await api(page, 'GET', /\/comments$/, 200, () => page.getByTestId('ost-tab-chat').click());
       await hitArea44(page.getByTestId('ost-chat-send'), 'chat send');
+
+      // Full-page detail: breadcrumb links, status chips and $ steps.
+      await page.goto(`/trees/${teamId}/nodes/${k.op1}`);
+      await expect(page.getByTestId('ost-node-detail-title')).toHaveValue('Parent opportunity');
+      for (const key of [k.p1, k.outcome]) await hitArea44(page.getByTestId(`ost-node-detail-crumb-${key}`), `page breadcrumb ${key}`);
+      for (const chip of await page.getByTestId('ost-node-detail').locator('[data-cy^="ost-status-"]').all()) {
+        await hitArea44(chip, `page status chip ${await chip.getAttribute('data-cy')}`);
+      }
+      for (let v = 1; v <= 5; v++) await hitArea44(page.getByTestId(`ost-value-${v}`), `page value step ${v}`);
       expect(takeErrors(page)).toEqual([]);
     } finally {
       await context.close();

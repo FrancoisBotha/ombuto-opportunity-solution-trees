@@ -125,11 +125,6 @@ export function evidenceBySolution(nodes: OstNode[]): Map<string, { tests: numbe
   return new Map([...acc].map(([key, a]) => [key, { tests: a.tests, score: Math.round(a.sum / a.tests) }]));
 }
 
-/** Evidence score per tested solution as a primitive, so an unchanged score never re-renders a node. */
-export function evidenceScores(nodes: OstNode[]): Map<string, number> {
-  return new Map([...evidenceBySolution(nodes)].map(([key, e]) => [key, e.score]));
-}
-
 // ---- overview map (prototype: Ombuto OST.dc.html "mini") ------------------------------------------
 
 export const MINIMAP_W = 198;

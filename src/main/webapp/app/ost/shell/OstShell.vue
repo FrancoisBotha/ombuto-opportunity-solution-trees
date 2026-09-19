@@ -7,7 +7,7 @@
           v-for="tab in TABS"
           :key="tab.name"
           :to="{ name: tab.name, params: { teamId: rawTeamId } }"
-          class="ost-nav__tab"
+          class="ost-nav__tab ost-hit"
           :class="{ 'is-active': route.name === tab.name }"
           :aria-current="route.name === tab.name ? 'page' : undefined"
           :data-cy="tab.cy"

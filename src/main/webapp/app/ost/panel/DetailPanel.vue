@@ -7,7 +7,7 @@
           <nav class="ost-panel__crumbs" aria-label="Ancestors" data-cy="ost-breadcrumb">
             <template v-for="(crumb, i) in crumbs" :key="crumb.id">
               <span v-if="i > 0" class="ost-panel__sep" aria-hidden="true">›</span>
-              <button type="button" class="ost-panel__crumb" :data-cy="`ost-breadcrumb-${crumb.id}`" @click="go(crumb.id)">
+              <button type="button" class="ost-panel__crumb ost-hit" :data-cy="`ost-breadcrumb-${crumb.id}`" @click="go(crumb.id)">
                 {{ crumb.title }}
               </button>
             </template>
@@ -269,6 +269,23 @@ async function reopen() {
 
 .ost-panel__sep {
   margin: 0 6px;
+}
+
+/* Touch: each crumb has a 48px hit area (.ost-hit). Crumbs wrap whole, rows 48px apart, and the
+   title field starts below the last row's hit area, so no two targets overlap. */
+@media (pointer: coarse) {
+  .ost-panel__crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 34px;
+    margin-bottom: 8px;
+  }
+
+  .ost-panel__crumb {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 .ost-panel__hide {

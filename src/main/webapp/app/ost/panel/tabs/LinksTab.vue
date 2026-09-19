@@ -16,7 +16,7 @@
         v-for="option in restore"
         :key="option.name"
         type="button"
-        class="ost-links__restore-btn"
+        class="ost-links__restore-btn ost-hit"
         :disabled="option.present || busy"
         :title="option.present ? `${option.name} already linked` : `Add a ${option.name} link`"
         :data-cy="`ost-link-restore-${slug(option.name)}`"
@@ -174,6 +174,13 @@ async function submit() {
   align-items: center;
   gap: 6px;
   margin-top: 2px;
+}
+
+/* Touch: wrapped restore buttons (28px) keep their 48px hit areas (.ost-hit) apart. */
+@media (pointer: coarse) {
+  .ost-links__restore {
+    row-gap: 22px;
+  }
 }
 
 .ost-links__restore-label {

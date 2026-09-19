@@ -33,7 +33,7 @@
           <nav class="ost-nd__crumbs" aria-label="Ancestors" data-cy="ost-node-detail-breadcrumb">
             <template v-for="(crumb, i) in crumbs" :key="crumb.id">
               <span v-if="i > 0" class="ost-nd__sep" aria-hidden="true">›</span>
-              <router-link class="ost-nd__crumb" :to="detailRoute(crumb.id)" :data-cy="`ost-node-detail-crumb-${crumb.id}`">
+              <router-link class="ost-nd__crumb ost-hit" :to="detailRoute(crumb.id)" :data-cy="`ost-node-detail-crumb-${crumb.id}`">
                 {{ crumb.title }}
               </router-link>
             </template>
@@ -332,6 +332,22 @@ watch(
 
 .ost-nd__sep {
   margin: 0 6px;
+}
+
+/* Touch: each crumb has a 48px hit area (.ost-hit). Crumbs wrap whole with rows 48px apart, clear
+   of the title above, so no two targets overlap. */
+@media (pointer: coarse) {
+  .ost-nd__crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 32px;
+    margin-top: 18px;
+  }
+
+  .ost-root .ost-nd__crumb {
+    min-width: 0;
+  }
 }
 
 .ost-nd__tags {

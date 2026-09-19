@@ -8,7 +8,7 @@
         v-for="step in STEPS"
         :key="step"
         type="button"
-        class="ost-value__step"
+        class="ost-value__step ost-hit"
         :class="{ 'is-on': step <= value }"
         :title="valueLabel(step)"
         :aria-label="`${valueLabel(step)} (${'$'.repeat(step)})`"

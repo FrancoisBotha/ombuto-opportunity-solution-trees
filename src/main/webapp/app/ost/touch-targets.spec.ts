@@ -53,8 +53,25 @@ describe('touch targets', () => {
       ['panel/fields/StatusChips.vue', 'ost-chip ost-hit'],
       ['panel/PanelTabs.vue', 'ost-tabs__tab ost-hit'],
       ['chat/ChatThread.vue', 'ost-chat__send ost-hit'],
+      ['canvas/NodePalette.vue', 'ost-palette__hide ost-hit'],
+      ['canvas/NodePalette.vue', 'ost-palette-rail__open ost-hit'],
+      ['canvas/CanvasProductCombo.vue', 'ost-product-combo__button ost-hit'],
+      ['panel/fields/ValueScale.vue', 'ost-value__step ost-hit'],
+      ['panel/tabs/LinksTab.vue', 'ost-links__restore-btn ost-hit'],
+      ['panel/DetailPanel.vue', 'ost-panel__crumb ost-hit'],
+      ['pages/NodeDetailPage.vue', 'ost-nd__crumb ost-hit'],
+      ['shell/OstShell.vue', 'ost-nav__tab ost-hit'],
+      ['shell/OstTeamCombo.vue', 'ost-team-combo__button ost-hit'],
     ]) {
       expect(readFileSync(`src/main/webapp/app/ost/${file}`, 'utf8'), `${file}: ${cls}`).toContain(`class="${cls}`);
+    }
+  });
+
+  it('wrapped rows of compact controls leave room for their hit areas on a coarse pointer', () => {
+    for (const file of ['panel/fields/StatusChips.vue', 'panel/tabs/LinksTab.vue']) {
+      const css = readFileSync(`src/main/webapp/app/ost/${file}`, 'utf8');
+      const coarse = /@media \(pointer: coarse\) \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+      expect(coarse, file).toMatch(/row-gap: (2[1-9]|[3-9]\d)px/);
     }
   });
 });

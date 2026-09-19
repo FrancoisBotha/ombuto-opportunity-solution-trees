@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { dto, node } from './fixtures.test-util';
-import { fromDto, nodeKey, parseKey, pickPatchFields, toApiType, toNodeType, toPatchBody } from './mapping';
+import { fromDto, nodeKey, parseKey, toApiType, toNodeType, toPatchBody } from './mapping';
 
 describe('OST mapping', () => {
   it('maps a TreeNodeDTO onto the lower-case domain vocabulary, key as id, parentKey as parent', () => {
@@ -73,10 +73,5 @@ describe('OST mapping', () => {
     expect(toApiType('solution')).toBe('SOLUTION');
     expect(toNodeType('EVIDENCE')).toBe('evidence');
     expect(() => toNodeType('BET')).toThrow();
-  });
-
-  it('snapshots the fields a patch touches', () => {
-    const n = node('opportunity-1', 'outcome-1', { status: 'exploring', priority: 30 });
-    expect(pickPatchFields(n, { status: 'parked', priority: 90 })).toEqual({ status: 'exploring', priority: 30 });
   });
 });

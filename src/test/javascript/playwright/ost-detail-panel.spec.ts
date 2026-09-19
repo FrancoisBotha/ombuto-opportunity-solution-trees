@@ -251,7 +251,7 @@ test.describe('OST detail panel', () => {
     await page.getByTestId(`ost-breadcrumb-${k.s1}`).click();
     await expect(page.getByTestId('ost-evidence-score')).toHaveText('60%');
     await expect(page.getByTestId('ost-evidence-bar').locator('button, input')).toHaveCount(0);
-    await expect(node(page, k.s1).getByTestId('ost-node-metric')).toHaveText('60% evidence');
+    await expect(node(page, k.s1).getByTestId('ost-node-metric')).toHaveText('2 tests · 60% evidence');
 
     await page.reload();
     await expect(page.getByTestId('ost-evidence-score')).toHaveText('60%');

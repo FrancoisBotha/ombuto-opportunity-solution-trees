@@ -284,8 +284,9 @@
  * On a coarse pointer (touch) every small OST control is at least 44 x 44px. min-* beats the
  * components' own width / height, so the fine-pointer (desktop) look is unchanged.
  * `.ost-hit` controls keep their visual size (node +, collapse and chat chips, filter and status
- * chips, panel tabs, chat send): an invisible ::before centred on them widens the HIT AREA to at
- * least 44 x 44px. :where() keeps the position: relative weaker than a component's own absolute
+ * chips, panel tabs, chat send, palette show / hide, product and team combos, top view tabs,
+ * breadcrumbs, $-value steps, link restore buttons): an invisible ::before centred on them widens
+ * the HIT AREA to at least 44 x 44px. Wrapped rows of them add a row-gap on a coarse pointer. :where() keeps the position: relative weaker than a component's own absolute
  * positioning. The widened area may overlap a few px of a neighbour's edge; the control wins there.
  */
 @media (pointer: coarse) {

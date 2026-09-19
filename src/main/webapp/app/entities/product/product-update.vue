@@ -78,7 +78,7 @@
               aria-describedby="product-sortOrder-help"
             />
             <small id="product-sortOrder-help" class="form-text text-muted" data-cy="sortOrderHelp"
-              >Set by the server: new products go last in their team. Reorder products on the tree canvas.</small
+              >Set automatically by the server — new products are added at the end of their team’s list.</small
             >
             <div v-if="v$.sortOrder.$anyDirty && v$.sortOrder.$invalid">
               <small class="form-text text-danger" v-for="error of v$.sortOrder.$errors" :key="error.$uid">{{ error.$message }}</small>

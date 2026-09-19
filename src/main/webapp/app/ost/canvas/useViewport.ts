@@ -102,6 +102,26 @@ export function centreOn(point: Point, size: Size, zoom: number): Viewport {
   return { zoom: z, x: size.width / 2 - point.x * z, y: size.height / 2 - point.y * z };
 }
 
+/** Room kept between a node brought into view (revealDelta) and the canvas edge, in screen px. */
+export const REVEAL_MARGIN = 24;
+
+/**
+ * Screen delta to pan by so the laid-out box `p` is fully inside a canvas of `size` at `viewport`
+ * (its zoom included): {0, 0} when it already is; otherwise the smallest move that leaves it
+ * REVEAL_MARGIN inside the edge it crossed (a box larger than the canvas keeps its top-left in view).
+ */
+export function revealDelta(p: Placed, viewport: Viewport, size: Size, margin = REVEAL_MARGIN): Point {
+  const z = viewport.zoom;
+  const axis = (lo: number, hi: number, extent: number) => {
+    if (lo >= 0 && hi <= extent) return 0;
+    if (lo < 0 || hi - lo + 2 * margin > extent) return margin - lo;
+    return extent - margin - hi;
+  };
+  const left = (p.x - p.w / 2) * z + viewport.x;
+  const top = p.y * z + viewport.y;
+  return { x: axis(left, left + p.w * z, size.width), y: axis(top, top + p.h * z, size.height) };
+}
+
 /**
  * Binds the maths to a Vue Flow store and the canvas element: a non-passive wheel listener
  * (Vue Flow's zoom-on-scroll must be off), toolbar steps, fit and centring.
@@ -148,7 +168,8 @@ export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
   // right/bottom edge moves (detail panel opening or closing, window resize) the content stays
   // where it is on screen, as in the prototype — so the first click on a node (which opens the
   // panel) never slides the node from under the pointer, and a double-click to rename still lands
-  // on the same title.
+  // on the same title. Only a node the opening panel would clip is then eased back into view
+  // (reveal, called by the canvas).
   const resizer =
     typeof ResizeObserver === 'undefined'
       ? null
@@ -228,6 +249,20 @@ export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
       userMoved();
       const v = current();
       apply({ zoom: v.zoom, x: v.x + dx, y: v.y + dy }, duration);
+    },
+    /**
+     * Eases the view just far enough that a laid-out box is fully visible (e.g. a node the opening
+     * detail panel would clip); false when it already was or the canvas has no size.
+     */
+    reveal(p: Placed, duration = 220): boolean {
+      const s = size();
+      if (!s.width || !s.height) return false;
+      const d = revealDelta(p, current(), s);
+      if (Math.abs(d.x) < 0.5 && Math.abs(d.y) < 0.5) return false;
+      userMoved();
+      const v = current();
+      apply({ zoom: v.zoom, x: v.x + d.x, y: v.y + d.y }, duration);
+      return true;
     },
     userMoved,
   };

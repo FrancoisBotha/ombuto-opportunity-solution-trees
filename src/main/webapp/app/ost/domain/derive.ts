@@ -62,23 +62,6 @@ export function descendantIds(key: string, nodes: OstNode[]): string[] {
 
 export const descendantCount = (key: string, nodes: OstNode[]): number => descendantIds(key, nodes).length;
 
-/** Nearest ancestor of the given type (not the node itself). */
-export function ancestorOfType(key: string, type: NodeType, nodes: OstNode[]): OstNode | null {
-  return (
-    breadcrumb(key, nodes)
-      .reverse()
-      .find(n => n.type === type) ?? null
-  );
-}
-
-/** The product a node belongs to (the node itself when it is a product). */
-export function productOf(key: string, nodes: OstNode[]): OstNode | null {
-  const node = nodes.find(n => n.id === key);
-  if (!node) return null;
-  if (node.type === 'product') return node;
-  return breadcrumb(key, nodes)[0] ?? null;
-}
-
 /** Evidence strength for a solution (see rules.ts); null score when it has no assumptions. */
 export function evidenceStrength(solutionKey: string, nodes: OstNode[]) {
   return ruleEvidenceStrength(solutionKey, nodes);

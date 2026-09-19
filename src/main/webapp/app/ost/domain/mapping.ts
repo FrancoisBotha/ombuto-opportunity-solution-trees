@@ -65,12 +65,3 @@ export function toPatchBody(patch: NodePatch): PatchNodeRequest {
   if (patch.archived !== undefined) body.archived = patch.archived;
   return body;
 }
-
-/** Inverse of fromDto for the editable fields (used by tests and optimistic snapshots). */
-export function pickPatchFields(node: OstNode, patch: NodePatch): NodePatch {
-  const snapshot: NodePatch = {};
-  for (const k of Object.keys(patch) as (keyof NodePatch)[]) {
-    (snapshot as any)[k] = node[k];
-  }
-  return snapshot;
-}
