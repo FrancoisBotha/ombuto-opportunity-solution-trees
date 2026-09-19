@@ -94,6 +94,19 @@ winning value immediately.
   than a product trio needs.
 - Reload the tree on reconnect, not event replay: no event log to keep, and
   trees are small enough to fetch whole.
+- Node discussion is a flat, chat-style thread, not threaded comments: a product
+  trio talking about one node does not need reply trees, and a flat thread reads
+  and renders the same everywhere (panel tab, chat modal, detail page). The
+  `Comment.parent` self-relationship that the original model carried was removed
+  from `ombuto.jdl` and the schema on 2026-09-20; this is a closed decision, not
+  a deferral, and epic 6 is closed against it. Live delivery of messages is the
+  only chat work left, and it belongs to epic 5.
+- JHipster's `tracker` WebSocket sample (`web/websocket/ActivityService`,
+  `app/admin/tracker/*`) was deleted on 2026-09-20: it tracked page views per
+  session and had nothing to do with the tree. The STOMP infrastructure it came
+  with — `WebsocketConfiguration` (SockJS endpoint, simple `/topic` broker) and
+  `WebsocketSecurityConfiguration` (authentication required on `/topic/**`,
+  everything else denied) — is kept for the team topic in epic 5.
 - Keycloak for all sign-in, local accounts included: Keycloak brokers the
   company IdP and holds local username/password users, so the app stores no
   passwords and sees one OIDC provider. Considered JHipster JWT auth with its
