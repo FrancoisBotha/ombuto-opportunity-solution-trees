@@ -3,11 +3,18 @@ package com.opportunity.tree.service;
 import com.opportunity.tree.domain.Assumption;
 import com.opportunity.tree.domain.Comment;
 import com.opportunity.tree.domain.Evidence;
+import com.opportunity.tree.domain.Interview;
+import com.opportunity.tree.domain.NodeHistory;
+import com.opportunity.tree.domain.NodeLink;
+import com.opportunity.tree.domain.OpenQuestion;
 import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.Outcome;
 import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.domain.Solution;
+import com.opportunity.tree.domain.Tag;
 import com.opportunity.tree.domain.Team;
+import com.opportunity.tree.domain.TeamMember;
+import com.opportunity.tree.domain.User;
 import com.opportunity.tree.repository.AssumptionRepository;
 import com.opportunity.tree.repository.CommentRepository;
 import com.opportunity.tree.repository.EvidenceRepository;
@@ -23,11 +30,15 @@ import com.opportunity.tree.repository.TagRepository;
 import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.service.dto.backup.BackupArchive;
+import com.opportunity.tree.service.dto.backup.BackupRestoreSummary;
 import jakarta.persistence.EntityManager;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.hibernate.ReplicationMode;
+import org.hibernate.Session;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -253,7 +264,6 @@ public class BackupService {
                     c.getCreatedDate(),
                     c.getEditedDate(),
                     c.getAuthor() == null ? null : c.getAuthor().getId(),
-                    idOf(c.getParent(), Comment::getId),
                     idOf(c.getOutcome(), Outcome::getId),
                     idOf(c.getOpportunity(), Opportunity::getId),
                     idOf(c.getSolution(), Solution::getId),
@@ -366,6 +376,318 @@ public class BackupService {
             opportunityTags,
             solutionTags
         );
+    }
+
+    /**
+     * Replaces every application-data row with the rows in a previously validated archive.
+     * Deletion, insertion and join-table rebuilding are one transaction, so any constraint or
+     * persistence failure rolls the entire replacement back.
+     */
+    @Transactional
+    public BackupRestoreSummary restoreAll(BackupArchive archive) {
+        deleteAllApplicationData();
+
+        Map<Long, Team> teams = new HashMap<>();
+        for (BackupArchive.TeamRow row : archive.teams()) {
+            Team restored = replicate(
+                new Team().id(row.id()).name(row.name()).description(row.description()).createdDate(row.createdDate())
+            );
+            teams.put(row.id(), restored);
+        }
+        em.flush();
+
+        for (BackupArchive.TeamMemberRow row : archive.teamMembers()) {
+            replicate(
+                new TeamMember()
+                    .id(row.id())
+                    .role(row.role())
+                    .joinedDate(row.joinedDate())
+                    .team(teams.get(row.teamId()))
+                    .user(userReference(row.userId()))
+            );
+        }
+        em.flush();
+
+        Map<Long, Product> products = new HashMap<>();
+        for (BackupArchive.ProductRow row : archive.products()) {
+            Product restored = replicate(
+                new Product()
+                    .id(row.id())
+                    .name(row.name())
+                    .description(row.description())
+                    .vision(row.vision())
+                    .archived(row.archived())
+                    .sortOrder(row.sortOrder())
+                    .createdDate(row.createdDate())
+                    .team(teams.get(row.teamId()))
+            );
+            products.put(row.id(), restored);
+        }
+        em.flush();
+
+        Map<Long, Outcome> outcomes = new HashMap<>();
+        for (BackupArchive.OutcomeRow row : archive.outcomes()) {
+            Outcome restored = replicate(
+                new Outcome()
+                    .id(row.id())
+                    .title(row.title())
+                    .description(row.description())
+                    .sortOrder(row.sortOrder())
+                    .createdDate(row.createdDate())
+                    .lastModifiedDate(row.lastModifiedDate())
+                    .product(products.get(row.productId()))
+                    .owner(userReference(row.ownerId()))
+            );
+            outcomes.put(row.id(), restored);
+        }
+        em.flush();
+
+        Map<Long, Opportunity> opportunities = new HashMap<>();
+        for (BackupArchive.OpportunityRow row : archive.opportunities()) {
+            Opportunity restored = replicate(
+                new Opportunity()
+                    .id(row.id())
+                    .title(row.title())
+                    .description(row.description())
+                    .status(row.status())
+                    .valuerating(row.valuerating())
+                    .priority(row.priority())
+                    .sortOrder(row.sortOrder())
+                    .createdDate(row.createdDate())
+                    .lastModifiedDate(row.lastModifiedDate())
+                    .outcome(outcomes.get(row.outcomeId()))
+                    .owner(userReference(row.ownerId()))
+            );
+            opportunities.put(row.id(), restored);
+        }
+        // Insert every opportunity with its outcome first, then wire the self-referencing tree.
+        em.flush();
+        for (BackupArchive.OpportunityRow row : archive.opportunities()) {
+            if (row.parentId() != null) {
+                opportunities.get(row.id()).setParent(opportunities.get(row.parentId()));
+            }
+        }
+        em.flush();
+
+        Map<Long, Solution> solutions = new HashMap<>();
+        for (BackupArchive.SolutionRow row : archive.solutions()) {
+            Solution restored = replicate(
+                new Solution()
+                    .id(row.id())
+                    .title(row.title())
+                    .description(row.description())
+                    .status(row.status())
+                    .sortOrder(row.sortOrder())
+                    .createdDate(row.createdDate())
+                    .lastModifiedDate(row.lastModifiedDate())
+                    .opportunity(opportunities.get(row.opportunityId()))
+                    .owner(userReference(row.ownerId()))
+            );
+            solutions.put(row.id(), restored);
+        }
+        em.flush();
+
+        Map<Long, Assumption> assumptions = new HashMap<>();
+        for (BackupArchive.AssumptionRow row : archive.assumptions()) {
+            Assumption restored = replicate(
+                new Assumption()
+                    .id(row.id())
+                    .statement(row.statement())
+                    .description(row.description())
+                    .status(row.status())
+                    .confidence(row.confidence())
+                    .sortOrder(row.sortOrder())
+                    .createdDate(row.createdDate())
+                    .lastModifiedDate(row.lastModifiedDate())
+                    .solution(solutions.get(row.solutionId()))
+                    .owner(userReference(row.ownerId()))
+            );
+            assumptions.put(row.id(), restored);
+        }
+        em.flush();
+
+        Map<Long, Evidence> evidences = new HashMap<>();
+        for (BackupArchive.EvidenceRow row : archive.evidences()) {
+            Evidence restored = replicate(
+                new Evidence()
+                    .id(row.id())
+                    .title(row.title())
+                    .description(row.description())
+                    .sortOrder(row.sortOrder())
+                    .createdDate(row.createdDate())
+                    .lastModifiedDate(row.lastModifiedDate())
+                    .opportunity(opportunities.get(row.opportunityId()))
+                    .assumption(assumptions.get(row.assumptionId()))
+            );
+            evidences.put(row.id(), restored);
+        }
+        em.flush();
+
+        Map<Long, Interview> interviews = new HashMap<>();
+        for (BackupArchive.InterviewRow row : archive.interviews()) {
+            Interview restored = replicate(
+                new Interview()
+                    .id(row.id())
+                    .title(row.title())
+                    .participant(row.participant())
+                    .interviewDate(row.interviewDate())
+                    .notes(row.notes())
+                    .recordingUrl(row.recordingUrl())
+                    .createdDate(row.createdDate())
+                    .product(products.get(row.productId()))
+                    .interviewer(userReference(row.interviewerId()))
+            );
+            interviews.put(row.id(), restored);
+        }
+        em.flush();
+
+        Map<Long, Tag> tags = new HashMap<>();
+        for (BackupArchive.TagRow row : archive.tags()) {
+            Tag restored = replicate(new Tag().id(row.id()).name(row.name()).colour(row.colour()).team(teams.get(row.teamId())));
+            tags.put(row.id(), restored);
+        }
+        em.flush();
+
+        for (BackupArchive.CommentRow row : archive.comments()) {
+            replicate(
+                new Comment()
+                    .id(row.id())
+                    .body(row.body())
+                    .createdDate(row.createdDate())
+                    .editedDate(row.editedDate())
+                    .author(userReference(row.authorId()))
+                    .outcome(outcomes.get(row.outcomeId()))
+                    .opportunity(opportunities.get(row.opportunityId()))
+                    .solution(solutions.get(row.solutionId()))
+                    .assumption(assumptions.get(row.assumptionId()))
+                    .evidence(evidences.get(row.evidenceId()))
+            );
+        }
+        em.flush();
+
+        for (BackupArchive.NodeLinkRow row : archive.nodeLinks()) {
+            replicate(
+                new NodeLink()
+                    .id(row.id())
+                    .name(row.name())
+                    .url(row.url())
+                    .sortOrder(row.sortOrder())
+                    .createdDate(row.createdDate())
+                    .product(products.get(row.productId()))
+                    .outcome(outcomes.get(row.outcomeId()))
+                    .opportunity(opportunities.get(row.opportunityId()))
+                    .solution(solutions.get(row.solutionId()))
+                    .assumption(assumptions.get(row.assumptionId()))
+                    .evidence(evidences.get(row.evidenceId()))
+            );
+        }
+        em.flush();
+
+        for (BackupArchive.OpenQuestionRow row : archive.openQuestions()) {
+            replicate(
+                new OpenQuestion()
+                    .id(row.id())
+                    .questionText(row.questionText())
+                    .done(row.done())
+                    .sortOrder(row.sortOrder())
+                    .createdDate(row.createdDate())
+                    .opportunity(opportunities.get(row.opportunityId()))
+            );
+        }
+        em.flush();
+
+        for (BackupArchive.NodeHistoryRow row : archive.nodeHistories()) {
+            replicate(
+                new NodeHistory()
+                    .id(row.id())
+                    .nodeType(row.nodeType())
+                    .nodeId(row.nodeId())
+                    .eventType(row.eventType())
+                    .summary(row.summary())
+                    .createdDate(row.createdDate())
+                    .author(userReference(row.authorId()))
+            );
+        }
+        em.flush();
+
+        insertJoinRows("rel_opportunity__interview", "opportunity_id", "interview_id", archive.opportunityInterviews());
+        insertJoinRows("rel_opportunity__tag", "opportunity_id", "tag_id", archive.opportunityTags());
+        insertJoinRows("rel_solution__tag", "solution_id", "tag_id", archive.solutionTags());
+
+        Map<String, Integer> counts = restoredCounts(archive);
+        return new BackupRestoreSummary(archive.exportedAt(), counts);
+    }
+
+    private void deleteAllApplicationData() {
+        em.flush();
+        em.createNativeQuery("delete from rel_opportunity__interview").executeUpdate();
+        em.createNativeQuery("delete from rel_opportunity__tag").executeUpdate();
+        em.createNativeQuery("delete from rel_solution__tag").executeUpdate();
+        em.createNativeQuery("delete from node_history").executeUpdate();
+        em.createNativeQuery("delete from open_question").executeUpdate();
+        em.createNativeQuery("delete from node_link").executeUpdate();
+        em.createNativeQuery("delete from comment").executeUpdate();
+        em.createNativeQuery("delete from tag").executeUpdate();
+        em.createNativeQuery("delete from interview").executeUpdate();
+        em.createNativeQuery("delete from evidence").executeUpdate();
+        em.createNativeQuery("delete from assumption").executeUpdate();
+        em.createNativeQuery("delete from solution").executeUpdate();
+        em.createNativeQuery("update opportunity set parent_id = null").executeUpdate();
+        em.createNativeQuery("delete from opportunity").executeUpdate();
+        em.createNativeQuery("delete from outcome").executeUpdate();
+        em.createNativeQuery("delete from product").executeUpdate();
+        em.createNativeQuery("delete from team_member").executeUpdate();
+        em.createNativeQuery("delete from team").executeUpdate();
+        em.clear();
+    }
+
+    private User userReference(String id) {
+        return id == null ? null : em.getReference(User.class, id);
+    }
+
+    private <E> E replicate(E entity) {
+        em.unwrap(Session.class).replicate(entity, ReplicationMode.EXCEPTION);
+        return entity;
+    }
+
+    private void insertJoinRows(String table, String leftColumn, String rightColumn, List<BackupArchive.JoinRow> rows) {
+        for (BackupArchive.JoinRow row : rows) {
+            em
+                .createNativeQuery("insert into " + table + " (" + leftColumn + ", " + rightColumn + ") values (:leftId, :rightId)")
+                .setParameter("leftId", row.leftId())
+                .setParameter("rightId", row.rightId())
+                .executeUpdate();
+        }
+    }
+
+    private Map<String, Integer> restoredCounts(BackupArchive archive) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        counts.put("teams", archive.teams().size());
+        counts.put("teamMembers", archive.teamMembers().size());
+        counts.put("products", archive.products().size());
+        counts.put("outcomes", archive.outcomes().size());
+        counts.put("opportunities", archive.opportunities().size());
+        counts.put("solutions", archive.solutions().size());
+        counts.put("assumptions", archive.assumptions().size());
+        counts.put("evidences", archive.evidences().size());
+        counts.put("interviews", archive.interviews().size());
+        counts.put("tags", archive.tags().size());
+        counts.put("comments", archive.comments().size());
+        counts.put("nodeLinks", archive.nodeLinks().size());
+        counts.put("openQuestions", archive.openQuestions().size());
+        counts.put("nodeHistories", archive.nodeHistories().size());
+        counts.put("opportunityInterviews", archive.opportunityInterviews().size());
+        counts.put("opportunityTags", archive.opportunityTags().size());
+        counts.put("solutionTags", archive.solutionTags().size());
+        counts.put(
+            "treeNodes",
+            archive.outcomes().size() +
+                archive.opportunities().size() +
+                archive.solutions().size() +
+                archive.assumptions().size() +
+                archive.evidences().size()
+        );
+        return counts;
     }
 
     private static <E> Long idOf(E entity, Function<E, Long> getId) {

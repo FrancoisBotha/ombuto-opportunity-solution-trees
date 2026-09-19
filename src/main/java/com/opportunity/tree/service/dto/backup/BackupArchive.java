@@ -41,6 +41,41 @@ public record BackupArchive(
 ) {
     public static final String FORMAT_VERSION = "1";
 
+    /**
+     * Whether all fields that identify the versioned backup envelope are present. Row-level
+     * database constraints are enforced later inside the restore transaction, but this check is
+     * deliberately completed before that transaction can delete any data.
+     */
+    public boolean hasExpectedEnvelope() {
+        return (
+            formatVersion != null &&
+            applicationVersion != null &&
+            exportedAt != null &&
+            counts != null &&
+            present(teams) &&
+            present(teamMembers) &&
+            present(products) &&
+            present(outcomes) &&
+            present(opportunities) &&
+            present(solutions) &&
+            present(assumptions) &&
+            present(evidences) &&
+            present(interviews) &&
+            present(comments) &&
+            present(nodeLinks) &&
+            present(openQuestions) &&
+            present(tags) &&
+            present(nodeHistories) &&
+            present(opportunityInterviews) &&
+            present(opportunityTags) &&
+            present(solutionTags)
+        );
+    }
+
+    private static boolean present(List<?> rows) {
+        return rows != null && rows.stream().noneMatch(java.util.Objects::isNull);
+    }
+
     public record TeamRow(Long id, String name, String description, Instant createdDate) {}
 
     public record TeamMemberRow(Long id, TeamRole role, Instant joinedDate, Long teamId, String userId) {}
@@ -136,7 +171,6 @@ public record BackupArchive(
         Instant createdDate,
         Instant editedDate,
         String authorId,
-        Long parentId,
         Long outcomeId,
         Long opportunityId,
         Long solutionId,
