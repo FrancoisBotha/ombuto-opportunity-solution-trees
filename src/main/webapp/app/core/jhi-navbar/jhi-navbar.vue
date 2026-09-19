@@ -57,10 +57,6 @@
               <span class="no-bold">Administration</span>
             </span>
           </template>
-          <b-dropdown-item to="/admin/tracker" active-class="active">
-            <font-awesome-icon icon="eye" />
-            <span>User tracker</span>
-          </b-dropdown-item>
           <b-dropdown-item to="/admin/metrics" active-class="active">
             <font-awesome-icon icon="tachometer-alt" />
             <span>Metrics</span>
