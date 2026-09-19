@@ -5,11 +5,14 @@
     <navbar></navbar>
     <sidebar-menu v-if="authenticated" v-model:expanded="sidebarExpanded"></sidebar-menu>
     <div class="main-content" :class="{ expanded: authenticated && sidebarExpanded, 'no-sidebar': !authenticated }">
-      <div class="va-container">
-        <div class="card jh-card">
+      <div class="va-container" :class="{ 'full-bleed': fullBleed }">
+        <div v-if="fullBleed" class="full-bleed-view">
           <router-view></router-view>
         </div>
-        <jhi-footer></jhi-footer>
+        <div v-else class="card jh-card">
+          <router-view></router-view>
+        </div>
+        <jhi-footer v-if="!fullBleed"></jhi-footer>
       </div>
     </div>
   </div>
