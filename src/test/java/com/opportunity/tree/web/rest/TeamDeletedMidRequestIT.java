@@ -123,6 +123,29 @@ class TeamDeletedMidRequestIT {
         }
     }
 
+    /**
+     * The same race on the "my teams" list: it used to load the memberships and then each team in a
+     * statement of its own, so the trap deleted team A right before its team row was read (500). It
+     * is now one projection statement; whatever the trap does after it, the list is a 200.
+     */
+    @Test
+    void myTeamsWhileOneOfTheTeamsIsDeletedIsNot500() throws Exception {
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        try {
+            StatementTrap.arm("team_member", () -> deleteTeamAsAdmin(other, doomedTeamId));
+            MockHttpServletResponse response = mvc
+                .perform(get("/api/team-management/my-teams").with(user(login)))
+                .andReturn()
+                .getResponse();
+            StatementTrap.disarm();
+
+            assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(200);
+            assertThat(response.getContentAsString()).contains("Kept team");
+        } finally {
+            other.shutdownNow();
+        }
+    }
+
     @Test
     void afterTheDeleteTheDeletedTeamIsForbiddenAndTheOtherStillReadable() throws Exception {
         ExecutorService other = Executors.newSingleThreadExecutor();
