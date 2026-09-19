@@ -556,7 +556,7 @@ test.describe('OST tree canvas — editing', () => {
     await expect(page.locator('[data-drop-target]')).toHaveCount(0);
 
     // Search match + focused: the match halo (box-shadow) stays.
-    await page.getByTestId('ost-search').fill('Draft kept off-screen'); // o2's title since the zoom test
+    await page.getByTestId('ost-search').fill((await serverNode(k.o2))!.title);
     await expect(o2).toHaveClass(/\bis-match\b/);
     await o2.focus();
     expect(await o2.evaluate(n => getComputedStyle(n).boxShadow)).toMatch(/3px/);
