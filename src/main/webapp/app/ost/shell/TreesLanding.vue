@@ -8,7 +8,14 @@
     <div v-else-if="failed" class="ost-state" data-cy="ostTreesError">
       <div class="ost-state__title">Your teams could not be loaded</div>
       <p class="ost-state__text">Check your connection and try again.</p>
-      <button type="button" class="ost-btn ost-btn--primary" @click="go">Try again</button>
+      <button type="button" class="ost-btn ost-btn--primary" data-cy="ostTreesRetry" @click="go">Try again</button>
+    </div>
+    <div v-else-if="stale" class="ost-state" data-cy="ostTreesReload">
+      <div class="ost-state__title">The tree view could not be opened</div>
+      <p class="ost-state__text">
+        Part of the app failed to load — it may have been updated since you opened it. Reload the page to continue.
+      </p>
+      <button type="button" class="ost-btn ost-btn--primary" data-cy="ostTreesReloadButton" @click="reload">Reload</button>
     </div>
     <div v-else class="ost-landing__loading" data-cy="ostTreesLoading" aria-live="polite">Opening your tree…</div>
   </div>
@@ -22,6 +29,7 @@
 import { type ComputedRef, inject, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import type { MyTeamDTO } from '../ost.model';
 import OstService from '../ost.service';
 import { readLastTeam } from '../stores/ost-ui.store';
 import '../styles/ost-styles';
@@ -31,22 +39,36 @@ const ostService = inject('ostService', () => new OstService());
 const currentUsername = inject<ComputedRef<string | undefined> | undefined>('currentUsername', undefined);
 
 const empty = ref(false);
+/** listMyTeams() failed: a retry may help. */
 const failed = ref(false);
+/** The navigation failed (typically a lazy chunk that no longer exists after a deploy): reload. */
+const stale = ref(false);
 
 async function go() {
   failed.value = false;
+  stale.value = false;
+  let teams: MyTeamDTO[];
   try {
-    const teams = await ostService().listMyTeams();
-    if (!teams.length) {
-      empty.value = true;
-      return;
-    }
-    const last = readLastTeam(currentUsername?.value);
-    const target = teams.find(t => t.id === last) ?? teams[0];
-    await router.replace({ name: 'OstDashboard', params: { teamId: String(target.id) } });
+    teams = await ostService().listMyTeams();
   } catch {
     failed.value = true;
+    return;
   }
+  if (!teams.length) {
+    empty.value = true;
+    return;
+  }
+  const last = readLastTeam(currentUsername?.value);
+  const target = teams.find(t => t.id === last) ?? teams[0];
+  try {
+    await router.replace({ name: 'OstDashboard', params: { teamId: String(target.id) } });
+  } catch {
+    stale.value = true;
+  }
+}
+
+function reload() {
+  window.location.reload();
 }
 
 onMounted(go);
