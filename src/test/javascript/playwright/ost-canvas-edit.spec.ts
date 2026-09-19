@@ -331,6 +331,28 @@ test.describe('OST tree canvas — editing', () => {
     await notes.blur();
   });
 
+  test('a rename ended by a click into the panel title keeps the new title; typing there edits it', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    await node(page, k.opA).locator('.ost-node__kicker').click();
+    const panelTitle = page.getByTestId('ost-panel-title');
+    await expect(panelTitle).toBeVisible();
+    const title = node(page, k.opA).getByTestId('ost-node-title');
+    const input = page.getByTestId('ost-rename-input');
+
+    await title.dblclick();
+    await input.fill('R3 x');
+    await panelTitle.click();
+    await page.keyboard.press('End');
+    await page.keyboard.type('yz');
+    await expect(panelTitle).toHaveValue('R3 xyz');
+    const saved = page.waitForResponse(r => r.request().method() === 'PATCH' && r.request().postData()?.includes('R3 xyz') === true);
+    await page.keyboard.press('Enter');
+    expect((await saved).status()).toBe(200);
+    await expect(title).toHaveText('R3 xyz');
+    await expect.poll(async () => (await serverNode(k.opA))?.title).toBe('R3 xyz');
+  });
+
   test('the delete dialog dims and covers the app chrome (navbar and sidebar) and centres on the viewport', async () => {
     const page = user.page;
     await openCanvas(page);
