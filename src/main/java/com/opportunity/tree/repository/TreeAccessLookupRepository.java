@@ -16,6 +16,15 @@ import org.springframework.data.repository.query.Param;
  * {@code ombuto.jdl} cannot overwrite it.
  */
 public interface TreeAccessLookupRepository extends org.springframework.data.repository.Repository<Team, Long> {
+    /**
+     * Every team the user with {@code login} belongs to, with the role: rows of [teamId (Long),
+     * role (TeamRole)]. One projection statement that reads the membership's foreign key and never
+     * loads a Team entity, so a team deleted concurrently simply drops out instead of failing the
+     * request with an ObjectNotFoundException (a lazy/eager team load after the memberships).
+     */
+    @Query("select m.team.id, m.role from TeamMember m where m.user.login = :login")
+    List<Object[]> findTeamRolesOfUser(@Param("login") String login);
+
     @Query("select p.team.id from Product p where p.id = :id")
     Optional<Long> findTeamIdOfProduct(@Param("id") Long id);
 

@@ -1,10 +1,7 @@
 package com.opportunity.tree.service;
 
-import com.opportunity.tree.domain.Team;
-import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
-import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TreeAccessLookupRepository;
 import com.opportunity.tree.security.SecurityUtils;
 import java.util.Collections;
@@ -39,11 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class TeamAccessService {
 
-    private final TeamMemberRepository teamMemberRepository;
     private final TreeAccessLookupRepository treeAccessLookupRepository;
 
-    public TeamAccessService(TeamMemberRepository teamMemberRepository, TreeAccessLookupRepository treeAccessLookupRepository) {
-        this.teamMemberRepository = teamMemberRepository;
+    public TeamAccessService(TreeAccessLookupRepository treeAccessLookupRepository) {
         this.treeAccessLookupRepository = treeAccessLookupRepository;
     }
 
@@ -57,12 +52,7 @@ public class TeamAccessService {
      * no user is authenticated.
      */
     public Set<Long> getCurrentUserTeamIds() {
-        return currentUserMemberships()
-            .stream()
-            .map(TeamMember::getTeam)
-            .filter(t -> t != null && t.getId() != null)
-            .map(Team::getId)
-            .collect(Collectors.toUnmodifiableSet());
+        return currentUserMemberships().stream().map(Membership::teamId).collect(Collectors.toUnmodifiableSet());
     }
 
     /**
@@ -75,8 +65,8 @@ public class TeamAccessService {
         }
         return currentUserMemberships()
             .stream()
-            .filter(tm -> tm.getTeam() != null && teamId.equals(tm.getTeam().getId()))
-            .map(TeamMember::getRole)
+            .filter(m -> teamId.equals(m.teamId()))
+            .map(Membership::role)
             .findFirst();
     }
 
@@ -265,7 +255,16 @@ public class TeamAccessService {
     // Internal helpers
     // ---------------------------------------------------------------------
 
-    private List<TeamMember> currentUserMemberships() {
-        return SecurityUtils.getCurrentUserLogin().map(teamMemberRepository::findAllByUserLogin).orElse(Collections.emptyList());
+    /** The current user's team id + role pairs; one projection query that never loads a Team (see findTeamRolesOfUser). */
+    private List<Membership> currentUserMemberships() {
+        return SecurityUtils.getCurrentUserLogin()
+            .map(treeAccessLookupRepository::findTeamRolesOfUser)
+            .orElse(Collections.emptyList())
+            .stream()
+            .filter(row -> row != null && row.length >= 2 && row[0] instanceof Number && row[1] instanceof TeamRole)
+            .map(row -> new Membership(((Number) row[0]).longValue(), (TeamRole) row[1]))
+            .toList();
     }
+
+    private record Membership(Long teamId, TeamRole role) {}
 }

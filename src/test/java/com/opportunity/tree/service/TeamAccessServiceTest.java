@@ -6,11 +6,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.opportunity.tree.domain.Team;
-import com.opportunity.tree.domain.TeamMember;
-import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
-import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TreeAccessLookupRepository;
 import java.util.List;
 import java.util.Optional;
@@ -46,9 +43,6 @@ class TeamAccessServiceTest {
     private static final Long ASSUMPTION_A = 50L;
 
     @Mock
-    private TeamMemberRepository teamMemberRepository;
-
-    @Mock
     private TreeAccessLookupRepository treeAccessLookupRepository;
 
     private TeamAccessService service;
@@ -58,7 +52,7 @@ class TeamAccessServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TeamAccessService(teamMemberRepository, treeAccessLookupRepository);
+        service = new TeamAccessService(treeAccessLookupRepository);
 
         teamA = team(TEAM_A);
         teamB = team(TEAM_B);
@@ -129,9 +123,9 @@ class TeamAccessServiceTest {
     @Test
     void userCanBeOwnerInOneTeamAndViewerInAnother() {
         authenticate();
-        TeamMember ownerInA = membership(TeamRole.OWNER, teamA);
-        TeamMember viewerInB = membership(TeamRole.VIEWER, teamB);
-        when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(List.of(ownerInA, viewerInB));
+        Object[] ownerInA = membership(TeamRole.OWNER, teamA);
+        Object[] viewerInB = membership(TeamRole.VIEWER, teamB);
+        when(treeAccessLookupRepository.findTeamRolesOfUser(LOGIN)).thenReturn(List.of(ownerInA, viewerInB));
 
         assertThat(service.canEditTeam(TEAM_A)).isTrue();
         assertThat(service.isTeamOwner(TEAM_A)).isTrue();
@@ -193,8 +187,8 @@ class TeamAccessServiceTest {
     @Test
     void getCurrentUserTeamIdsReturnsAllMembershipTeams() {
         authenticate();
-        when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(
-            List.of(membership(TeamRole.OWNER, teamA), membership(TeamRole.VIEWER, teamB))
+        when(treeAccessLookupRepository.findTeamRolesOfUser(LOGIN)).thenReturn(
+            List.<Object[]>of(membership(TeamRole.OWNER, teamA), membership(TeamRole.VIEWER, teamB))
         );
 
         assertThat(service.getCurrentUserTeamIds()).containsExactlyInAnyOrder(TEAM_A, TEAM_B);
@@ -282,7 +276,9 @@ class TeamAccessServiceTest {
     @Test
     void missingNodeIsIndistinguishableFromNonMembership() {
         authenticate();
-        lenient().when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(List.of(membership(TeamRole.OWNER, teamA)));
+        lenient()
+            .when(treeAccessLookupRepository.findTeamRolesOfUser(LOGIN))
+            .thenReturn(List.<Object[]>of(membership(TeamRole.OWNER, teamA)));
         when(treeAccessLookupRepository.findTeamIdOfEvidence(MISSING)).thenReturn(Optional.empty());
         when(treeAccessLookupRepository.findTeamIdOfOpportunity(OPPORTUNITY_A)).thenReturn(Optional.of(OTHER_TEAM));
 
@@ -358,7 +354,9 @@ class TeamAccessServiceTest {
     @Test
     void missingLinkQuestionOrCommentIsDenied() {
         authenticate();
-        lenient().when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(List.of(membership(TeamRole.OWNER, teamA)));
+        lenient()
+            .when(treeAccessLookupRepository.findTeamRolesOfUser(LOGIN))
+            .thenReturn(List.<Object[]>of(membership(TeamRole.OWNER, teamA)));
         when(treeAccessLookupRepository.findNodeIdsOfLink(MISSING)).thenReturn(List.of());
         when(treeAccessLookupRepository.findOpportunityIdOfQuestion(MISSING)).thenReturn(Optional.empty());
         when(treeAccessLookupRepository.findNodeIdsOfComment(MISSING)).thenReturn(List.of());
@@ -379,21 +377,16 @@ class TeamAccessServiceTest {
     }
 
     private void stubMembership(TeamRole role, Team team) {
-        when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(List.of(membership(role, team)));
+        when(treeAccessLookupRepository.findTeamRolesOfUser(LOGIN)).thenReturn(List.<Object[]>of(membership(role, team)));
     }
 
     private void stubNoMemberships() {
-        when(teamMemberRepository.findAllByUserLogin(LOGIN)).thenReturn(List.of());
+        when(treeAccessLookupRepository.findTeamRolesOfUser(LOGIN)).thenReturn(List.of());
     }
 
-    private TeamMember membership(TeamRole role, Team team) {
-        TeamMember tm = new TeamMember();
-        tm.setRole(role);
-        tm.setTeam(team);
-        User user = new User();
-        user.setLogin(LOGIN);
-        tm.setUser(user);
-        return tm;
+    /** A row of TreeAccessLookupRepository.findTeamRolesOfUser: [teamId, role]. */
+    private static Object[] membership(TeamRole role, Team team) {
+        return new Object[] { team.getId(), role };
     }
 
     private static Team team(Long id) {
