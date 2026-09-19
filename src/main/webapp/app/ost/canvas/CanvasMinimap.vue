@@ -1,8 +1,9 @@
 <template>
   <div
     class="ost-minimap"
-    role="img"
-    aria-label="Overview map — click or drag to recentre the canvas"
+    role="group"
+    aria-roledescription="overview map"
+    aria-label="Overview map: click or drag to recentre the canvas, scroll to zoom"
     data-cy="ost-minimap"
     @pointerdown="onDown"
     @wheel.prevent.stop="onWheel"

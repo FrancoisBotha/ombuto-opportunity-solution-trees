@@ -107,16 +107,20 @@ export function centreOn(point: Point, size: Size, zoom: number): Viewport {
  * (Vue Flow's zoom-on-scroll must be off), toolbar steps, fit and centring.
  */
 export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
-  const size = (): Size => {
+  const rect = () => {
     const r = el.value?.getBoundingClientRect();
-    return { width: r?.width ?? 0, height: r?.height ?? 0 };
+    return { left: r?.left ?? 0, top: r?.top ?? 0, width: r?.width ?? 0, height: r?.height ?? 0 };
+  };
+  const size = (): Size => {
+    const { width, height } = rect();
+    return { width, height };
   };
   const current = (): Viewport => ({ ...flow.viewport.value });
-  /** Canvas size the current viewport was computed for (see the resize observer below). */
-  let last: Size | null = null;
+  /** Canvas box the current viewport was computed for (see the resize observer below). */
+  let last: ReturnType<typeof rect> | null = null;
   const apply = (next: Viewport) => {
-    const s = size();
-    if (s.width && s.height) last = s;
+    const r = rect();
+    if (r.width && r.height) last = r;
     return flow.setViewport(next);
   };
 
@@ -126,16 +130,22 @@ export function useViewport(flow: VueFlowStore, el: Ref<HTMLElement | null>) {
     apply(wheelZoom(current(), { x: event.clientX - r.left, y: event.clientY - r.top }, event.deltaY));
   }
 
-  // Keep the point in the middle of the canvas in the middle when the canvas is resized (app
-  // sidebar animating, detail panel opening/closing, window resize).
+  // When the canvas's left/top edge moves (app sidebar animating) keep the point in the middle of
+  // the canvas in the middle. When only the right/bottom edge moves (detail panel opening or
+  // closing, window resize) the content stays where it is on screen, as in the prototype — so the
+  // first click on a node (which opens the panel) never slides the node from under the pointer,
+  // and a double-click to rename still lands on the same title.
   const resizer =
     typeof ResizeObserver === 'undefined'
       ? null
       : new ResizeObserver(() => {
-          const now = size();
+          const now = rect();
           if (last && now.width && now.height && (now.width !== last.width || now.height !== last.height)) {
-            const v = current();
-            apply({ zoom: v.zoom, x: v.x + (now.width - last.width) / 2, y: v.y + (now.height - last.height) / 2 });
+            const anchored = Math.abs(now.left - last.left) < 0.5 && Math.abs(now.top - last.top) < 0.5;
+            if (!anchored) {
+              const v = current();
+              apply({ zoom: v.zoom, x: v.x + (now.width - last.width) / 2, y: v.y + (now.height - last.height) / 2 });
+            }
           }
           last = now.width && now.height ? now : last;
         });
