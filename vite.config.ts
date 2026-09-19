@@ -44,6 +44,13 @@ let config = defineConfig({
       '@content': fileURLToPath(new URL('./src/main/webapp/content/', import.meta.url)),
     },
   },
+  optimizeDeps: {
+    // The OST module is lazy-loaded. Pre-bundle its packages at server start so a first canvas
+    // visit, or a merge that adds an import while the dev server runs, never makes Vite
+    // re-optimise and full-reload every open page mid-navigation (the e2e "Open branch" flake).
+    // Guarded by app/ost/vite-optimize-deps.spec.ts.
+    include: ['@vue-flow/core', '@phosphor-icons/vue'],
+  },
   define: {
     I18N_HASH: '"generated_hash"',
     SERVER_API_URL: '"/"',

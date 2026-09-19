@@ -1,5 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
@@ -8,7 +9,7 @@ import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERN
  *
  * Reads only the seeded team NAMES (Team Jupiter / Team Venus for `user`, Team Mars admin-only),
  * never tree content, and never changes the seeded teams. The long-team-list case creates its own
- * throwaway teams and deletes them (as admin) afterwards.
+ * throwaway teams; they are deleted after the run (support/cleanup.ts).
  */
 
 interface MyTeam {
@@ -215,17 +216,6 @@ test.describe('OST shell', () => {
 
   test.describe('a long team list', () => {
     const stamp = Date.now();
-    const created: number[] = [];
-
-    test.afterAll(async ({ browser }) => {
-      if (!created.length) return;
-      const admin = await openSession(browser, ADMIN_USERNAME, ADMIN_PASSWORD);
-      for (const id of created) {
-        const deleted = await admin.api('delete', `/api/admin/teams/${id}`);
-        expect([200, 204], `delete throwaway team ${id}`).toContain(deleted.status());
-      }
-      await admin.context.close();
-    });
 
     test('scrolls inside the combo menu; the shell and its nav never move; Escape closes', async () => {
       for (let i = 0; i < 15; i++) {
@@ -234,7 +224,7 @@ test.describe('OST shell', () => {
           description: 'step 6b e2e (throwaway)',
         });
         expect(response.status()).toBe(201);
-        created.push((await response.json()).id);
+        registerTeamForCleanup((await response.json()).id);
       }
 
       const page = user.page;
@@ -280,6 +270,33 @@ test.describe('OST shell', () => {
       await page.keyboard.press('Tab');
       await expect(menu).toHaveCount(0);
       expect((await nav.boundingBox())!.y).toBe(navTop);
+    });
+
+    test('in a 480px-high window the menu ends above the bottom edge, and it follows a resize', async () => {
+      const page = user.page;
+      const before = page.viewportSize();
+      try {
+        await page.setViewportSize({ width: 1280, height: 480 });
+        await page.goto(`/trees/${jupiter.id}`);
+        await expect(page.getByTestId('ostTeamComboLabel')).toHaveText(JUPITER);
+        const menu = page.getByTestId('ostTeamComboMenu');
+        await page.getByTestId('ostTeamComboButton').click();
+        await expect(menu).toBeVisible();
+        // The long list from the previous test is still there: the menu has to scroll, not overflow.
+        expect(await menu.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+        const bottom = async () => {
+          const box = (await menu.boundingBox())!;
+          return box.y + box.height;
+        };
+        expect(await bottom()).toBeLessThanOrEqual(480);
+
+        await page.setViewportSize({ width: 1280, height: 400 });
+        await expect.poll(bottom).toBeLessThanOrEqual(400);
+        await expect(menu.getByRole('option').last()).toBeAttached();
+      } finally {
+        await page.keyboard.press('Escape');
+        if (before) await page.setViewportSize(before);
+      }
     });
   });
 });

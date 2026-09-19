@@ -121,4 +121,50 @@ describe('OstTeamCombo', () => {
     await nextTick();
     expect(menu(w).exists()).toBe(false);
   });
+
+  describe('menu height and direction', () => {
+    /** Puts the trigger at top..bottom in a window `height` px tall (happy-dom has no layout). */
+    function place(w: VueWrapper, top: number, bottom: number, height: number) {
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(height);
+      vi.spyOn(trigger(w).element, 'getBoundingClientRect').mockReturnValue({ top, bottom } as DOMRect);
+    }
+    const style = (w: VueWrapper) => (menu(w).element as HTMLElement).style.maxHeight;
+
+    it('caps the menu at 400px when the window has room', async () => {
+      const w = await mountCombo();
+      place(w, 55, 81, 1000);
+      await trigger(w).trigger('click');
+      expect(style(w)).toBe('400px');
+      expect(menu(w).classes()).not.toContain('is-above');
+    });
+
+    it('shrinks the menu to the room below the trigger in a short window (480px)', async () => {
+      const w = await mountCombo();
+      place(w, 55, 81, 480);
+      await trigger(w).trigger('click');
+      // 480 - 81 (trigger bottom) - 6 (gap) - 8 (margin)
+      expect(style(w)).toBe('385px');
+      expect(menu(w).classes()).not.toContain('is-above');
+    });
+
+    it('opens upward when there is too little room below and more above', async () => {
+      const w = await mountCombo();
+      place(w, 500, 526, 600);
+      await trigger(w).trigger('click');
+      expect(menu(w).classes()).toContain('is-above');
+      // 500 (trigger top) - 6 - 8
+      expect(style(w)).toBe('400px');
+    });
+
+    it('re-sizes an open menu when the window is resized', async () => {
+      const w = await mountCombo();
+      place(w, 55, 81, 1000);
+      await trigger(w).trigger('click');
+      expect(style(w)).toBe('400px');
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(300);
+      window.dispatchEvent(new Event('resize'));
+      await nextTick();
+      expect(style(w)).toBe('205px');
+    });
+  });
 });
