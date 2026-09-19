@@ -178,6 +178,32 @@ describe('TreeDetailPanel', () => {
     expect((svc as any).getTeamTree.callCount).toBe(0);
   });
 
+  it('saves through a default TreeService when the app provides none', async () => {
+    const updateOutcome = sinon.stub(TreeService.prototype, 'updateOutcome').resolves({
+      id: 10,
+      title: 'Outcome A renamed',
+      description: 'o-desc',
+      status: OutcomeStatus.ACTIVE,
+      sortOrder: 0,
+    } as any);
+    try {
+      const wrapper = mount(TreeDetailPanel, {
+        global: { plugins: [createTestingPinia({ stubActions: false })], stubs: { 'font-awesome-icon': true, 'router-link': true } },
+      });
+      const store = useTreeStore();
+      store.setTree(populatedTree());
+      store.selectNode('outcome', 10);
+      await flush(wrapper);
+      await wrapper.find('[data-cy="detailTitle"]').setValue('Outcome A renamed');
+      await wrapper.find('[data-cy="detailSave"]').trigger('click');
+      await flush(wrapper);
+      expect(updateOutcome.calledOnce).toBe(true);
+      expect((store.findNode('outcome', 10) as any).title).toBe('Outcome A renamed');
+    } finally {
+      updateOutcome.restore();
+    }
+  });
+
   it('toggling archived on a product and saving sends archived and updates the node in place', async () => {
     (svc as any).updateProduct = sinon.stub().resolves({
       id: 1,

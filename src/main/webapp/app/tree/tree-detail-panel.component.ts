@@ -31,7 +31,7 @@ export default defineComponent({
   emits: ['delete'],
   setup(_, { emit }) {
     const store = useTreeStore();
-    const treeService = inject('treeService', () => new TreeService(), true);
+    const treeService = inject('treeService', () => new TreeService());
 
     const productForm = ref<ProductForm>(emptyProduct());
     const titledForm = ref<TitledForm>(emptyTitled());
