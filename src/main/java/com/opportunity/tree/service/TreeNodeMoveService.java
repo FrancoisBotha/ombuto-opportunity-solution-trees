@@ -14,6 +14,8 @@ import com.opportunity.tree.repository.OpportunityRepository;
 import com.opportunity.tree.repository.OutcomeRepository;
 import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.repository.SolutionRepository;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.tree.MoveTreeNodeRequest;
 import com.opportunity.tree.service.dto.tree.MoveTreeNodeResponse;
 import com.opportunity.tree.service.dto.tree.SiblingOrderDTO;
@@ -72,6 +74,7 @@ public class TreeNodeMoveService {
     private final AssumptionRepository assumptionRepository;
     private final EvidenceRepository evidenceRepository;
     private final TreeStructureLock structureLock;
+    private final TreeChangePublisher changePublisher;
 
     @PersistenceContext
     private EntityManager em;
@@ -86,7 +89,8 @@ public class TreeNodeMoveService {
         SolutionRepository solutionRepository,
         AssumptionRepository assumptionRepository,
         EvidenceRepository evidenceRepository,
-        TreeStructureLock structureLock
+        TreeStructureLock structureLock,
+        TreeChangePublisher changePublisher
     ) {
         this.teamAccessService = teamAccessService;
         this.historyRecorder = historyRecorder;
@@ -98,6 +102,7 @@ public class TreeNodeMoveService {
         this.assumptionRepository = assumptionRepository;
         this.evidenceRepository = evidenceRepository;
         this.structureLock = structureLock;
+        this.changePublisher = changePublisher;
     }
 
     public MoveTreeNodeResponse move(MoveTreeNodeRequest request) {
@@ -161,7 +166,9 @@ public class TreeNodeMoveService {
             historyRecorder.record(nodeType, nodeId, HistoryEventType.MOVED, "Moved under “" + titleOf(newParent) + "”");
         }
         em.flush();
-        return new MoveTreeNodeResponse(dtoAssembler.toDto(nodeType, nodeId), siblings);
+        MoveTreeNodeResponse response = new MoveTreeNodeResponse(dtoAssembler.toDto(nodeType, nodeId), siblings);
+        changePublisher.publish(TreeChangeType.NODE_MOVED, nodeTeamId, response);
+        return response;
     }
 
     // ---------------------------------------------------------------------
@@ -181,7 +188,9 @@ public class TreeNodeMoveService {
         structureLock.requireNode(TreeNodeType.PRODUCT, productId, teamId);
         List<SiblingOrderDTO> siblings = renumber(TreeNodeType.PRODUCT, new TreeNodeRef(null, teamId), productId, position);
         em.flush();
-        return new MoveTreeNodeResponse(dtoAssembler.toDto(TreeNodeType.PRODUCT, productId), siblings);
+        MoveTreeNodeResponse response = new MoveTreeNodeResponse(dtoAssembler.toDto(TreeNodeType.PRODUCT, productId), siblings);
+        changePublisher.publish(TreeChangeType.NODE_MOVED, teamId, response);
+        return response;
     }
 
     // ---------------------------------------------------------------------

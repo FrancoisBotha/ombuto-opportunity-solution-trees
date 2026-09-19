@@ -1,6 +1,9 @@
 package com.opportunity.tree.service;
 
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
+import com.opportunity.tree.service.broadcast.NodeDeletedPayload;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
@@ -36,13 +39,19 @@ public class TreeNodeCascadeService {
 
     private final TeamAccessService teamAccessService;
     private final TreeStructureLock structureLock;
+    private final TreeChangePublisher changePublisher;
 
     @PersistenceContext
     private EntityManager em;
 
-    public TreeNodeCascadeService(TeamAccessService teamAccessService, TreeStructureLock structureLock) {
+    public TreeNodeCascadeService(
+        TeamAccessService teamAccessService,
+        TreeStructureLock structureLock,
+        TreeChangePublisher changePublisher
+    ) {
         this.teamAccessService = teamAccessService;
         this.structureLock = structureLock;
+        this.changePublisher = changePublisher;
     }
 
     public void deleteProduct(Long productId) {
@@ -119,6 +128,7 @@ public class TreeNodeCascadeService {
         structureLock.lockTeam(teamId);
         // Deleted by the previous lock holder while this request waited: 409, not a silent no-op.
         structureLock.requireNode(type, id, teamId);
+        List<String> descendantKeys = collectDescendantKeys(type, id);
         switch (type) {
             case PRODUCT -> deleteProduct(id);
             case OUTCOME -> deleteOutcome(id);
@@ -127,6 +137,70 @@ public class TreeNodeCascadeService {
             case ASSUMPTION -> deleteAssumption(id);
             case EVIDENCE -> deleteEvidence(id);
         }
+        changePublisher.publish(TreeChangeType.NODE_DELETED, teamId, new NodeDeletedPayload(TreeNodeRef.key(type, id), descendantKeys));
+    }
+
+    /**
+     * Collects the keys of every descendant of {@code (type, id)} (root not included) in the same
+     * order the cascade would delete them. Called before the delete runs so ids are still resolvable.
+     */
+    private List<String> collectDescendantKeys(TreeNodeType type, Long id) {
+        List<String> keys = new ArrayList<>();
+        switch (type) {
+            case PRODUCT -> {
+                List<Long> outcomes = idsBy("select o.id from Outcome o where o.product.id = :pid", id);
+                for (Long oid : outcomes) {
+                    keys.add(TreeNodeRef.key(TreeNodeType.OUTCOME, oid));
+                    collectUnderOutcome(oid, keys);
+                }
+            }
+            case OUTCOME -> collectUnderOutcome(id, keys);
+            case OPPORTUNITY -> collectUnderOpportunity(id, keys);
+            case SOLUTION -> collectUnderSolution(id, keys);
+            case ASSUMPTION -> collectUnderAssumption(id, keys);
+            case EVIDENCE -> {
+                // Evidence has no descendants.
+            }
+        }
+        return keys;
+    }
+
+    private void collectUnderOutcome(Long outcomeId, List<String> keys) {
+        for (Long oppId : idsBy("select o.id from Opportunity o where o.outcome.id = :pid and o.parent is null", outcomeId)) {
+            keys.add(TreeNodeRef.key(TreeNodeType.OPPORTUNITY, oppId));
+            collectUnderOpportunity(oppId, keys);
+        }
+    }
+
+    private void collectUnderOpportunity(Long oppId, List<String> keys) {
+        for (Long childOpp : idsBy("select o.id from Opportunity o where o.parent.id = :pid", oppId)) {
+            keys.add(TreeNodeRef.key(TreeNodeType.OPPORTUNITY, childOpp));
+            collectUnderOpportunity(childOpp, keys);
+        }
+        for (Long sid : idsBy("select s.id from Solution s where s.opportunity.id = :pid", oppId)) {
+            keys.add(TreeNodeRef.key(TreeNodeType.SOLUTION, sid));
+            collectUnderSolution(sid, keys);
+        }
+        for (Long eid : idsBy("select e.id from Evidence e where e.opportunity.id = :pid", oppId)) {
+            keys.add(TreeNodeRef.key(TreeNodeType.EVIDENCE, eid));
+        }
+    }
+
+    private void collectUnderSolution(Long solutionId, List<String> keys) {
+        for (Long aid : idsBy("select a.id from Assumption a where a.solution.id = :pid", solutionId)) {
+            keys.add(TreeNodeRef.key(TreeNodeType.ASSUMPTION, aid));
+            collectUnderAssumption(aid, keys);
+        }
+    }
+
+    private void collectUnderAssumption(Long assumptionId, List<String> keys) {
+        for (Long eid : idsBy("select e.id from Evidence e where e.assumption.id = :pid", assumptionId)) {
+            keys.add(TreeNodeRef.key(TreeNodeType.EVIDENCE, eid));
+        }
+    }
+
+    private List<Long> idsBy(String jpql, Long pid) {
+        return em.createQuery(jpql, Long.class).setParameter("pid", pid).getResultList();
     }
 
     // ---------------------------------------------------------------------

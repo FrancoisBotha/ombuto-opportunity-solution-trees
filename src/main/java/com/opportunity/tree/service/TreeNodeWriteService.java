@@ -14,6 +14,8 @@ import com.opportunity.tree.domain.enumeration.SolutionStatus;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.UserRepository;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.tree.CreateTreeNodeRequest;
 import com.opportunity.tree.service.dto.tree.TreeNodeDTO;
 import jakarta.persistence.EntityManager;
@@ -91,6 +93,7 @@ public class TreeNodeWriteService {
     private final UserRepository userRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TreeStructureLock structureLock;
+    private final TreeChangePublisher changePublisher;
 
     @PersistenceContext
     private EntityManager em;
@@ -103,7 +106,8 @@ public class TreeNodeWriteService {
         TreeNodeCascadeService cascadeService,
         UserRepository userRepository,
         TeamMemberRepository teamMemberRepository,
-        TreeStructureLock structureLock
+        TreeStructureLock structureLock,
+        TreeChangePublisher changePublisher
     ) {
         this.teamAccessService = teamAccessService;
         this.historyRecorder = historyRecorder;
@@ -113,6 +117,7 @@ public class TreeNodeWriteService {
         this.userRepository = userRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.structureLock = structureLock;
+        this.changePublisher = changePublisher;
     }
 
     // ---------------------------------------------------------------------
@@ -224,7 +229,9 @@ public class TreeNodeWriteService {
         defaultNodeLinks.addDefaults(entity);
         historyRecorder.record(type, id, HistoryEventType.CREATED, "Node created as " + TreeNodeRules.label(type));
         em.flush();
-        return dtoAssembler.toDto(type, id);
+        TreeNodeDTO dto = dtoAssembler.toDto(type, id);
+        changePublisher.publish(TreeChangeType.NODE_CREATED, teamId, dto);
+        return dto;
     }
 
     private int nextSortOrder(String maxQuery, Long parentId) {
@@ -383,7 +390,9 @@ public class TreeNodeWriteService {
             }
         }
         em.flush();
-        return dtoAssembler.toDto(type, id);
+        TreeNodeDTO dto = dtoAssembler.toDto(type, id);
+        changePublisher.publish(TreeChangeType.NODE_UPDATED, teamId, dto);
+        return dto;
     }
 
     // ---------------------------------------------------------------------
