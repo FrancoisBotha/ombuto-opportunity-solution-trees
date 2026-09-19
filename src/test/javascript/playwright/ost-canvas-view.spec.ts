@@ -49,8 +49,29 @@ async function zoomPercent(page: Page) {
   return Number((await page.getByTestId('ost-zoom-level').textContent())!.replace('%', '').trim());
 }
 
-/** Lets the 180ms re-layout ease settle. */
-const settle = (page: Page) => page.waitForTimeout(350);
+/**
+ * Waits until the canvas is still: the viewport transform and every node's computed transform
+ * (mid-transition values included) are unchanged across two probes — i.e. the 180ms re-layout
+ * ease and any viewport change have settled.
+ */
+async function settle(page: Page) {
+  let last = '';
+  await expect
+    .poll(
+      async () => {
+        const now = await page.evaluate(() => {
+          const pane = document.querySelector<HTMLElement>('.vue-flow__transformationpane');
+          const nodes = Array.from(document.querySelectorAll<HTMLElement>('.vue-flow__node'), n => getComputedStyle(n).transform);
+          return `${pane ? getComputedStyle(pane).transform : ''}|${nodes.join('|')}`;
+        });
+        const still = now === last;
+        last = now;
+        return still;
+      },
+      { intervals: [120] },
+    )
+    .toBe(true);
+}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -385,6 +406,28 @@ test.describe('OST tree canvas — render & navigate', () => {
       })
       .toBeLessThan(40);
     await expect(page.getByTestId(`ost-collapse-${k.op1}`)).toHaveText('–');
+  });
+
+  test('a ?node= outside the chosen ?product= is not centred later by Fit', async () => {
+    const page = user.page;
+    // op1 lives in product A, the scope is product B: nothing to centre, so nothing stays pending.
+    await page.goto(`/trees/${teamId}/canvas?product=${k.productB}&node=${k.op1}`);
+    await expect(node(page, k.productB)).toBeVisible();
+    await expect(node(page, k.op1)).toHaveCount(0);
+    await settle(page);
+
+    // Switching to all products re-fits: that must be the plain Fit framing (the same as pressing
+    // Fit), not a late jump to op1.
+    await page.getByTestId('ost-product-combo').click();
+    await page.getByTestId('ost-product-option-all').click();
+    await expect(node(page, k.productA)).toBeVisible();
+    await settle(page);
+    const afterSwitch = centre(await box(node(page, k.productA)));
+    await page.getByTestId('ost-fit').click();
+    await settle(page);
+    const fitted = centre(await box(node(page, k.productA)));
+    expect(Math.abs(afterSwitch.x - fitted.x)).toBeLessThan(2);
+    expect(Math.abs(afterSwitch.y - fitted.y)).toBeLessThan(2);
   });
 
   test('viewers see the same canvas without + buttons', async () => {
