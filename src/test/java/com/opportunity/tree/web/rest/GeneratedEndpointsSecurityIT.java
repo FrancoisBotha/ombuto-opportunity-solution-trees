@@ -10,18 +10,25 @@ import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
+import com.opportunity.tree.domain.enumeration.AssumptionStatus;
 import com.opportunity.tree.domain.enumeration.HistoryEventType;
+import com.opportunity.tree.domain.enumeration.OpportunityStatus;
+import com.opportunity.tree.domain.enumeration.SolutionStatus;
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TeamRepository;
+import com.opportunity.tree.service.dto.AssumptionDTO;
+import com.opportunity.tree.service.dto.CommentDTO;
 import com.opportunity.tree.service.dto.EvidenceDTO;
 import com.opportunity.tree.service.dto.NodeHistoryDTO;
 import com.opportunity.tree.service.dto.NodeLinkDTO;
 import com.opportunity.tree.service.dto.OpenQuestionDTO;
 import com.opportunity.tree.service.dto.OpportunityDTO;
+import com.opportunity.tree.service.dto.OutcomeDTO;
 import com.opportunity.tree.service.dto.ProductDTO;
+import com.opportunity.tree.service.dto.SolutionDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.dto.TeamMemberDTO;
 import com.opportunity.tree.service.dto.UserDTO;
@@ -51,8 +58,10 @@ import org.springframework.transaction.annotation.Transactional;
  * non-members (403 on writes; empty list on GET-all; 404 on GET-one — matching
  * a non-existent id so existence cannot be probed).
  *
- * <p>The OST node entities added in OST-1 (Evidence, NodeLink, OpenQuestion,
- * NodeHistory) are locked to ROLE_ADMIN the same way as Team and TeamMember.
+ * <p>The OST node entities (Outcome, Opportunity, Solution, Assumption, Evidence,
+ * NodeLink, OpenQuestion, NodeHistory) and Comment are locked to ROLE_ADMIN the same
+ * way as Team and TeamMember; plain users write the tree only through
+ * {@code /api/tree/**}.
  */
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -300,6 +309,87 @@ class GeneratedEndpointsSecurityIT {
         body.setSummary("Created");
         body.setCreatedDate(Instant.now());
         assertAdminOnlyOnEveryVerb("/api/node-histories", body);
+    }
+
+    // ---------------------------------------------------------------------
+    // Outcome, Opportunity, Solution, Assumption, Comment — locked to ROLE_ADMIN.
+    // Plain users write the tree only through /api/tree/** (TeamAccessService).
+    // ---------------------------------------------------------------------
+
+    @Test
+    @Transactional
+    void outcomeEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        ProductDTO productRef = new ProductDTO();
+        productRef.setId(otherProduct.getId());
+        OutcomeDTO body = new OutcomeDTO();
+        body.setId(1L);
+        body.setTitle("valid title");
+        body.setSortOrder(0);
+        body.setCreatedDate(Instant.now());
+        body.setProduct(productRef);
+        assertAdminOnlyOnEveryVerb("/api/outcomes", body);
+    }
+
+    @Test
+    @Transactional
+    void opportunityEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        OutcomeDTO outcomeRef = new OutcomeDTO();
+        outcomeRef.setId(1L);
+        OpportunityDTO body = new OpportunityDTO();
+        body.setId(1L);
+        body.setTitle("valid title");
+        body.setStatus(OpportunityStatus.UNEXPLORED);
+        body.setValuerating(3);
+        body.setPriority(50);
+        body.setSortOrder(0);
+        body.setCreatedDate(Instant.now());
+        body.setOutcome(outcomeRef);
+        assertAdminOnlyOnEveryVerb("/api/opportunities", body);
+    }
+
+    @Test
+    @Transactional
+    void solutionEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        OpportunityDTO opportunityRef = new OpportunityDTO();
+        opportunityRef.setId(1L);
+        SolutionDTO body = new SolutionDTO();
+        body.setId(1L);
+        body.setTitle("valid title");
+        body.setStatus(SolutionStatus.CANDIDATE);
+        body.setSortOrder(0);
+        body.setCreatedDate(Instant.now());
+        body.setOpportunity(opportunityRef);
+        assertAdminOnlyOnEveryVerb("/api/solutions", body);
+    }
+
+    @Test
+    @Transactional
+    void assumptionEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        SolutionDTO solutionRef = new SolutionDTO();
+        solutionRef.setId(1L);
+        AssumptionDTO body = new AssumptionDTO();
+        body.setId(1L);
+        body.setStatement("valid statement");
+        body.setStatus(AssumptionStatus.UNTESTED);
+        body.setConfidence(40);
+        body.setSortOrder(0);
+        body.setCreatedDate(Instant.now());
+        body.setSolution(solutionRef);
+        assertAdminOnlyOnEveryVerb("/api/assumptions", body);
+    }
+
+    @Test
+    @Transactional
+    void commentEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        UserDTO authorRef = new UserDTO();
+        authorRef.setId("some-user");
+        authorRef.setLogin("some-user");
+        CommentDTO body = new CommentDTO();
+        body.setId(1L);
+        body.setBody("Hello");
+        body.setCreatedDate(Instant.now());
+        body.setAuthor(authorRef);
+        assertAdminOnlyOnEveryVerb("/api/comments", body);
     }
 
     /** Every verb on a generated CRUD resource must 403 for a plain ROLE_USER. The body is valid so validation cannot mask it. */

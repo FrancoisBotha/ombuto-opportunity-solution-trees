@@ -1,19 +1,9 @@
 package com.opportunity.tree.service;
 
-import com.opportunity.tree.domain.Assumption;
-import com.opportunity.tree.domain.Opportunity;
-import com.opportunity.tree.domain.Outcome;
-import com.opportunity.tree.domain.Product;
-import com.opportunity.tree.domain.Solution;
 import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
-import com.opportunity.tree.repository.AssumptionRepository;
-import com.opportunity.tree.repository.OpportunityRepository;
-import com.opportunity.tree.repository.OutcomeRepository;
-import com.opportunity.tree.repository.ProductRepository;
-import com.opportunity.tree.repository.SolutionRepository;
 import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TreeAccessLookupRepository;
 import com.opportunity.tree.security.SecurityUtils;
@@ -50,28 +40,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class TeamAccessService {
 
     private final TeamMemberRepository teamMemberRepository;
-    private final ProductRepository productRepository;
-    private final OutcomeRepository outcomeRepository;
-    private final OpportunityRepository opportunityRepository;
-    private final SolutionRepository solutionRepository;
-    private final AssumptionRepository assumptionRepository;
     private final TreeAccessLookupRepository treeAccessLookupRepository;
 
-    public TeamAccessService(
-        TeamMemberRepository teamMemberRepository,
-        ProductRepository productRepository,
-        OutcomeRepository outcomeRepository,
-        OpportunityRepository opportunityRepository,
-        SolutionRepository solutionRepository,
-        AssumptionRepository assumptionRepository,
-        TreeAccessLookupRepository treeAccessLookupRepository
-    ) {
+    public TeamAccessService(TeamMemberRepository teamMemberRepository, TreeAccessLookupRepository treeAccessLookupRepository) {
         this.teamMemberRepository = teamMemberRepository;
-        this.productRepository = productRepository;
-        this.outcomeRepository = outcomeRepository;
-        this.opportunityRepository = opportunityRepository;
-        this.solutionRepository = solutionRepository;
-        this.assumptionRepository = assumptionRepository;
         this.treeAccessLookupRepository = treeAccessLookupRepository;
     }
 
@@ -142,140 +114,6 @@ public class TeamAccessService {
 
     public void requireOwnerTeam(Long teamId) {
         if (!isTeamOwner(teamId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    // ---------------------------------------------------------------------
-    // Product-level checks
-    // ---------------------------------------------------------------------
-
-    public boolean canReadProduct(Long productId) {
-        return teamIdForProduct(productId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditProduct(Long productId) {
-        return teamIdForProduct(productId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isProductOwner(Long productId) {
-        return teamIdForProduct(productId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadProduct(Long productId) {
-        if (!canReadProduct(productId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditProduct(Long productId) {
-        if (!canEditProduct(productId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireOwnerProduct(Long productId) {
-        if (!isProductOwner(productId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    // ---------------------------------------------------------------------
-    // Node-level checks (outcome, opportunity, solution, assumption)
-    // ---------------------------------------------------------------------
-
-    public boolean canReadOutcome(Long outcomeId) {
-        return teamIdForOutcome(outcomeId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditOutcome(Long outcomeId) {
-        return teamIdForOutcome(outcomeId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isOutcomeOwner(Long outcomeId) {
-        return teamIdForOutcome(outcomeId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadOutcome(Long outcomeId) {
-        if (!canReadOutcome(outcomeId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditOutcome(Long outcomeId) {
-        if (!canEditOutcome(outcomeId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public boolean canReadOpportunity(Long opportunityId) {
-        return teamIdForOpportunity(opportunityId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditOpportunity(Long opportunityId) {
-        return teamIdForOpportunity(opportunityId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isOpportunityOwner(Long opportunityId) {
-        return teamIdForOpportunity(opportunityId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadOpportunity(Long opportunityId) {
-        if (!canReadOpportunity(opportunityId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditOpportunity(Long opportunityId) {
-        if (!canEditOpportunity(opportunityId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public boolean canReadSolution(Long solutionId) {
-        return teamIdForSolution(solutionId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditSolution(Long solutionId) {
-        return teamIdForSolution(solutionId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isSolutionOwner(Long solutionId) {
-        return teamIdForSolution(solutionId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadSolution(Long solutionId) {
-        if (!canReadSolution(solutionId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditSolution(Long solutionId) {
-        if (!canEditSolution(solutionId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public boolean canReadAssumption(Long assumptionId) {
-        return teamIdForAssumption(assumptionId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditAssumption(Long assumptionId) {
-        return teamIdForAssumption(assumptionId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isAssumptionOwner(Long assumptionId) {
-        return teamIdForAssumption(assumptionId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadAssumption(Long assumptionId) {
-        if (!canReadAssumption(assumptionId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditAssumption(Long assumptionId) {
-        if (!canEditAssumption(assumptionId)) {
             throw new TeamAccessDeniedException();
         }
     }
@@ -429,62 +267,5 @@ public class TeamAccessService {
 
     private List<TeamMember> currentUserMemberships() {
         return SecurityUtils.getCurrentUserLogin().map(teamMemberRepository::findAllByUserLogin).orElse(Collections.emptyList());
-    }
-
-    private Optional<Long> teamIdForProduct(Long productId) {
-        if (productId == null) {
-            return Optional.empty();
-        }
-        return productRepository.findById(productId).map(Product::getTeam).map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForOutcome(Long outcomeId) {
-        if (outcomeId == null) {
-            return Optional.empty();
-        }
-        return outcomeRepository
-            .findById(outcomeId)
-            .map(Outcome::getProduct)
-            .flatMap(p -> Optional.ofNullable(p.getTeam()))
-            .map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForOpportunity(Long opportunityId) {
-        if (opportunityId == null) {
-            return Optional.empty();
-        }
-        return opportunityRepository
-            .findById(opportunityId)
-            .map(Opportunity::getOutcome)
-            .map(Outcome::getProduct)
-            .map(Product::getTeam)
-            .map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForSolution(Long solutionId) {
-        if (solutionId == null) {
-            return Optional.empty();
-        }
-        return solutionRepository
-            .findById(solutionId)
-            .map(Solution::getOpportunity)
-            .map(Opportunity::getOutcome)
-            .map(Outcome::getProduct)
-            .map(Product::getTeam)
-            .map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForAssumption(Long assumptionId) {
-        if (assumptionId == null) {
-            return Optional.empty();
-        }
-        return assumptionRepository
-            .findById(assumptionId)
-            .map(Assumption::getSolution)
-            .map(Solution::getOpportunity)
-            .map(Opportunity::getOutcome)
-            .map(Outcome::getProduct)
-            .map(Product::getTeam)
-            .map(Team::getId);
     }
 }
