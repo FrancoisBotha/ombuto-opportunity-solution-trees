@@ -103,6 +103,20 @@ test.describe('OST dashboard and experiments', () => {
       await expect(page.getByTestId('ost-stat-evidence')).toContainText('Evidence this month');
     });
 
+    test('the dashboard fits a 390px-wide screen without horizontal scrolling', async () => {
+      const page = user.page;
+      const before = page.viewportSize();
+      await page.setViewportSize({ width: 390, height: 844 });
+      try {
+        await page.goto(`/trees/${jupiter.id}`);
+        await expect(page.getByTestId('ost-dashboard')).toBeVisible();
+        const overflow = await page.getByTestId('ostDashboardPage').evaluate(el => el.scrollWidth - el.clientWidth);
+        expect(overflow).toBeLessThanOrEqual(0);
+      } finally {
+        if (before) await page.setViewportSize(before);
+      }
+    });
+
     test('one card per product; "Open branch" opens the canvas scoped to it', async () => {
       const page = user.page;
       const products = tree.nodes.filter(n => n.type === 'PRODUCT');
