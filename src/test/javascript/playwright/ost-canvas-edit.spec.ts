@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
@@ -9,8 +10,8 @@ import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERN
  * ghost chip, click-to-arm, collapse to a rail), delete with a descendant count, keyboard paths,
  * and viewers seeing none of it.
  *
- * Builds its own throwaway team through the API (`user` owns it, `admin` is a VIEWER) and deletes it
- * afterwards. Seeded teams are never touched.
+ * Builds its own throwaway team through the API (`user` owns it, `admin` is a VIEWER), deletes its
+ * products afterwards and registers the team for the run-end cleanup (support/cleanup.ts). Seeded teams are never touched.
  */
 
 interface TreeNode {
@@ -140,6 +141,7 @@ test.describe('OST tree canvas — editing', () => {
     const team = await user.api('post', '/api/team-management/teams', { name: `e2e canvas edit ${stamp}`, description: 'ost-canvas-edit' });
     expect(team.status()).toBe(201);
     teamId = (await team.json()).id;
+    registerTeamForCleanup(teamId);
     const found = (await (await user.api('get', `/api/team-management/teams/${teamId}/user-search?q=admin`)).json()) as {
       id: string;
       login: string;
@@ -166,10 +168,9 @@ test.describe('OST tree canvas — editing', () => {
   });
 
   test.afterAll(async () => {
-    if (teamId) {
-      for (const id of productIds) await user.api('delete', `/api/products/${id}`);
-      const res = await admin.api('delete', `/api/admin/teams/${teamId}`);
-      expect(res.status(), 'team cleanup').toBe(204);
+    for (const id of productIds) {
+      const res = await user.api('delete', `/api/tree/nodes/product/${id}`);
+      expect(res.status(), `product ${id} cleanup`).toBe(204);
     }
     await user?.context.close();
     await admin?.context.close();
