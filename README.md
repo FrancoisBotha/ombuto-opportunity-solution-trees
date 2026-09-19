@@ -68,7 +68,7 @@ npm start            # frontend dev server on http://localhost:9000  (second ter
 
 `./mvnw` starts the Keycloak and PostgreSQL containers from `src/main/docker/services.yml` for you
 (Spring Boot's Docker Compose support), creates the H2 development database under `target/h2db/`,
-and loads sample data. On Windows use `mvnw.cmd` from PowerShell, or `./mvnw` from Git Bash.
+and seeds sample data (`DevDataSeeder`): four teams, and the full prototype tree in Team Jupiter. On Windows use `mvnw.cmd` from PowerShell, or `./mvnw` from Git Bash.
 
 Open **http://localhost:9000** and sign in with one of the development accounts:
 
@@ -89,8 +89,8 @@ a company identity provider, see
 - **`Bind for 127.0.0.1:9080 failed: port is already allocated`** — another Keycloak container is
   holding the port. `docker ps -a --filter name=keycloak`, then remove any that is not
   `opportunitysolutiontree-keycloak-1`.
-- **Liquibase checksum errors on startup** — the development database predates a schema change.
-  Stop the app and delete `target/h2db/db`.
+- **Liquibase checksum errors on startup** — the development database predates a schema change
+  (the Tree Builder rewrote the entity changelogs in place). Stop the app and delete `target/h2db/`.
 - **Frontend tests fail with `localStorage.clear is not a function`** — Node 25 or newer; run them
   with `NODE_OPTIONS=--no-experimental-webstorage`.
 

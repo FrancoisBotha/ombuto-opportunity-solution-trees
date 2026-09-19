@@ -57,21 +57,6 @@
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-control-label" for="solution">Effort</label>
-            <input
-              type="number"
-              class="form-control"
-              name="effort"
-              id="solution-effort"
-              data-cy="effort"
-              :class="{ valid: !v$.effort.$invalid, invalid: v$.effort.$invalid }"
-              v-model.number="v$.effort.$model"
-            />
-            <div v-if="v$.effort.$anyDirty && v$.effort.$invalid">
-              <small class="form-text text-danger" v-for="error of v$.effort.$errors" :key="error.$uid">{{ error.$message }}</small>
-            </div>
-          </div>
-          <div class="mb-3">
             <label class="form-control-label" for="solution">Sort Order</label>
             <input
               type="number"

@@ -13,8 +13,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Assumption;
 import com.opportunity.tree.domain.Solution;
-import com.opportunity.tree.domain.enumeration.AssumptionCategory;
+import com.opportunity.tree.domain.enumeration.AssumptionStatus;
 import com.opportunity.tree.repository.AssumptionRepository;
+import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.service.AssumptionService;
 import com.opportunity.tree.service.dto.AssumptionDTO;
 import com.opportunity.tree.service.mapper.AssumptionMapper;
@@ -51,20 +52,23 @@ class AssumptionResourceIT {
     private static final String DEFAULT_STATEMENT = "AAAAAAAAAA";
     private static final String UPDATED_STATEMENT = "BBBBBBBBBB";
 
-    private static final AssumptionCategory DEFAULT_CATEGORY = AssumptionCategory.DESIRABILITY;
-    private static final AssumptionCategory UPDATED_CATEGORY = AssumptionCategory.VIABILITY;
+    private static final String DEFAULT_DESCRIPTION = "AAAAAAAAAA";
+    private static final String UPDATED_DESCRIPTION = "BBBBBBBBBB";
 
-    private static final Integer DEFAULT_IMPORTANCE = 1;
-    private static final Integer UPDATED_IMPORTANCE = 2;
+    private static final AssumptionStatus DEFAULT_STATUS = AssumptionStatus.UNTESTED;
+    private static final AssumptionStatus UPDATED_STATUS = AssumptionStatus.TESTING;
 
-    private static final Integer DEFAULT_EVIDENCE = 1;
-    private static final Integer UPDATED_EVIDENCE = 2;
+    private static final Integer DEFAULT_CONFIDENCE = 0;
+    private static final Integer UPDATED_CONFIDENCE = 1;
 
-    private static final Boolean DEFAULT_VALIDATED = false;
-    private static final Boolean UPDATED_VALIDATED = true;
+    private static final Integer DEFAULT_SORT_ORDER = 1;
+    private static final Integer UPDATED_SORT_ORDER = 2;
 
     private static final Instant DEFAULT_CREATED_DATE = Instant.ofEpochMilli(0L);
     private static final Instant UPDATED_CREATED_DATE = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+
+    private static final Instant DEFAULT_LAST_MODIFIED_DATE = Instant.ofEpochMilli(0L);
+    private static final Instant UPDATED_LAST_MODIFIED_DATE = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 
     private static final String ENTITY_API_URL = "/api/assumptions";
     private static final String ENTITY_API_URL_ID = ENTITY_API_URL + "/{id}";
@@ -77,6 +81,9 @@ class AssumptionResourceIT {
 
     @Autowired
     private AssumptionRepository assumptionRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Mock
     private AssumptionRepository assumptionRepositoryMock;
@@ -106,11 +113,12 @@ class AssumptionResourceIT {
     public static Assumption createEntity(EntityManager em) {
         Assumption assumption = new Assumption()
             .statement(DEFAULT_STATEMENT)
-            .category(DEFAULT_CATEGORY)
-            .importance(DEFAULT_IMPORTANCE)
-            .evidence(DEFAULT_EVIDENCE)
-            .validated(DEFAULT_VALIDATED)
-            .createdDate(DEFAULT_CREATED_DATE);
+            .description(DEFAULT_DESCRIPTION)
+            .status(DEFAULT_STATUS)
+            .confidence(DEFAULT_CONFIDENCE)
+            .sortOrder(DEFAULT_SORT_ORDER)
+            .createdDate(DEFAULT_CREATED_DATE)
+            .lastModifiedDate(DEFAULT_LAST_MODIFIED_DATE);
         // Add required entity
         Solution solution;
         if (TestUtil.findAll(em, Solution.class).isEmpty()) {
@@ -133,11 +141,12 @@ class AssumptionResourceIT {
     public static Assumption createUpdatedEntity(EntityManager em) {
         Assumption updatedAssumption = new Assumption()
             .statement(UPDATED_STATEMENT)
-            .category(UPDATED_CATEGORY)
-            .importance(UPDATED_IMPORTANCE)
-            .evidence(UPDATED_EVIDENCE)
-            .validated(UPDATED_VALIDATED)
-            .createdDate(UPDATED_CREATED_DATE);
+            .description(UPDATED_DESCRIPTION)
+            .status(UPDATED_STATUS)
+            .confidence(UPDATED_CONFIDENCE)
+            .sortOrder(UPDATED_SORT_ORDER)
+            .createdDate(UPDATED_CREATED_DATE)
+            .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
         // Add required entity
         Solution solution;
         if (TestUtil.findAll(em, Solution.class).isEmpty()) {
@@ -162,6 +171,7 @@ class AssumptionResourceIT {
             assumptionRepository.delete(insertedAssumption);
             insertedAssumption = null;
         }
+        userRepository.deleteAll();
     }
 
     @Test
@@ -227,10 +237,10 @@ class AssumptionResourceIT {
 
     @Test
     @Transactional
-    void checkCategoryIsRequired() throws Exception {
+    void checkStatusIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
-        assumption.setCategory(null);
+        assumption.setStatus(null);
 
         // Create the Assumption, which fails.
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
@@ -244,10 +254,10 @@ class AssumptionResourceIT {
 
     @Test
     @Transactional
-    void checkImportanceIsRequired() throws Exception {
+    void checkConfidenceIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
-        assumption.setImportance(null);
+        assumption.setConfidence(null);
 
         // Create the Assumption, which fails.
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
@@ -261,10 +271,10 @@ class AssumptionResourceIT {
 
     @Test
     @Transactional
-    void checkEvidenceIsRequired() throws Exception {
+    void checkSortOrderIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
-        assumption.setEvidence(null);
+        assumption.setSortOrder(null);
 
         // Create the Assumption, which fails.
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(assumption);
@@ -306,11 +316,12 @@ class AssumptionResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(assumption.getId().intValue())))
             .andExpect(jsonPath("$.[*].statement").value(hasItem(DEFAULT_STATEMENT)))
-            .andExpect(jsonPath("$.[*].category").value(hasItem(DEFAULT_CATEGORY.toString())))
-            .andExpect(jsonPath("$.[*].importance").value(hasItem(DEFAULT_IMPORTANCE)))
-            .andExpect(jsonPath("$.[*].evidence").value(hasItem(DEFAULT_EVIDENCE)))
-            .andExpect(jsonPath("$.[*].validated").value(hasItem(DEFAULT_VALIDATED)))
-            .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())));
+            .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
+            .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
+            .andExpect(jsonPath("$.[*].confidence").value(hasItem(DEFAULT_CONFIDENCE)))
+            .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
+            .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
+            .andExpect(jsonPath("$.[*].lastModifiedDate").value(hasItem(DEFAULT_LAST_MODIFIED_DATE.toString())));
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -343,11 +354,12 @@ class AssumptionResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.id").value(assumption.getId().intValue()))
             .andExpect(jsonPath("$.statement").value(DEFAULT_STATEMENT))
-            .andExpect(jsonPath("$.category").value(DEFAULT_CATEGORY.toString()))
-            .andExpect(jsonPath("$.importance").value(DEFAULT_IMPORTANCE))
-            .andExpect(jsonPath("$.evidence").value(DEFAULT_EVIDENCE))
-            .andExpect(jsonPath("$.validated").value(DEFAULT_VALIDATED))
-            .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()));
+            .andExpect(jsonPath("$.description").value(DEFAULT_DESCRIPTION))
+            .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
+            .andExpect(jsonPath("$.confidence").value(DEFAULT_CONFIDENCE))
+            .andExpect(jsonPath("$.sortOrder").value(DEFAULT_SORT_ORDER))
+            .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()))
+            .andExpect(jsonPath("$.lastModifiedDate").value(DEFAULT_LAST_MODIFIED_DATE.toString()));
     }
 
     @Test
@@ -371,11 +383,12 @@ class AssumptionResourceIT {
         em.detach(updatedAssumption);
         updatedAssumption
             .statement(UPDATED_STATEMENT)
-            .category(UPDATED_CATEGORY)
-            .importance(UPDATED_IMPORTANCE)
-            .evidence(UPDATED_EVIDENCE)
-            .validated(UPDATED_VALIDATED)
-            .createdDate(UPDATED_CREATED_DATE);
+            .description(UPDATED_DESCRIPTION)
+            .status(UPDATED_STATUS)
+            .confidence(UPDATED_CONFIDENCE)
+            .sortOrder(UPDATED_SORT_ORDER)
+            .createdDate(UPDATED_CREATED_DATE)
+            .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
         AssumptionDTO assumptionDTO = assumptionMapper.toDto(updatedAssumption);
 
         restAssumptionMockMvc
@@ -469,10 +482,11 @@ class AssumptionResourceIT {
         partialUpdatedAssumption.setId(assumption.getId());
 
         partialUpdatedAssumption
-            .category(UPDATED_CATEGORY)
-            .evidence(UPDATED_EVIDENCE)
-            .validated(UPDATED_VALIDATED)
-            .createdDate(UPDATED_CREATED_DATE);
+            .description(UPDATED_DESCRIPTION)
+            .confidence(UPDATED_CONFIDENCE)
+            .sortOrder(UPDATED_SORT_ORDER)
+            .createdDate(UPDATED_CREATED_DATE)
+            .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
 
         restAssumptionMockMvc
             .perform(
@@ -506,11 +520,12 @@ class AssumptionResourceIT {
 
         partialUpdatedAssumption
             .statement(UPDATED_STATEMENT)
-            .category(UPDATED_CATEGORY)
-            .importance(UPDATED_IMPORTANCE)
-            .evidence(UPDATED_EVIDENCE)
-            .validated(UPDATED_VALIDATED)
-            .createdDate(UPDATED_CREATED_DATE);
+            .description(UPDATED_DESCRIPTION)
+            .status(UPDATED_STATUS)
+            .confidence(UPDATED_CONFIDENCE)
+            .sortOrder(UPDATED_SORT_ORDER)
+            .createdDate(UPDATED_CREATED_DATE)
+            .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
 
         restAssumptionMockMvc
             .perform(

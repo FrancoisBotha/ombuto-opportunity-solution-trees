@@ -23,16 +23,16 @@
             <span>{{ opportunity.status }}</span>
           </dd>
           <dt>
-            <span>Value</span>
+            <span>Valuerating</span>
           </dt>
           <dd>
             <span>{{ opportunity.valuerating }}</span>
           </dd>
           <dt>
-            <span>Complexity</span>
+            <span>Priority</span>
           </dt>
           <dd>
-            <span>{{ opportunity.complexity }}</span>
+            <span>{{ opportunity.priority }}</span>
           </dd>
           <dt>
             <span>Sort Order</span>

@@ -30,12 +30,6 @@
             <th scope="col"><span>ID</span></th>
             <th scope="col"><span>Title</span></th>
             <th scope="col"><span>Description</span></th>
-            <th scope="col"><span>Metric</span></th>
-            <th scope="col"><span>Target Value</span></th>
-            <th scope="col"><span>Current Value</span></th>
-            <th scope="col"><span>Status</span></th>
-            <th scope="col"><span>Start Date</span></th>
-            <th scope="col"><span>Target Date</span></th>
             <th scope="col"><span>Sort Order</span></th>
             <th scope="col"><span>Created Date</span></th>
             <th scope="col"><span>Last Modified Date</span></th>
@@ -51,12 +45,6 @@
             </td>
             <td>{{ outcome.title }}</td>
             <td>{{ outcome.description }}</td>
-            <td>{{ outcome.metric }}</td>
-            <td>{{ outcome.targetValue }}</td>
-            <td>{{ outcome.currentValue }}</td>
-            <td>{{ outcome.status }}</td>
-            <td>{{ outcome.startDate }}</td>
-            <td>{{ outcome.targetDate }}</td>
             <td>{{ outcome.sortOrder }}</td>
             <td>{{ formatDateShort(outcome.createdDate) || '' }}</td>
             <td>{{ formatDateShort(outcome.lastModifiedDate) || '' }}</td>

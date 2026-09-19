@@ -33,7 +33,9 @@ export default defineConfig({
   },
   projects: [
     // Logs in once through Keycloak and stores the session for the other projects.
-    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    { name: 'setup', testMatch: /auth\.setup\.ts/, teardown: 'cleanup' },
+    // After every spec has finished: deletes the throwaway teams they registered (support/cleanup.ts).
+    { name: 'cleanup', testMatch: /cleanup\.teardown\.ts/, use: { storageState: STORAGE_STATE } },
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },

@@ -14,29 +14,75 @@ controller or route through `TeamAccessService` in the service layer.
 - **Protection** — what enforces authorisation:
   - `ROLE_ADMIN` — locked at the controller with `@PreAuthorize("hasAuthority('ROLE_ADMIN')")`.
   - `TeamAccessService` — every read/write in the service goes through
-    `TeamAccessService` (non-members get 403 on writes and 404 on reads,
-    without existence disclosure — NFR-002).
+    `TeamAccessService` (non-members get 403 without existence disclosure —
+    NFR-002).
   - `authenticated` — any signed-in user; behaviour is intentionally public to
     all authenticated users.
   - `permitAll` / role from `SecurityConfiguration` — filter chain rule.
 
-## Team-owned entities
+## Team-owned entities (generated CRUD)
 
-| Controller                | Base path                | Verbs                                                  | Owner scope                          | Protection                                                                                                                                                        |
-| ------------------------- | ------------------------ | ------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TeamResource`            | `/api/teams`             | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned                           | `ROLE_ADMIN`                                                                                                                                                      |
-| `TeamMemberResource`      | `/api/team-members`      | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned                           | `ROLE_ADMIN`                                                                                                                                                      |
-| `ProductResource`         | `/api/products`          | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned                           | `TeamAccessService` (via `ProductServiceImpl`; list is filtered to the caller's teams, single read/writes go through `requireReadProduct` / `requireEditProduct`) |
-| `OutcomeResource`         | `/api/outcomes`          | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Product)             | POST, PUT, PATCH: `TeamAccessService` (via `OutcomeServiceImpl`, `requireEditOutcome`); GET, GET/{id}, DELETE: `ROLE_ADMIN`                                       |
-| `OpportunityResource`     | `/api/opportunities`     | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Outcome)             | POST, PUT, PATCH: `TeamAccessService` (via `OpportunityServiceImpl`, `requireEditOpportunity`); GET, GET/{id}, DELETE: `ROLE_ADMIN`                               |
-| `OpportunityLinkResource` | `/api/opportunity-links` | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Opportunity)         | `ROLE_ADMIN`                                                                                                                                                      |
-| `SolutionResource`        | `/api/solutions`         | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Opportunity)         | POST, PUT, PATCH: `TeamAccessService` (via `SolutionServiceImpl`, `requireEditSolution`); GET, GET/{id}, DELETE: `ROLE_ADMIN`                                     |
-| `SolutionLinkResource`    | `/api/solution-links`    | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Solution)            | `ROLE_ADMIN`                                                                                                                                                      |
-| `AssumptionResource`      | `/api/assumptions`       | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Solution)            | `ROLE_ADMIN`                                                                                                                                                      |
-| `ExperimentResource`      | `/api/experiments`       | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Assumption)          | `ROLE_ADMIN`                                                                                                                                                      |
-| `InterviewResource`       | `/api/interviews`        | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Product)             | `ROLE_ADMIN`                                                                                                                                                      |
-| `CommentResource`         | `/api/comments`          | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via node)                | `ROLE_ADMIN`                                                                                                                                                      |
-| `TagResource`             | `/api/tags`              | GET, GET/{id}, POST, PUT/{id}, PATCH/{id}, DELETE/{id} | team-owned (via Solution/Assumption) | `ROLE_ADMIN`                                                                                                                                                      |
+Every generated CRUD resource except `ProductResource` carries a class-level
+`@PreAuthorize(ROLE_ADMIN)`: they are the admin "Static Data" screens, and team
+members work through the tree APIs below instead. All support GET, GET/{id},
+POST, PUT/{id}, PATCH/{id} and DELETE/{id}. Outcome, Opportunity, Solution and
+Interview also support GET /count.
+
+| Controller             | Base path             | Owner scope                               | Protection                                                                                                                                                                                                                                        |
+| ---------------------- | --------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TeamResource`         | `/api/teams`          | team-owned                                | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `TeamMemberResource`   | `/api/team-members`   | team-owned                                | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `ProductResource`      | `/api/products`       | team-owned                                | `TeamAccessService` (via `ProductServiceImpl`): the list is filtered to the caller's teams, and create / update / delete need OWNER or EDITOR. `sortOrder` is server-owned. DELETE cascades the whole product subtree (`TreeNodeCascadeService`). |
+| `OutcomeResource`      | `/api/outcomes`       | team-owned (via Product)                  | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `OpportunityResource`  | `/api/opportunities`  | team-owned (via Outcome / Opportunity)    | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `SolutionResource`     | `/api/solutions`      | team-owned (via Opportunity)              | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `AssumptionResource`   | `/api/assumptions`    | team-owned (via Solution)                 | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `EvidenceResource`     | `/api/evidences`      | team-owned (via Opportunity / Assumption) | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `NodeLinkResource`     | `/api/node-links`     | team-owned (via any node)                 | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `OpenQuestionResource` | `/api/open-questions` | team-owned (via Opportunity)              | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `NodeHistoryResource`  | `/api/node-histories` | team-owned (via node type + id)           | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `CommentResource`      | `/api/comments`       | team-owned (via node)                     | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `InterviewResource`    | `/api/interviews`     | team-owned (via Product)                  | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+| `TagResource`          | `/api/tags`           | team-owned (via Solution / Assumption)    | `ROLE_ADMIN`                                                                                                                                                                                                                                      |
+
+A generated DELETE that a database reference blocks (for example, an opportunity
+that still has children) returns `409 error.dataintegrity` without any SQL.
+`GeneratedEndpointsSecurityIT` asserts that every verb above is admin-only.
+
+## Tree Builder APIs (built on `TeamAccessService`)
+
+These are hand-written resources beside the generated code (Epic 11), open to
+authenticated users. Authorisation is checked per call:
+
+- **Read**: any member of the node's team.
+- **Write**: OWNER or EDITOR. Chat is a write, so viewers are read-only there too.
+- **Non-members, unknown ids and `ROLE_ADMIN` without membership**: 403, with no
+  existence leak.
+- **Anonymous**: 401.
+
+`{type}` is one of `product`, `outcome`, `opportunity`, `solution`, `assumption`,
+`evidence` (case-insensitive). The writes marked "Lock" take the team's
+`TreeStructureLock`. They answer `409 error.concurrencyFailure` when the wait
+passes 5 s, or when the node was deleted by the request they queued behind.
+
+| Controller                 | Verb and path                                 | Who                          | Notes                                                                                               |
+| -------------------------- | --------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| `TeamTreeResource`         | GET `/api/teams/{teamId}/tree`                | member                       | Flat, pre-ordered `TeamTreeDTO`: nodes, members, `canEdit`, `evidenceThisMonth`                     |
+| `TreeNodeResource`         | POST `/api/tree/nodes`                        | OWNER / EDITOR               | Create under an allowed parent (server-side matrix), with defaults and default links. Lock.         |
+| `TreeNodeResource`         | PATCH `/api/tree/nodes/{type}/{id}`           | OWNER / EDITOR               | Merge-patch of title, notes, status, confidence, priority, valueRating, ownerLogin, archived. Lock. |
+| `TreeNodeResource`         | DELETE `/api/tree/nodes/{type}/{id}`          | OWNER / EDITOR               | Cascades the subtree with its links, questions, comments and history. Lock.                         |
+| `TreeNodeMoveResource`     | POST `/api/tree/nodes/move`                   | OWNER / EDITOR               | Re-parent (cycle / type / same-team checks), product reorder. Lock.                                 |
+| `TreeNodeLinkResource`     | POST `/api/tree/nodes/{type}/{id}/links`      | OWNER / EDITOR               | Add a link (`^https?://.+`). Lock.                                                                  |
+| `TreeNodeLinkResource`     | PATCH / DELETE `/api/tree/links/{id}`         | OWNER / EDITOR               | Edit / remove a link                                                                                |
+| `TreeOpenQuestionResource` | POST `/api/tree/opportunities/{id}/questions` | OWNER / EDITOR               | Add an open question (opportunities only). Lock.                                                    |
+| `TreeOpenQuestionResource` | PATCH / DELETE `/api/tree/questions/{id}`     | OWNER / EDITOR               | Edit text, tick / untick, remove                                                                    |
+| `TreeCommentResource`      | GET `/api/tree/nodes/{type}/{id}/comments`    | member                       | Oldest first. Products → 400 `chatnotsupported`                                                     |
+| `TreeCommentResource`      | POST `/api/tree/nodes/{type}/{id}/comments`   | OWNER / EDITOR               | Post. Lock.                                                                                         |
+| `TreeCommentResource`      | PATCH / DELETE `/api/tree/comments/{id}`      | author, while OWNER / EDITOR | Edit (sets `editedDate`) / delete own message. Lock.                                                |
+| `TreeNodeHistoryResource`  | GET `/api/tree/nodes/{type}/{id}/history`     | member                       | Newest first. Products → 400 `historynotsupported`                                                  |
+
+The rules behind these endpoints (defaults, history, locking) are in
+[`Architecture.md`](Architecture.md) section 6 and the resources' Javadoc.
 
 ## Team-scoped façades (built on `TeamAccessService`)
 
@@ -47,6 +93,7 @@ authorisation is enforced per call inside the service.
 | ------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `TeamManagementResource` | `/api/team-management/**`      | Create team / list-my-teams / member add-remove-role / user-search. All flows delegate to `TeamManagementService` → `TeamAccessService`. |
 | `TeamProductResource`    | `/api/teams/{teamId}/products` | Lists a team's products (including archived); non-members get 403 via `teamAccessService.requireReadTeam`.                               |
+| `AdminTeamResource`      | `/api/admin/teams/**`          | Admin team list / create / delete and member management. `ROLE_ADMIN` (class-level and the `/api/admin/**` filter rule).                 |
 
 ## Platform endpoints (not team-owned)
 
@@ -61,11 +108,12 @@ authorisation is enforced per call inside the service.
 ## Front-end alignment
 
 The generated JHipster CRUD screens for team-owned entities (Team, TeamMember,
-Product, Outcome, Opportunity, OpportunityLink, Solution, SolutionLink,
-Assumption, Experiment, Interview, Comment, Tag) are gated on `ROLE_ADMIN` in
-the router (`src/main/webapp/app/router/entities.ts`) and hidden from the nav
-bar (`src/main/webapp/app/core/jhi-navbar/jhi-navbar.vue`) so a non-admin user
-is never led to a URL that now returns 403.
+Product, Outcome, Opportunity, Solution, Assumption, Evidence, NodeLink,
+OpenQuestion, NodeHistory, Interview, Comment, Tag) are gated on `ROLE_ADMIN` in
+the router (`src/main/webapp/app/router/entities.ts`). They are linked only from
+the admin-only "Static Data" sidebar group, so a non-admin user is never led to
+a URL that returns 403.
 
-Team members still reach their teams and products through the team-scoped
-façades (TEAMS-002 / TEAMS-003 endpoints and the future Epic 2 tree editor).
+Team members reach their teams and products through the team-scoped façades
+(TEAMS-002 / TEAMS-003), and their trees through the Tree Builder (`/trees`)
+and the APIs above.

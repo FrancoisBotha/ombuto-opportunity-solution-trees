@@ -1,21 +1,8 @@
 package com.opportunity.tree.service;
 
-import com.opportunity.tree.domain.Assumption;
-import com.opportunity.tree.domain.Experiment;
-import com.opportunity.tree.domain.Opportunity;
-import com.opportunity.tree.domain.Outcome;
-import com.opportunity.tree.domain.Product;
-import com.opportunity.tree.domain.Solution;
-import com.opportunity.tree.domain.Team;
-import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.enumeration.TeamRole;
-import com.opportunity.tree.repository.AssumptionRepository;
-import com.opportunity.tree.repository.ExperimentRepository;
-import com.opportunity.tree.repository.OpportunityRepository;
-import com.opportunity.tree.repository.OutcomeRepository;
-import com.opportunity.tree.repository.ProductRepository;
-import com.opportunity.tree.repository.SolutionRepository;
-import com.opportunity.tree.repository.TeamMemberRepository;
+import com.opportunity.tree.domain.enumeration.TreeNodeType;
+import com.opportunity.tree.repository.TreeAccessLookupRepository;
 import com.opportunity.tree.security.SecurityUtils;
 import java.util.Collections;
 import java.util.List;
@@ -49,30 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class TeamAccessService {
 
-    private final TeamMemberRepository teamMemberRepository;
-    private final ProductRepository productRepository;
-    private final OutcomeRepository outcomeRepository;
-    private final OpportunityRepository opportunityRepository;
-    private final SolutionRepository solutionRepository;
-    private final AssumptionRepository assumptionRepository;
-    private final ExperimentRepository experimentRepository;
+    private final TreeAccessLookupRepository treeAccessLookupRepository;
 
-    public TeamAccessService(
-        TeamMemberRepository teamMemberRepository,
-        ProductRepository productRepository,
-        OutcomeRepository outcomeRepository,
-        OpportunityRepository opportunityRepository,
-        SolutionRepository solutionRepository,
-        AssumptionRepository assumptionRepository,
-        ExperimentRepository experimentRepository
-    ) {
-        this.teamMemberRepository = teamMemberRepository;
-        this.productRepository = productRepository;
-        this.outcomeRepository = outcomeRepository;
-        this.opportunityRepository = opportunityRepository;
-        this.solutionRepository = solutionRepository;
-        this.assumptionRepository = assumptionRepository;
-        this.experimentRepository = experimentRepository;
+    public TeamAccessService(TreeAccessLookupRepository treeAccessLookupRepository) {
+        this.treeAccessLookupRepository = treeAccessLookupRepository;
     }
 
     // ---------------------------------------------------------------------
@@ -85,12 +52,7 @@ public class TeamAccessService {
      * no user is authenticated.
      */
     public Set<Long> getCurrentUserTeamIds() {
-        return currentUserMemberships()
-            .stream()
-            .map(TeamMember::getTeam)
-            .filter(t -> t != null && t.getId() != null)
-            .map(Team::getId)
-            .collect(Collectors.toUnmodifiableSet());
+        return currentUserMemberships().stream().map(Membership::teamId).collect(Collectors.toUnmodifiableSet());
     }
 
     /**
@@ -103,8 +65,8 @@ public class TeamAccessService {
         }
         return currentUserMemberships()
             .stream()
-            .filter(tm -> tm.getTeam() != null && teamId.equals(tm.getTeam().getId()))
-            .map(TeamMember::getRole)
+            .filter(m -> teamId.equals(m.teamId()))
+            .map(Membership::role)
             .findFirst();
     }
 
@@ -147,239 +109,162 @@ public class TeamAccessService {
     }
 
     // ---------------------------------------------------------------------
-    // Product-level checks
+    // Generic node checks (all six tree node types) — OST tree builder.
+    //
+    // Read = any member; edit (including chat, links, questions) = OWNER or
+    // EDITOR. A missing id and a non-member get the same TeamAccessDeniedException
+    // (no existence leak). ROLE_ADMIN grants no implicit access.
     // ---------------------------------------------------------------------
 
-    public boolean canReadProduct(Long productId) {
-        return teamIdForProduct(productId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditProduct(Long productId) {
-        return teamIdForProduct(productId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isProductOwner(Long productId) {
-        return teamIdForProduct(productId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadProduct(Long productId) {
-        if (!canReadProduct(productId)) {
-            throw new TeamAccessDeniedException();
+    /** Resolves a node of any type to its team id; empty when the node does not exist. */
+    public Optional<Long> teamIdForNode(TreeNodeType type, Long id) {
+        if (type == null || id == null) {
+            return Optional.empty();
         }
+        return switch (type) {
+            case PRODUCT -> treeAccessLookupRepository.findTeamIdOfProduct(id);
+            case OUTCOME -> treeAccessLookupRepository.findTeamIdOfOutcome(id);
+            case OPPORTUNITY -> treeAccessLookupRepository.findTeamIdOfOpportunity(id);
+            case SOLUTION -> treeAccessLookupRepository.findTeamIdOfSolution(id);
+            case ASSUMPTION -> treeAccessLookupRepository.findTeamIdOfAssumption(id);
+            case EVIDENCE -> treeAccessLookupRepository.findTeamIdOfEvidence(id);
+        };
     }
 
-    public void requireEditProduct(Long productId) {
-        if (!canEditProduct(productId)) {
-            throw new TeamAccessDeniedException();
+    public boolean canReadNode(TreeNodeType type, Long id) {
+        return teamIdForNode(type, id).map(this::canReadTeam).orElse(false);
+    }
+
+    public boolean canEditNode(TreeNodeType type, Long id) {
+        return teamIdForNode(type, id).map(this::canEditTeam).orElse(false);
+    }
+
+    /** Requires read access (any member) to the node; returns the node's team id. */
+    public Long requireReadNode(TreeNodeType type, Long id) {
+        Long teamId = teamIdForNode(type, id).orElseThrow(TeamAccessDeniedException::new);
+        requireReadTeam(teamId);
+        return teamId;
+    }
+
+    /** Requires edit access (OWNER or EDITOR) to the node; returns the node's team id. */
+    public Long requireEditNode(TreeNodeType type, Long id) {
+        Long teamId = teamIdForNode(type, id).orElseThrow(TeamAccessDeniedException::new);
+        requireEditTeam(teamId);
+        return teamId;
+    }
+
+    /** The node a {@code NodeLink} hangs off; empty when the link does not exist. */
+    public Optional<TreeNodeRef> nodeOfLink(Long linkId) {
+        if (linkId == null) {
+            return Optional.empty();
         }
+        return firstNonNull(
+            treeAccessLookupRepository.findNodeIdsOfLink(linkId),
+            TreeNodeType.PRODUCT,
+            TreeNodeType.OUTCOME,
+            TreeNodeType.OPPORTUNITY,
+            TreeNodeType.SOLUTION,
+            TreeNodeType.ASSUMPTION,
+            TreeNodeType.EVIDENCE
+        );
     }
 
-    public void requireOwnerProduct(Long productId) {
-        if (!isProductOwner(productId)) {
-            throw new TeamAccessDeniedException();
+    /** The opportunity an {@code OpenQuestion} belongs to; empty when the question does not exist. */
+    public Optional<TreeNodeRef> nodeOfQuestion(Long questionId) {
+        if (questionId == null) {
+            return Optional.empty();
         }
+        return treeAccessLookupRepository.findOpportunityIdOfQuestion(questionId).map(id -> new TreeNodeRef(TreeNodeType.OPPORTUNITY, id));
     }
 
-    // ---------------------------------------------------------------------
-    // Node-level checks (outcome, opportunity, solution, assumption, experiment)
-    // ---------------------------------------------------------------------
-
-    public boolean canReadOutcome(Long outcomeId) {
-        return teamIdForOutcome(outcomeId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditOutcome(Long outcomeId) {
-        return teamIdForOutcome(outcomeId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isOutcomeOwner(Long outcomeId) {
-        return teamIdForOutcome(outcomeId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadOutcome(Long outcomeId) {
-        if (!canReadOutcome(outcomeId)) {
-            throw new TeamAccessDeniedException();
+    /** The node a {@code Comment} is attached to; empty when the comment does not exist. */
+    public Optional<TreeNodeRef> nodeOfComment(Long commentId) {
+        if (commentId == null) {
+            return Optional.empty();
         }
+        return firstNonNull(
+            treeAccessLookupRepository.findNodeIdsOfComment(commentId),
+            TreeNodeType.OUTCOME,
+            TreeNodeType.OPPORTUNITY,
+            TreeNodeType.SOLUTION,
+            TreeNodeType.ASSUMPTION,
+            TreeNodeType.EVIDENCE
+        );
     }
 
-    public void requireEditOutcome(Long outcomeId) {
-        if (!canEditOutcome(outcomeId)) {
-            throw new TeamAccessDeniedException();
+    /** Requires read access to the link's node; returns that node. */
+    public TreeNodeRef requireReadLink(Long linkId) {
+        return requireReadOn(nodeOfLink(linkId));
+    }
+
+    /** Requires edit access to the link's node; returns that node. */
+    public TreeNodeRef requireEditLink(Long linkId) {
+        return requireEditOn(nodeOfLink(linkId));
+    }
+
+    /** Requires read access to the question's opportunity; returns that node. */
+    public TreeNodeRef requireReadQuestion(Long questionId) {
+        return requireReadOn(nodeOfQuestion(questionId));
+    }
+
+    /** Requires edit access to the question's opportunity; returns that node. */
+    public TreeNodeRef requireEditQuestion(Long questionId) {
+        return requireEditOn(nodeOfQuestion(questionId));
+    }
+
+    /** Requires read access to the comment's node; returns that node. */
+    public TreeNodeRef requireReadComment(Long commentId) {
+        return requireReadOn(nodeOfComment(commentId));
+    }
+
+    /**
+     * Requires edit access (OWNER or EDITOR) to the comment's node; returns that
+     * node. Callers must additionally check that the current user authored the
+     * comment before editing or deleting it.
+     */
+    public TreeNodeRef requireEditComment(Long commentId) {
+        return requireEditOn(nodeOfComment(commentId));
+    }
+
+    private TreeNodeRef requireReadOn(Optional<TreeNodeRef> node) {
+        TreeNodeRef ref = node.orElseThrow(TeamAccessDeniedException::new);
+        requireReadNode(ref.type(), ref.id());
+        return ref;
+    }
+
+    private TreeNodeRef requireEditOn(Optional<TreeNodeRef> node) {
+        TreeNodeRef ref = node.orElseThrow(TeamAccessDeniedException::new);
+        requireEditNode(ref.type(), ref.id());
+        return ref;
+    }
+
+    private static Optional<TreeNodeRef> firstNonNull(List<Object[]> rows, TreeNodeType... columnTypes) {
+        if (rows == null || rows.isEmpty()) {
+            return Optional.empty();
         }
-    }
-
-    public boolean canReadOpportunity(Long opportunityId) {
-        return teamIdForOpportunity(opportunityId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditOpportunity(Long opportunityId) {
-        return teamIdForOpportunity(opportunityId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isOpportunityOwner(Long opportunityId) {
-        return teamIdForOpportunity(opportunityId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadOpportunity(Long opportunityId) {
-        if (!canReadOpportunity(opportunityId)) {
-            throw new TeamAccessDeniedException();
+        Object[] row = rows.get(0);
+        for (int i = 0; i < columnTypes.length && i < row.length; i++) {
+            if (row[i] instanceof Number n) {
+                return Optional.of(new TreeNodeRef(columnTypes[i], n.longValue()));
+            }
         }
-    }
-
-    public void requireEditOpportunity(Long opportunityId) {
-        if (!canEditOpportunity(opportunityId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public boolean canReadSolution(Long solutionId) {
-        return teamIdForSolution(solutionId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditSolution(Long solutionId) {
-        return teamIdForSolution(solutionId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isSolutionOwner(Long solutionId) {
-        return teamIdForSolution(solutionId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadSolution(Long solutionId) {
-        if (!canReadSolution(solutionId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditSolution(Long solutionId) {
-        if (!canEditSolution(solutionId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public boolean canReadAssumption(Long assumptionId) {
-        return teamIdForAssumption(assumptionId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditAssumption(Long assumptionId) {
-        return teamIdForAssumption(assumptionId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isAssumptionOwner(Long assumptionId) {
-        return teamIdForAssumption(assumptionId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadAssumption(Long assumptionId) {
-        if (!canReadAssumption(assumptionId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditAssumption(Long assumptionId) {
-        if (!canEditAssumption(assumptionId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public boolean canReadExperiment(Long experimentId) {
-        return teamIdForExperiment(experimentId).map(this::canReadTeam).orElse(false);
-    }
-
-    public boolean canEditExperiment(Long experimentId) {
-        return teamIdForExperiment(experimentId).map(this::canEditTeam).orElse(false);
-    }
-
-    public boolean isExperimentOwner(Long experimentId) {
-        return teamIdForExperiment(experimentId).map(this::isTeamOwner).orElse(false);
-    }
-
-    public void requireReadExperiment(Long experimentId) {
-        if (!canReadExperiment(experimentId)) {
-            throw new TeamAccessDeniedException();
-        }
-    }
-
-    public void requireEditExperiment(Long experimentId) {
-        if (!canEditExperiment(experimentId)) {
-            throw new TeamAccessDeniedException();
-        }
+        return Optional.empty();
     }
 
     // ---------------------------------------------------------------------
     // Internal helpers
     // ---------------------------------------------------------------------
 
-    private List<TeamMember> currentUserMemberships() {
-        return SecurityUtils.getCurrentUserLogin().map(teamMemberRepository::findAllByUserLogin).orElse(Collections.emptyList());
+    /** The current user's team id + role pairs; one projection query that never loads a Team (see findTeamRolesOfUser). */
+    private List<Membership> currentUserMemberships() {
+        return SecurityUtils.getCurrentUserLogin()
+            .map(treeAccessLookupRepository::findTeamRolesOfUser)
+            .orElse(Collections.emptyList())
+            .stream()
+            .filter(row -> row != null && row.length >= 2 && row[0] instanceof Number && row[1] instanceof TeamRole)
+            .map(row -> new Membership(((Number) row[0]).longValue(), (TeamRole) row[1]))
+            .toList();
     }
 
-    private Optional<Long> teamIdForProduct(Long productId) {
-        if (productId == null) {
-            return Optional.empty();
-        }
-        return productRepository.findById(productId).map(Product::getTeam).map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForOutcome(Long outcomeId) {
-        if (outcomeId == null) {
-            return Optional.empty();
-        }
-        return outcomeRepository
-            .findById(outcomeId)
-            .map(Outcome::getProduct)
-            .flatMap(p -> Optional.ofNullable(p.getTeam()))
-            .map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForOpportunity(Long opportunityId) {
-        if (opportunityId == null) {
-            return Optional.empty();
-        }
-        return opportunityRepository
-            .findById(opportunityId)
-            .map(Opportunity::getOutcome)
-            .map(Outcome::getProduct)
-            .map(Product::getTeam)
-            .map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForSolution(Long solutionId) {
-        if (solutionId == null) {
-            return Optional.empty();
-        }
-        return solutionRepository
-            .findById(solutionId)
-            .map(Solution::getOpportunity)
-            .map(Opportunity::getOutcome)
-            .map(Outcome::getProduct)
-            .map(Product::getTeam)
-            .map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForAssumption(Long assumptionId) {
-        if (assumptionId == null) {
-            return Optional.empty();
-        }
-        return assumptionRepository
-            .findById(assumptionId)
-            .map(Assumption::getSolution)
-            .map(Solution::getOpportunity)
-            .map(Opportunity::getOutcome)
-            .map(Outcome::getProduct)
-            .map(Product::getTeam)
-            .map(Team::getId);
-    }
-
-    private Optional<Long> teamIdForExperiment(Long experimentId) {
-        if (experimentId == null) {
-            return Optional.empty();
-        }
-        return experimentRepository
-            .findById(experimentId)
-            .map(Experiment::getSolution)
-            .map(Solution::getOpportunity)
-            .map(Opportunity::getOutcome)
-            .map(Outcome::getProduct)
-            .map(Product::getTeam)
-            .map(Team::getId);
-    }
+    private record Membership(Long teamId, TeamRole role) {}
 }

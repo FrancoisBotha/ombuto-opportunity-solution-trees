@@ -33,20 +33,20 @@ Java tests.
 
 ## 2. Test directory layout
 
-| What | Where |
-|---|---|
-| Java unit tests (`*Test.java`) | `src/test/java/com/opportunity/tree/**` — mirrors the main package |
-| Java integration tests (`*IT.java`, full Spring context) | same tree, mostly `web/rest/`, `service/`, `security/`, `config/` |
-| Integration-test meta-annotation | `src/test/java/com/opportunity/tree/IntegrationTest.java` (`@IntegrationTest`) |
-| Entity test fixtures | `domain/*TestSamples.java`, `domain/*Asserts.java` |
-| Architecture rules | `src/test/java/com/opportunity/tree/TechnicalStructureTest.java` |
-| Cucumber runner + step defs | `src/test/java/com/opportunity/tree/cucumber/` (`CucumberTest`, `stepdefs/`) |
-| Cucumber feature files | `src/test/resources/com/opportunity/tree/cucumber/*.feature` |
-| Test Spring config | `src/test/resources/config/application.yml`, `application-testdev.yml` (H2), `application-testprod.yml` (Testcontainers PostgreSQL) |
-| JUnit platform settings (timeouts, class order) | `src/test/resources/junit-platform.properties` |
-| Frontend unit tests (`*.spec.ts`) | **co-located** with the source under `src/main/webapp/app/**` |
-| Frontend test setup | `src/main/webapp/app/test-setup.ts` |
-| Playwright E2E | `src/test/javascript/playwright/*.spec.ts`, `auth.setup.ts`, `support/` (excluded from Vitest) |
+| What                                                     | Where                                                                                                                               |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Java unit tests (`*Test.java`)                           | `src/test/java/com/opportunity/tree/**` — mirrors the main package                                                                  |
+| Java integration tests (`*IT.java`, full Spring context) | same tree, mostly `web/rest/`, `service/`, `security/`, `config/`                                                                   |
+| Integration-test meta-annotation                         | `src/test/java/com/opportunity/tree/IntegrationTest.java` (`@IntegrationTest`)                                                      |
+| Entity test fixtures                                     | `domain/*TestSamples.java`, `domain/*Asserts.java`                                                                                  |
+| Architecture rules                                       | `src/test/java/com/opportunity/tree/TechnicalStructureTest.java`                                                                    |
+| Cucumber runner + step defs                              | `src/test/java/com/opportunity/tree/cucumber/` (`CucumberTest`, `stepdefs/`)                                                        |
+| Cucumber feature files                                   | `src/test/resources/com/opportunity/tree/cucumber/*.feature`                                                                        |
+| Test Spring config                                       | `src/test/resources/config/application.yml`, `application-testdev.yml` (H2), `application-testprod.yml` (Testcontainers PostgreSQL) |
+| JUnit platform settings (timeouts, class order)          | `src/test/resources/junit-platform.properties`                                                                                      |
+| Frontend unit tests (`*.spec.ts`)                        | **co-located** with the source under `src/main/webapp/app/**`                                                                       |
+| Frontend test setup                                      | `src/main/webapp/app/test-setup.ts`                                                                                                 |
+| Playwright E2E                                           | `src/test/javascript/playwright/*.spec.ts`, `auth.setup.ts`, `support/` (excluded from Vitest)                                      |
 
 All generated output lands under `target/` (already git-ignored): `surefire-reports/`,
 `failsafe-reports/`, `cucumber-reports/`, `site/jacoco*/`, `test-results/`, `vite-coverage/`,
@@ -134,14 +134,14 @@ Optional, heavier:
 
 ## 5. Lint and type-check commands
 
-| Check | Scoped to files | Whole repo |
-|---|---|---|
-| ESLint (`eslint.config.ts`) | `npx eslint <files>` | `npm run lint` (`lint:fix` to auto-fix) |
-| Prettier (`.prettierrc`, `.prettierignore`) — covers `.java`, `.ts`, `.vue`, `.json`, `.yml`, `.md`, `.scss`, `.html` | `npx prettier --check <files>` / `--write <files>` | `npm run prettier:check` / `npm run prettier:format` |
-| Java compile (type check) | not file-scopable | `./mvnw -ntp --batch-mode -Dskip.installnodenpm -Dskip.npm test-compile` |
-| Checkstyle nohttp (`checkstyle.xml`) | not file-scopable | `npm run backend:nohttp:test` (= `./mvnw -ntp checkstyle:check`) |
-| Javadoc validity | not file-scopable | `npm run backend:doc:test` |
-| Frontend type check | none — `vue-tsc` not installed | none |
+| Check                                                                                                                 | Scoped to files                                    | Whole repo                                                               |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------ |
+| ESLint (`eslint.config.ts`)                                                                                           | `npx eslint <files>`                               | `npm run lint` (`lint:fix` to auto-fix)                                  |
+| Prettier (`.prettierrc`, `.prettierignore`) — covers `.java`, `.ts`, `.vue`, `.json`, `.yml`, `.md`, `.scss`, `.html` | `npx prettier --check <files>` / `--write <files>` | `npm run prettier:check` / `npm run prettier:format`                     |
+| Java compile (type check)                                                                                             | not file-scopable                                  | `./mvnw -ntp --batch-mode -Dskip.installnodenpm -Dskip.npm test-compile` |
+| Checkstyle nohttp (`checkstyle.xml`)                                                                                  | not file-scopable                                  | `npm run backend:nohttp:test` (= `./mvnw -ntp checkstyle:check`)         |
+| Javadoc validity                                                                                                      | not file-scopable                                  | `npm run backend:doc:test`                                               |
+| Frontend type check                                                                                                   | none — `vue-tsc` not installed                     | none                                                                     |
 
 husky's pre-commit hook runs `lint-staged` → `prettier --write` on staged files
 (`.lintstagedrc.cjs`), so a commit may reformat what was staged.
@@ -218,12 +218,12 @@ for custom behaviour go in separate classes/specs so regeneration does not clobb
 ## 9. Known pitfalls on this project
 
 - **Node 25+ breaks Vitest specs that touch `localStorage`** (`TypeError: localStorage.clear is
-  not a function`). Node's built-in Web Storage global shadows happy-dom's. Run Vitest with
+not a function`). Node's built-in Web Storage global shadows happy-dom's. Run Vitest with
   `NODE_OPTIONS=--no-experimental-webstorage` (verified fix), or use Node 24 LTS. In PowerShell:
   `$env:NODE_OPTIONS='--no-experimental-webstorage'; npx vitest run <file>`.
 - **Vue service injection: `inject('xService', () => new XService())` — no third argument.**
   Components call it as `xService().method()`. Adding `true` (treat default as factory) makes the
-  default an *instance*, so `xService()` throws `TypeError` in the real app — which the component's
+  default an _instance_, so `xService()` throws `TypeError` in the real app — which the component's
   `catch` reports as a misleading "Server not reachable" toast with no request ever sent. Unit
   specs cannot catch this because they `provide` a function stub and never use the default; only
   a Playwright run does. It broke every Teams and Trees page once (fixed 2026-09-19). `alertService`
@@ -238,7 +238,7 @@ for custom behaviour go in separate classes/specs so regeneration does not clobb
   files fixes those files; do not mass-reformat the repo inside a ticket.
 - **Avoid SQL reserved words as field/column names** (`value`, `order`, `key`, `user`, `rank`, …).
   PostgreSQL tolerates several that H2 rejects (`Syntax error in SQL statement … expected
-  "identifier"`), so the failure only shows on the H2 (`testdev`) run and takes out every IT that
+"identifier"`), so the failure only shows on the H2 (`testdev`) run and takes out every IT that
   joins the table. This happened with `Opportunity.value`, renamed to `valuerating` on 2026-09-18.
   Baseline after the rename: H2 → 124 + 445 tests green; `-Pprod` → 126 + 445 green.
 - **`./mvnw test` does not run `*IT` classes.** A green `test` says nothing about REST/resource
@@ -277,20 +277,104 @@ for custom behaviour go in separate classes/specs so regeneration does not clobb
   errors there under the default profile are expected.
 - **Maven first run downloads the world.** Offline or cold caches: `npm run backend:build-cache` first.
 
+## 9a. Tree Builder (OST) tests
+
+**Layout**
+
+| What                                                               | Where                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pure domain logic (layout, rules, mapping, derive)                 | `src/main/webapp/app/ost/domain/*.spec.ts`                                                                                                                                                                                                                                                                                    |
+| Stores (optimistic patch sequencing, rollback, create/move/delete) | `src/main/webapp/app/ost/stores/*.spec.ts`                                                                                                                                                                                                                                                                                    |
+| Components (canvas, panel, tabs, chat, pages, shell)               | co-located `*.spec.ts` under `app/ost/**`. Shared fixtures are in `*.test-util.ts` (`domain/fixtures`, `panel/panel`, `chat/chat`), which Vitest does not collect.                                                                                                                                                            |
+| Guards                                                             | `app/ost/vite-optimize-deps.spec.ts` (keeps the Vite pre-bundle list in step with OST imports), `touch-targets.spec.ts`, `icon-weights.spec.ts`                                                                                                                                                                               |
+| Backend tree ITs                                                   | `src/test/java/.../web/rest/Tree*IT.java`, `TeamTreeResourceIT`, `TreeStructureLockIT`, `TreeConcurrencyIT`, `TreeDeleteRaceIT`, `TeamDeletedMidRequestIT`. Shared fixtures are `OstTreeTestData` and `TreeCollaborationFixture`.                                                                                             |
+| Playwright                                                         | `src/test/javascript/playwright/ost-*.spec.ts`: one spec per feature (shell, canvas view/edit, panel, collaboration tabs, node detail, dashboard/experiments, seed), `ost-journey.spec.ts` (the whole flow as an editor, then a viewer) and `ost-perf.spec.ts` (300-node smoke, numbers in `target/playwright/ost-perf.json`) |
+
+**Playwright conventions for OST specs**
+
+- Each spec builds its own throwaway team through the API. `user` or `admin`
+  owns it and the other joins as EDITOR or VIEWER (`support/session.ts`
+  `openSession` gives each user their own browser context). Only
+  `ost-seed.spec.ts` and read-only looks may use the seeded teams. Never modify
+  them.
+- Register every throwaway team with `registerTeamForCleanup(teamId)`
+  (`support/cleanup.ts`). The `cleanup` teardown project
+  (`cleanup.teardown.ts`, the `teardown` of `setup` in `playwright.config.ts`)
+  deletes their products, then the teams, once all specs have finished. Do not
+  delete a team in `afterAll`: other workers may still be using it. Deleting a
+  spec's own products in `afterAll` is fine.
+- Fail on every `pageerror` and `console.error`. Filter only lines that are
+  expected, such as the browser's "status of 403" log in viewer tests.
+- No fixed sleeps. Wait for the request (`page.waitForResponse`) or for the
+  layout to settle (poll the node transforms), and use web-first assertions.
+- `request.newContext()` inside the `chromium` project inherits the signed-in
+  state. Anonymous checks belong in `anonymous.spec.ts`, or use a plain `fetch`.
+
+**Running Playwright from a git worktree** (a parallel agent must not disturb the
+main checkout's Vite on :9000):
+
+1. Link `node_modules` to the main checkout as a junction. Never run
+   `npm install` / `ci` / `prune` inside the worktree.
+2. Start a Vite of the worktree on another port through an **uncommitted**
+   wrapper config under `target/`. Plain `npx vite` in a worktree answers 403 for
+   the `@fontsource/inter` files, because the junction's target is outside
+   Vite's `server.fs.allow`:
+
+   ```ts
+   // target/vite.wt.config.mts — never commit
+   import { mergeConfig } from 'vite';
+   import base from '../vite.config';
+   export default mergeConfig(base, {
+     server: { port: 9012, strictPort: true, fs: { allow: ['<worktree>', 'C:/dev/build/ombuto-opportunity-solution-tree/node_modules'] } },
+   });
+   ```
+
+   `npx vite --config target/vite.wt.config.mts`, then
+   `E2E_BASE_URL=http://localhost:9012 npx playwright test <spec>`. It uses the
+   shared backend on :8080. Stop that Vite by its port afterwards.
+
+3. Removing the worktree: delete the junction first with PowerShell
+   `[System.IO.Directory]::Delete('<wt>\node_modules', $false)`. That call is
+   non-recursive, so only the link goes, not the main checkout's modules. Then run
+   `git worktree remove --force <wt>`. Never use `rmdir /s` on a worktree that
+   still has the junction (a safety hook blocks it anyway).
+
+4. Two Maven builds must not share one `target/`. Each worktree has its own, so
+   run the backend ITs from the worktree, not from the main checkout.
+
+- After a change to `vite.config.ts` `optimizeDeps`, restart the running Vite
+  once.
+
+**Concurrency ITs.** Tests of real concurrency between requests are annotated
+`@ConcurrentConnections` (an 8-connection Hikari pool; `testprod` otherwise
+caps the pool at 1, which serialises the "concurrent" requests and lets the
+test pass without any locking). Such a test also calls
+`ConcurrentConnections.Guard.assertRealConcurrency(dataSource)`. To hit an exact
+interleaving, `StatementTrap`, a test-only Hibernate `StatementInspector`, runs
+an action right after a given SQL statement of the armed thread. The classes
+that use it register it through
+`spring.jpa.properties.hibernate.session_factory.statement_inspector`.
+
+**Error details in dev.** In the `dev` profile, some non-database exceptions
+(Jackson parse errors, type mismatches) still echo Java class names in the
+problem `detail`. That is the generator's default, masked in `prod`. Do not
+assert on it in Playwright against a dev backend. Database errors never carry
+SQL (`ExceptionTranslatorIT`).
+
 ## 10. Phase gates — what each agent runs
 
 ### Build phase (in_progress) — MUST run before finishing, CHANGED FILES ONLY
 
-- Formatter (write):  `npx prettier --write <changed files>` — handles `.java`, `.ts`, `.vue`, `.json`, `.yml`, `.md`, `.scss`, `.html`
-- Linter / vet:       frontend → `npx eslint <changed .ts/.vue files>`; backend → none — Checkstyle here only checks for `http://` URLs and cannot be file-scoped (left to the test phase)
+- Formatter (write): `npx prettier --write <changed files>` — handles `.java`, `.ts`, `.vue`, `.json`, `.yml`, `.md`, `.scss`, `.html`
+- Linter / vet: frontend → `npx eslint <changed .ts/.vue files>`; backend → none — Checkstyle here only checks for `http://` URLs and cannot be file-scoped (left to the test phase)
 - Type / compile check: backend → implicit: the section 3 Maven command compiles main + test sources first, a compile error fails it; frontend → none — `vue-tsc` not installed
 - Tests written for this ticket: section 3 — `-Dtest=<Class>` for `*Test`, the `verify … -Dit.test=<Class>` form for `*IT`, `npx vitest run <spec>` for frontend
 
 ### Build phase — MUST NOT run (too slow, or owned by a later phase)
 
-- Full test suite:    `npm run backend:unit:test -- -Pprod`, `npm test`
-- Repo-wide lint:     `npm run lint`, `npm run prettier:check`, `npm run backend:nohttp:test`, `npm run backend:doc:test`
-- Integration / E2E:  `npm run e2e` (Playwright), anything with `-Pprod` (Testcontainers), `CucumberTest`
+- Full test suite: `npm run backend:unit:test -- -Pprod`, `npm test`
+- Repo-wide lint: `npm run lint`, `npm run prettier:check`, `npm run backend:nohttp:test`, `npm run backend:doc:test`
+- Integration / E2E: `npm run e2e` (Playwright), anything with `-Pprod` (Testcontainers), `CucumberTest`
 - Production build / packaging: `npm run build`, `npm run java:jar:prod`, `npm run java:docker`
 
 ### Test phase — runs regardless

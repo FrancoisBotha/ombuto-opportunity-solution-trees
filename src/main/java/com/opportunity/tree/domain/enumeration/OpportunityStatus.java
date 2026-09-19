@@ -4,11 +4,8 @@ package com.opportunity.tree.domain.enumeration;
  * The OpportunityStatus enumeration.
  */
 public enum OpportunityStatus {
-    IDENTIFIED,
+    UNEXPLORED,
     EXPLORING,
-    PRIORITISED,
-    IN_PROGRESS,
-    ADDRESSED,
+    VALIDATED,
     PARKED,
-    DISCARDED,
 }

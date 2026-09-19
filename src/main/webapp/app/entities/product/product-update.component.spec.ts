@@ -87,6 +87,21 @@ describe('Component Tests', () => {
       });
     });
 
+    describe('sort order (server-owned)', () => {
+      it('is read-only with a hint and not required', () => {
+        const wrapper = shallowMount(ProductUpdate, { global: mountOptions });
+        const field = wrapper.get('[data-cy="sortOrder"]');
+        expect(field.attributes('readonly')).toBeDefined();
+        expect(field.attributes('required')).toBeUndefined();
+        const help = wrapper.get('[data-cy="sortOrderHelp"]').text();
+        expect(help).toContain('Set automatically by the server');
+        expect(help).toContain('new products are added at the end');
+        // Products cannot be reordered on the canvas; the hint must not promise it.
+        expect(help).not.toMatch(/reorder|canvas/i);
+        expect((wrapper.vm as any).v$.sortOrder.required).toBeUndefined();
+      });
+    });
+
     describe('save', () => {
       it('Should call update service on save for existing entity', async () => {
         // GIVEN

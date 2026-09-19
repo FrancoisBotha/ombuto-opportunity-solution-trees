@@ -114,11 +114,11 @@ export default defineComponent({
         min: validations.minValue('This field should be at least 1.', 1),
         max: validations.maxValue('This field cannot be more than 5.', 5),
       },
-      complexity: {
+      priority: {
         required: validations.required('This field is required.'),
         integer: validations.integer('This field should be a number.'),
         min: validations.minValue('This field should be at least 1.', 1),
-        max: validations.maxValue('This field cannot be more than 5.', 5),
+        max: validations.maxValue('This field cannot be more than 100.', 100),
       },
       sortOrder: {
         required: validations.required('This field is required.'),

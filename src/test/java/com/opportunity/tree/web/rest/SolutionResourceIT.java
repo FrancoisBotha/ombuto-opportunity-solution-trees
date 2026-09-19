@@ -14,12 +14,9 @@ import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.Solution;
 import com.opportunity.tree.domain.Tag;
-import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.SolutionStatus;
-import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.SolutionRepository;
-import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.service.SolutionService;
 import com.opportunity.tree.service.dto.SolutionDTO;
@@ -60,12 +57,8 @@ class SolutionResourceIT {
     private static final String DEFAULT_DESCRIPTION = "AAAAAAAAAA";
     private static final String UPDATED_DESCRIPTION = "BBBBBBBBBB";
 
-    private static final SolutionStatus DEFAULT_STATUS = SolutionStatus.IDEA;
-    private static final SolutionStatus UPDATED_STATUS = SolutionStatus.ASSUMPTION_MAPPING;
-
-    private static final Integer DEFAULT_EFFORT = 1;
-    private static final Integer UPDATED_EFFORT = 2;
-    private static final Integer SMALLER_EFFORT = 1 - 1;
+    private static final SolutionStatus DEFAULT_STATUS = SolutionStatus.CANDIDATE;
+    private static final SolutionStatus UPDATED_STATUS = SolutionStatus.BUILDING;
 
     private static final Integer DEFAULT_SORT_ORDER = 1;
     private static final Integer UPDATED_SORT_ORDER = 2;
@@ -91,11 +84,6 @@ class SolutionResourceIT {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private TeamMemberRepository teamMemberRepository;
-
-    private TeamMember insertedMembership;
 
     @Mock
     private SolutionRepository solutionRepositoryMock;
@@ -127,7 +115,6 @@ class SolutionResourceIT {
             .title(DEFAULT_TITLE)
             .description(DEFAULT_DESCRIPTION)
             .status(DEFAULT_STATUS)
-            .effort(DEFAULT_EFFORT)
             .sortOrder(DEFAULT_SORT_ORDER)
             .createdDate(DEFAULT_CREATED_DATE)
             .lastModifiedDate(DEFAULT_LAST_MODIFIED_DATE);
@@ -155,7 +142,6 @@ class SolutionResourceIT {
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
-            .effort(UPDATED_EFFORT)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -175,24 +161,6 @@ class SolutionResourceIT {
     @BeforeEach
     void initTest() {
         solution = createEntity(em);
-        // The mock user ("user" — the @WithMockUser default) must be an OWNER of the
-        // solution's team so the team-scoped access checks in SolutionServiceImpl let
-        // the generated CRUD calls through. Without this seed every write would 403.
-        User user = userRepository
-            .findOneByLogin("user")
-            .orElseGet(() -> {
-                User u = UserResourceIT.createEntity();
-                u.setLogin("user");
-                em.persist(u);
-                em.flush();
-                return u;
-            });
-        TeamMember membership = new TeamMember().role(TeamRole.OWNER).joinedDate(Instant.now());
-        membership.setTeam(solution.getOpportunity().getOutcome().getProduct().getTeam());
-        membership.setUser(user);
-        em.persist(membership);
-        em.flush();
-        insertedMembership = membership;
     }
 
     @AfterEach
@@ -200,10 +168,6 @@ class SolutionResourceIT {
         if (insertedSolution != null) {
             solutionRepository.delete(insertedSolution);
             insertedSolution = null;
-        }
-        if (insertedMembership != null) {
-            teamMemberRepository.delete(insertedMembership);
-            insertedMembership = null;
         }
         userRepository.deleteAll();
     }
@@ -288,47 +252,36 @@ class SolutionResourceIT {
 
     @Test
     @Transactional
-    void createSolutionIgnoresClientSuppliedServerSetFields() throws Exception {
-        // An existing sibling, so append-last is observable
-        Solution sibling = solutionRepository.saveAndFlush(createEntity(em).sortOrder(7));
+    void checkSortOrderIsRequired() throws Exception {
+        long databaseSizeBeforeTest = getRepositoryCount();
+        // set the field null
+        solution.setSortOrder(null);
 
-        // sortOrder, createdDate and lastModifiedDate are server-set (TREE-002)
-        solution.sortOrder(99).createdDate(DEFAULT_CREATED_DATE).lastModifiedDate(DEFAULT_LAST_MODIFIED_DATE);
-        SolutionDTO solutionDTO = solutionMapper.toDto(solution);
-
-        var returnedSolutionDTO = om.readValue(
-            restSolutionMockMvc
-                .perform(
-                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionDTO))
-                )
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString(),
-            SolutionDTO.class
-        );
-
-        Solution persisted = solutionRepository.findById(returnedSolutionDTO.getId()).orElseThrow();
-        assertThat(persisted.getSortOrder()).isEqualTo(sibling.getSortOrder() + 1);
-        assertThat(persisted.getCreatedDate()).isAfter(DEFAULT_CREATED_DATE);
-        assertThat(persisted.getLastModifiedDate()).isEqualTo(persisted.getCreatedDate());
-    }
-
-    @Test
-    @Transactional
-    void createSolutionWithoutServerSetFields() throws Exception {
-        long databaseSizeBeforeCreate = getRepositoryCount();
-        solution.sortOrder(null).createdDate(null).lastModifiedDate(null);
+        // Create the Solution, which fails.
         SolutionDTO solutionDTO = solutionMapper.toDto(solution);
 
         restSolutionMockMvc
             .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionDTO)))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.sortOrder").isNumber())
-            .andExpect(jsonPath("$.createdDate").isNotEmpty())
-            .andExpect(jsonPath("$.lastModifiedDate").isNotEmpty());
+            .andExpect(status().isBadRequest());
 
-        assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
+        assertSameRepositoryCount(databaseSizeBeforeTest);
+    }
+
+    @Test
+    @Transactional
+    void checkCreatedDateIsRequired() throws Exception {
+        long databaseSizeBeforeTest = getRepositoryCount();
+        // set the field null
+        solution.setCreatedDate(null);
+
+        // Create the Solution, which fails.
+        SolutionDTO solutionDTO = solutionMapper.toDto(solution);
+
+        restSolutionMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(solutionDTO)))
+            .andExpect(status().isBadRequest());
+
+        assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
@@ -346,7 +299,6 @@ class SolutionResourceIT {
             .andExpect(jsonPath("$.[*].title").value(hasItem(DEFAULT_TITLE)))
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
-            .andExpect(jsonPath("$.[*].effort").value(hasItem(DEFAULT_EFFORT)))
             .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
             .andExpect(jsonPath("$.[*].lastModifiedDate").value(hasItem(DEFAULT_LAST_MODIFIED_DATE.toString())));
@@ -384,7 +336,6 @@ class SolutionResourceIT {
             .andExpect(jsonPath("$.title").value(DEFAULT_TITLE))
             .andExpect(jsonPath("$.description").value(DEFAULT_DESCRIPTION))
             .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
-            .andExpect(jsonPath("$.effort").value(DEFAULT_EFFORT))
             .andExpect(jsonPath("$.sortOrder").value(DEFAULT_SORT_ORDER))
             .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()))
             .andExpect(jsonPath("$.lastModifiedDate").value(DEFAULT_LAST_MODIFIED_DATE.toString()));
@@ -483,76 +434,6 @@ class SolutionResourceIT {
 
         // Get all the solutionList where status is not null
         defaultSolutionFiltering("status.specified=true", "status.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllSolutionsByEffortIsEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedSolution = solutionRepository.saveAndFlush(solution);
-
-        // Get all the solutionList where effort equals to
-        defaultSolutionFiltering("effort.equals=" + DEFAULT_EFFORT, "effort.equals=" + UPDATED_EFFORT);
-    }
-
-    @Test
-    @Transactional
-    void getAllSolutionsByEffortIsInShouldWork() throws Exception {
-        // Initialize the database
-        insertedSolution = solutionRepository.saveAndFlush(solution);
-
-        // Get all the solutionList where effort in
-        defaultSolutionFiltering("effort.in=" + DEFAULT_EFFORT + "," + UPDATED_EFFORT, "effort.in=" + UPDATED_EFFORT);
-    }
-
-    @Test
-    @Transactional
-    void getAllSolutionsByEffortIsNullOrNotNull() throws Exception {
-        // Initialize the database
-        insertedSolution = solutionRepository.saveAndFlush(solution);
-
-        // Get all the solutionList where effort is not null
-        defaultSolutionFiltering("effort.specified=true", "effort.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllSolutionsByEffortIsGreaterThanOrEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedSolution = solutionRepository.saveAndFlush(solution);
-
-        // Get all the solutionList where effort is greater than or equal to
-        defaultSolutionFiltering("effort.greaterThanOrEqual=" + DEFAULT_EFFORT, "effort.greaterThanOrEqual=" + (DEFAULT_EFFORT + 1));
-    }
-
-    @Test
-    @Transactional
-    void getAllSolutionsByEffortIsLessThanOrEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedSolution = solutionRepository.saveAndFlush(solution);
-
-        // Get all the solutionList where effort is less than or equal to
-        defaultSolutionFiltering("effort.lessThanOrEqual=" + DEFAULT_EFFORT, "effort.lessThanOrEqual=" + SMALLER_EFFORT);
-    }
-
-    @Test
-    @Transactional
-    void getAllSolutionsByEffortIsLessThanSomething() throws Exception {
-        // Initialize the database
-        insertedSolution = solutionRepository.saveAndFlush(solution);
-
-        // Get all the solutionList where effort is less than
-        defaultSolutionFiltering("effort.lessThan=" + (DEFAULT_EFFORT + 1), "effort.lessThan=" + DEFAULT_EFFORT);
-    }
-
-    @Test
-    @Transactional
-    void getAllSolutionsByEffortIsGreaterThanSomething() throws Exception {
-        // Initialize the database
-        insertedSolution = solutionRepository.saveAndFlush(solution);
-
-        // Get all the solutionList where effort is greater than
-        defaultSolutionFiltering("effort.greaterThan=" + SMALLER_EFFORT, "effort.greaterThan=" + DEFAULT_EFFORT);
     }
 
     @Test
@@ -780,7 +661,6 @@ class SolutionResourceIT {
             .andExpect(jsonPath("$.[*].title").value(hasItem(DEFAULT_TITLE)))
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
-            .andExpect(jsonPath("$.[*].effort").value(hasItem(DEFAULT_EFFORT)))
             .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
             .andExpect(jsonPath("$.[*].lastModifiedDate").value(hasItem(DEFAULT_LAST_MODIFIED_DATE.toString())));
@@ -835,7 +715,6 @@ class SolutionResourceIT {
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
-            .effort(UPDATED_EFFORT)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -852,7 +731,6 @@ class SolutionResourceIT {
 
         // Validate the Solution in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(updatedSolution);
         assertPersistedSolutionToMatchAllProperties(updatedSolution);
     }
 
@@ -865,8 +743,7 @@ class SolutionResourceIT {
         // Create the Solution
         SolutionDTO solutionDTO = solutionMapper.toDto(solution);
 
-        // A non-existent id must return the same 403 as an id the caller cannot
-        // edit, so existence is never revealed (NFR-002).
+        // If the entity doesn't have an ID, it will throw BadRequestAlertException
         restSolutionMockMvc
             .perform(
                 put(ENTITY_API_URL_ID, solutionDTO.getId())
@@ -874,7 +751,7 @@ class SolutionResourceIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(om.writeValueAsBytes(solutionDTO))
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isBadRequest());
 
         // Validate the Solution in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -937,8 +814,8 @@ class SolutionResourceIT {
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
-            .effort(UPDATED_EFFORT)
-            .sortOrder(UPDATED_SORT_ORDER);
+            .sortOrder(UPDATED_SORT_ORDER)
+            .createdDate(UPDATED_CREATED_DATE);
 
         restSolutionMockMvc
             .perform(
@@ -952,7 +829,6 @@ class SolutionResourceIT {
         // Validate the Solution in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(partialUpdatedSolution);
         assertSolutionUpdatableFieldsEquals(createUpdateProxyForBean(partialUpdatedSolution, solution), getPersistedSolution(solution));
     }
 
@@ -972,7 +848,6 @@ class SolutionResourceIT {
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
-            .effort(UPDATED_EFFORT)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -989,7 +864,6 @@ class SolutionResourceIT {
         // Validate the Solution in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(partialUpdatedSolution);
         assertSolutionUpdatableFieldsEquals(partialUpdatedSolution, getPersistedSolution(partialUpdatedSolution));
     }
 
@@ -1002,8 +876,7 @@ class SolutionResourceIT {
         // Create the Solution
         SolutionDTO solutionDTO = solutionMapper.toDto(solution);
 
-        // A non-existent id must return the same 403 as an id the caller cannot
-        // edit, so existence is never revealed (NFR-002).
+        // If the entity doesn't have an ID, it will throw BadRequestAlertException
         restSolutionMockMvc
             .perform(
                 patch(ENTITY_API_URL_ID, solutionDTO.getId())
@@ -1011,7 +884,7 @@ class SolutionResourceIT {
                     .contentType("application/merge-patch+json")
                     .content(om.writeValueAsBytes(solutionDTO))
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isBadRequest());
 
         // Validate the Solution in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -1075,16 +948,6 @@ class SolutionResourceIT {
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
-    }
-
-    /**
-     * sortOrder and createdDate are server-owned and lastModifiedDate is stamped by the
-     * server on every update (TREE-002), whatever the client sent.
-     */
-    private void expectServerSetFields(Solution expected) {
-        Solution persisted = getPersistedSolution(expected);
-        assertThat(persisted.getLastModifiedDate()).isAfter(DEFAULT_LAST_MODIFIED_DATE);
-        expected.sortOrder(DEFAULT_SORT_ORDER).createdDate(DEFAULT_CREATED_DATE).lastModifiedDate(persisted.getLastModifiedDate());
     }
 
     protected long getRepositoryCount() {

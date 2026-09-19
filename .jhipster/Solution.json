@@ -20,14 +20,7 @@
       "fieldName": "status",
       "fieldType": "SolutionStatus",
       "fieldValidateRules": ["required"],
-      "fieldValues": "IDEA,ASSUMPTION_MAPPING,TESTING,VALIDATED,INVALIDATED,SHIPPED,DROPPED"
-    },
-    {
-      "fieldName": "effort",
-      "fieldType": "Integer",
-      "fieldValidateRules": ["min", "max"],
-      "fieldValidateRulesMax": "5",
-      "fieldValidateRulesMin": "1"
+      "fieldValues": "CANDIDATE,BUILDING,SHIPPED,DROPPED"
     },
     {
       "fieldName": "sortOrder",

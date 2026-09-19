@@ -1,7 +1,9 @@
 package com.opportunity.tree.domain;
 
+import static com.opportunity.tree.domain.AssumptionTestSamples.*;
 import static com.opportunity.tree.domain.CommentTestSamples.*;
 import static com.opportunity.tree.domain.CommentTestSamples.*;
+import static com.opportunity.tree.domain.EvidenceTestSamples.*;
 import static com.opportunity.tree.domain.OpportunityTestSamples.*;
 import static com.opportunity.tree.domain.OutcomeTestSamples.*;
 import static com.opportunity.tree.domain.SolutionTestSamples.*;
@@ -72,5 +74,29 @@ class CommentTest {
 
         comment.solution(null);
         assertThat(comment.getSolution()).isNull();
+    }
+
+    @Test
+    void assumptionTest() {
+        Comment comment = getCommentRandomSampleGenerator();
+        Assumption assumptionBack = getAssumptionRandomSampleGenerator();
+
+        comment.setAssumption(assumptionBack);
+        assertThat(comment.getAssumption()).isEqualTo(assumptionBack);
+
+        comment.assumption(null);
+        assertThat(comment.getAssumption()).isNull();
+    }
+
+    @Test
+    void evidenceTest() {
+        Comment comment = getCommentRandomSampleGenerator();
+        Evidence evidenceBack = getEvidenceRandomSampleGenerator();
+
+        comment.setEvidence(evidenceBack);
+        assertThat(comment.getEvidence()).isEqualTo(evidenceBack);
+
+        comment.evidence(null);
+        assertThat(comment.getEvidence()).isNull();
     }
 }

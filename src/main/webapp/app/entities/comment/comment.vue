@@ -61,6 +61,14 @@
               <span>Solution</span>
               <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'solution.title'"></jhi-sort-indicator>
             </th>
+            <th scope="col" @click="changeOrder('assumption.statement')">
+              <span>Assumption</span>
+              <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'assumption.statement'"></jhi-sort-indicator>
+            </th>
+            <th scope="col" @click="changeOrder('evidence.title')">
+              <span>Evidence</span>
+              <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'evidence.title'"></jhi-sort-indicator>
+            </th>
             <th scope="col"></th>
           </tr>
         </thead>
@@ -98,6 +106,20 @@
               <div v-if="comment.solution">
                 <router-link :to="{ name: 'SolutionView', params: { solutionId: comment.solution.id } }">{{
                   comment.solution.title
+                }}</router-link>
+              </div>
+            </td>
+            <td>
+              <div v-if="comment.assumption">
+                <router-link :to="{ name: 'AssumptionView', params: { assumptionId: comment.assumption.id } }">{{
+                  comment.assumption.statement
+                }}</router-link>
+              </div>
+            </td>
+            <td>
+              <div v-if="comment.evidence">
+                <router-link :to="{ name: 'EvidenceView', params: { evidenceId: comment.evidence.id } }">{{
+                  comment.evidence.title
                 }}</router-link>
               </div>
             </td>

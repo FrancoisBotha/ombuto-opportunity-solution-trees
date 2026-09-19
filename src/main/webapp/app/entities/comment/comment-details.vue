@@ -66,6 +66,26 @@
               }}</router-link>
             </div>
           </dd>
+          <dt>
+            <span>Assumption</span>
+          </dt>
+          <dd>
+            <div v-if="comment.assumption">
+              <router-link :to="{ name: 'AssumptionView', params: { assumptionId: comment.assumption.id } }">{{
+                comment.assumption.statement
+              }}</router-link>
+            </div>
+          </dd>
+          <dt>
+            <span>Evidence</span>
+          </dt>
+          <dd>
+            <div v-if="comment.evidence">
+              <router-link :to="{ name: 'EvidenceView', params: { evidenceId: comment.evidence.id } }">{{
+                comment.evidence.title
+              }}</router-link>
+            </div>
+          </dd>
         </dl>
         <button type="submit" @click.prevent="previousState()" class="btn btn-info" data-cy="entityDetailsBackButton">
           <font-awesome-icon icon="arrow-left"></font-awesome-icon>&nbsp;<span>Back</span>

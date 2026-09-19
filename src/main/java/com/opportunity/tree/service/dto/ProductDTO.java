@@ -27,6 +27,8 @@ public class ProductDTO implements Serializable {
     @NotNull
     private Boolean archived;
 
+    private Integer sortOrder;
+
     private Instant createdDate;
 
     @NotNull
@@ -70,6 +72,14 @@ public class ProductDTO implements Serializable {
 
     public void setArchived(Boolean archived) {
         this.archived = archived;
+    }
+
+    public Integer getSortOrder() {
+        return sortOrder;
+    }
+
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
     }
 
     public Instant getCreatedDate() {
@@ -118,6 +128,7 @@ public class ProductDTO implements Serializable {
             ", description='" + getDescription() + "'" +
             ", vision='" + getVision() + "'" +
             ", archived='" + getArchived() + "'" +
+            ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
             ", team=" + getTeam() +
             "}";

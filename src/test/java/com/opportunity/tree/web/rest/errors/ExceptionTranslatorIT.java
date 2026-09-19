@@ -1,5 +1,7 @@
 package com.opportunity.tree.web.rest.errors;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,6 +35,97 @@ class ExceptionTranslatorIT {
             .andExpect(status().isConflict())
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.message").value(ErrorConstants.ERR_CONCURRENCY_FAILURE));
+    }
+
+    @Test
+    void dataIntegrityViolationIsAConflictWithoutSql() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/data-integrity").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.message").value("error.dataintegrity"))
+            .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DATA_INTEGRITY_DETAIL))
+            .andExpect(content().string(not(containsString("delete from"))))
+            .andExpect(content().string(not(containsString("foreign key"))));
+    }
+
+    @Test
+    void untranslatedConstraintViolationsAreAConflictWithoutSql() throws Exception {
+        for (String path : new String[] { "hibernate-constraint-violation", "constraint-violation-at-commit" }) {
+            mockMvc
+                .perform(get("/api/exception-translator-test/" + path).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.message").value("error.dataintegrity"))
+                .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DATA_INTEGRITY_DETAIL))
+                .andExpect(content().string(not(containsString("delete from"))))
+                .andExpect(content().string(not(containsString("foreign key"))))
+                .andExpect(content().string(not(containsString("fk_comment"))));
+        }
+    }
+
+    @Test
+    void uniqueViolationsAreAConflictWithTheirOwnGenericMessage() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/unique-violation").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value(ExceptionTranslator.ERR_DUPLICATE))
+            .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DUPLICATE_DETAIL))
+            .andExpect(content().string(not(containsString("ux_team_member"))))
+            .andExpect(content().string(not(containsString("insert into"))))
+            .andExpect(content().string(not(containsString("referenced"))));
+    }
+
+    @Test
+    void otherDatabaseErrorsNeverReturnTheirSqlAsDetail() throws Exception {
+        for (String path : new String[] { "jdbc-error", "sql-exception" }) {
+            mockMvc
+                .perform(get("/api/exception-translator-test/" + path).with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DATA_ACCESS_DETAIL))
+                .andExpect(content().string(not(containsString("secret"))))
+                .andExpect(content().string(not(containsString("select"))));
+        }
+    }
+
+    @Test
+    void errorResponsesNeverPutJavaToStringInTheDetail() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/bad-request-alert").with(csrf()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("error.cycle"))
+            .andExpect(jsonPath("$.detail").value("A node cannot move under its own descendant"))
+            .andExpect(content().string(not(containsString("ProblemDetailWithCause"))))
+            .andExpect(content().string(not(containsString("BAD_REQUEST"))));
+        mockMvc
+            .perform(get("/api/exception-translator-test/response-status-without-reason").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(content().string(not(containsString("409 CONFLICT"))))
+            .andExpect(content().string(not(containsString("ProblemDetail"))));
+    }
+
+    @Test
+    void responseStatusReasonIsTheCleanDetail() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/response-status-with-reason").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.detail").value("The team was changed meanwhile"))
+            .andExpect(content().string(not(containsString("409 CONFLICT"))))
+            .andExpect(content().string(not(containsString("ResponseStatusException"))))
+            .andExpect(content().string(not(containsString("ProblemDetail"))));
+    }
+
+    @Test
+    void lockFailuresAreAConflictWithoutSql() throws Exception {
+        for (String path : new String[] { "cannot-acquire-lock", "jpa-pessimistic-lock" }) {
+            mockMvc
+                .perform(get("/api/exception-translator-test/" + path).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(ErrorConstants.ERR_CONCURRENCY_FAILURE))
+                .andExpect(jsonPath("$.detail").value(ExceptionTranslator.CONCURRENCY_DETAIL))
+                .andExpect(content().string(not(containsString("delete from"))));
+        }
     }
 
     @Test
@@ -95,7 +188,8 @@ class ExceptionTranslatorIT {
             .andExpect(status().isMethodNotAllowed())
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.message").value("error.http.405"))
-            .andExpect(jsonPath("$.detail").value("Request method 'POST' is not supported"));
+            .andExpect(jsonPath("$.detail").value("Request method 'POST' is not supported"))
+            .andExpect(content().string(not(containsString("HttpRequestMethodNotSupportedException"))));
     }
 
     @Test

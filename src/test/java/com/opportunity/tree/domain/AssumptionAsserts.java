@@ -48,11 +48,12 @@ public class AssumptionAsserts {
         assertThat(actual)
             .as("Verify Assumption relevant properties")
             .satisfies(a -> assertThat(a.getStatement()).as("check statement").isEqualTo(expected.getStatement()))
-            .satisfies(a -> assertThat(a.getCategory()).as("check category").isEqualTo(expected.getCategory()))
-            .satisfies(a -> assertThat(a.getImportance()).as("check importance").isEqualTo(expected.getImportance()))
-            .satisfies(a -> assertThat(a.getEvidence()).as("check evidence").isEqualTo(expected.getEvidence()))
-            .satisfies(a -> assertThat(a.getValidated()).as("check validated").isEqualTo(expected.getValidated()))
-            .satisfies(a -> assertThat(a.getCreatedDate()).as("check createdDate").isEqualTo(expected.getCreatedDate()));
+            .satisfies(a -> assertThat(a.getDescription()).as("check description").isEqualTo(expected.getDescription()))
+            .satisfies(a -> assertThat(a.getStatus()).as("check status").isEqualTo(expected.getStatus()))
+            .satisfies(a -> assertThat(a.getConfidence()).as("check confidence").isEqualTo(expected.getConfidence()))
+            .satisfies(a -> assertThat(a.getSortOrder()).as("check sortOrder").isEqualTo(expected.getSortOrder()))
+            .satisfies(a -> assertThat(a.getCreatedDate()).as("check createdDate").isEqualTo(expected.getCreatedDate()))
+            .satisfies(a -> assertThat(a.getLastModifiedDate()).as("check lastModifiedDate").isEqualTo(expected.getLastModifiedDate()));
     }
 
     /**
@@ -64,7 +65,6 @@ public class AssumptionAsserts {
     public static void assertAssumptionUpdatableRelationshipsEquals(Assumption expected, Assumption actual) {
         assertThat(actual)
             .as("Verify Assumption relationships")
-            .satisfies(a -> assertThat(a.getSolution()).as("check solution").isEqualTo(expected.getSolution()))
-            .satisfies(a -> assertThat(a.getExperiments()).as("check experiments").isEqualTo(expected.getExperiments()));
+            .satisfies(a -> assertThat(a.getSolution()).as("check solution").isEqualTo(expected.getSolution()));
     }
 }

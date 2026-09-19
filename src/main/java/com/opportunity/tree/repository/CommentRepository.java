@@ -30,18 +30,18 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     }
 
     @Query(
-        value = "select comment from Comment comment left join fetch comment.author left join fetch comment.outcome left join fetch comment.opportunity left join fetch comment.solution",
+        value = "select comment from Comment comment left join fetch comment.author left join fetch comment.outcome left join fetch comment.opportunity left join fetch comment.solution left join fetch comment.assumption left join fetch comment.evidence",
         countQuery = "select count(comment) from Comment comment"
     )
     Page<Comment> findAllWithToOneRelationships(Pageable pageable);
 
     @Query(
-        "select comment from Comment comment left join fetch comment.author left join fetch comment.outcome left join fetch comment.opportunity left join fetch comment.solution"
+        "select comment from Comment comment left join fetch comment.author left join fetch comment.outcome left join fetch comment.opportunity left join fetch comment.solution left join fetch comment.assumption left join fetch comment.evidence"
     )
     List<Comment> findAllWithToOneRelationships();
 
     @Query(
-        "select comment from Comment comment left join fetch comment.author left join fetch comment.outcome left join fetch comment.opportunity left join fetch comment.solution where comment.id =:id"
+        "select comment from Comment comment left join fetch comment.author left join fetch comment.outcome left join fetch comment.opportunity left join fetch comment.solution left join fetch comment.assumption left join fetch comment.evidence where comment.id =:id"
     )
     Optional<Comment> findOneWithToOneRelationships(@Param("id") Long id);
 }

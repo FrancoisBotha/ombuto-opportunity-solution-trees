@@ -17,42 +17,6 @@
             <span>{{ outcome.description }}</span>
           </dd>
           <dt>
-            <span>Metric</span>
-          </dt>
-          <dd>
-            <span>{{ outcome.metric }}</span>
-          </dd>
-          <dt>
-            <span>Target Value</span>
-          </dt>
-          <dd>
-            <span>{{ outcome.targetValue }}</span>
-          </dd>
-          <dt>
-            <span>Current Value</span>
-          </dt>
-          <dd>
-            <span>{{ outcome.currentValue }}</span>
-          </dd>
-          <dt>
-            <span>Status</span>
-          </dt>
-          <dd>
-            <span>{{ outcome.status }}</span>
-          </dd>
-          <dt>
-            <span>Start Date</span>
-          </dt>
-          <dd>
-            <span>{{ outcome.startDate }}</span>
-          </dd>
-          <dt>
-            <span>Target Date</span>
-          </dt>
-          <dd>
-            <span>{{ outcome.targetDate }}</span>
-          </dd>
-          <dt>
             <span>Sort Order</span>
           </dt>
           <dd>

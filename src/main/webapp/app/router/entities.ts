@@ -21,25 +21,13 @@ const Opportunity = () => import('@/entities/opportunity/opportunity.vue');
 const OpportunityUpdate = () => import('@/entities/opportunity/opportunity-update.vue');
 const OpportunityDetails = () => import('@/entities/opportunity/opportunity-details.vue');
 
-const OpportunityLink = () => import('@/entities/opportunity-link/opportunity-link.vue');
-const OpportunityLinkUpdate = () => import('@/entities/opportunity-link/opportunity-link-update.vue');
-const OpportunityLinkDetails = () => import('@/entities/opportunity-link/opportunity-link-details.vue');
-
 const Solution = () => import('@/entities/solution/solution.vue');
 const SolutionUpdate = () => import('@/entities/solution/solution-update.vue');
 const SolutionDetails = () => import('@/entities/solution/solution-details.vue');
 
-const SolutionLink = () => import('@/entities/solution-link/solution-link.vue');
-const SolutionLinkUpdate = () => import('@/entities/solution-link/solution-link-update.vue');
-const SolutionLinkDetails = () => import('@/entities/solution-link/solution-link-details.vue');
-
 const Assumption = () => import('@/entities/assumption/assumption.vue');
 const AssumptionUpdate = () => import('@/entities/assumption/assumption-update.vue');
 const AssumptionDetails = () => import('@/entities/assumption/assumption-details.vue');
-
-const Experiment = () => import('@/entities/experiment/experiment.vue');
-const ExperimentUpdate = () => import('@/entities/experiment/experiment-update.vue');
-const ExperimentDetails = () => import('@/entities/experiment/experiment-details.vue');
 
 const Interview = () => import('@/entities/interview/interview.vue');
 const InterviewUpdate = () => import('@/entities/interview/interview-update.vue');
@@ -52,6 +40,22 @@ const CommentDetails = () => import('@/entities/comment/comment-details.vue');
 const Tag = () => import('@/entities/tag/tag.vue');
 const TagUpdate = () => import('@/entities/tag/tag-update.vue');
 const TagDetails = () => import('@/entities/tag/tag-details.vue');
+
+const Evidence = () => import('@/entities/evidence/evidence.vue');
+const EvidenceUpdate = () => import('@/entities/evidence/evidence-update.vue');
+const EvidenceDetails = () => import('@/entities/evidence/evidence-details.vue');
+
+const NodeLink = () => import('@/entities/node-link/node-link.vue');
+const NodeLinkUpdate = () => import('@/entities/node-link/node-link-update.vue');
+const NodeLinkDetails = () => import('@/entities/node-link/node-link-details.vue');
+
+const OpenQuestion = () => import('@/entities/open-question/open-question.vue');
+const OpenQuestionUpdate = () => import('@/entities/open-question/open-question-update.vue');
+const OpenQuestionDetails = () => import('@/entities/open-question/open-question-details.vue');
+
+const NodeHistory = () => import('@/entities/node-history/node-history.vue');
+const NodeHistoryUpdate = () => import('@/entities/node-history/node-history-update.vue');
+const NodeHistoryDetails = () => import('@/entities/node-history/node-history-details.vue');
 
 // jhipster-needle-add-entity-to-router-import - JHipster will import entities to the router here
 
@@ -180,30 +184,6 @@ export default {
       meta: { authorities: [Authority.ADMIN] },
     },
     {
-      path: 'opportunity-link',
-      name: 'OpportunityLink',
-      component: OpportunityLink,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'opportunity-link/new',
-      name: 'OpportunityLinkCreate',
-      component: OpportunityLinkUpdate,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'opportunity-link/:opportunityLinkId/edit',
-      name: 'OpportunityLinkEdit',
-      component: OpportunityLinkUpdate,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'opportunity-link/:opportunityLinkId/view',
-      name: 'OpportunityLinkView',
-      component: OpportunityLinkDetails,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
       path: 'solution',
       name: 'Solution',
       component: Solution,
@@ -228,30 +208,6 @@ export default {
       meta: { authorities: [Authority.ADMIN] },
     },
     {
-      path: 'solution-link',
-      name: 'SolutionLink',
-      component: SolutionLink,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'solution-link/new',
-      name: 'SolutionLinkCreate',
-      component: SolutionLinkUpdate,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'solution-link/:solutionLinkId/edit',
-      name: 'SolutionLinkEdit',
-      component: SolutionLinkUpdate,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'solution-link/:solutionLinkId/view',
-      name: 'SolutionLinkView',
-      component: SolutionLinkDetails,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
       path: 'assumption',
       name: 'Assumption',
       component: Assumption,
@@ -273,30 +229,6 @@ export default {
       path: 'assumption/:assumptionId/view',
       name: 'AssumptionView',
       component: AssumptionDetails,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'experiment',
-      name: 'Experiment',
-      component: Experiment,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'experiment/new',
-      name: 'ExperimentCreate',
-      component: ExperimentUpdate,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'experiment/:experimentId/edit',
-      name: 'ExperimentEdit',
-      component: ExperimentUpdate,
-      meta: { authorities: [Authority.ADMIN] },
-    },
-    {
-      path: 'experiment/:experimentId/view',
-      name: 'ExperimentView',
-      component: ExperimentDetails,
       meta: { authorities: [Authority.ADMIN] },
     },
     {
@@ -369,6 +301,102 @@ export default {
       path: 'tag/:tagId/view',
       name: 'TagView',
       component: TagDetails,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'evidence',
+      name: 'Evidence',
+      component: Evidence,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'evidence/new',
+      name: 'EvidenceCreate',
+      component: EvidenceUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'evidence/:evidenceId/edit',
+      name: 'EvidenceEdit',
+      component: EvidenceUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'evidence/:evidenceId/view',
+      name: 'EvidenceView',
+      component: EvidenceDetails,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'node-link',
+      name: 'NodeLink',
+      component: NodeLink,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'node-link/new',
+      name: 'NodeLinkCreate',
+      component: NodeLinkUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'node-link/:nodeLinkId/edit',
+      name: 'NodeLinkEdit',
+      component: NodeLinkUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'node-link/:nodeLinkId/view',
+      name: 'NodeLinkView',
+      component: NodeLinkDetails,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'open-question',
+      name: 'OpenQuestion',
+      component: OpenQuestion,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'open-question/new',
+      name: 'OpenQuestionCreate',
+      component: OpenQuestionUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'open-question/:openQuestionId/edit',
+      name: 'OpenQuestionEdit',
+      component: OpenQuestionUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'open-question/:openQuestionId/view',
+      name: 'OpenQuestionView',
+      component: OpenQuestionDetails,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'node-history',
+      name: 'NodeHistory',
+      component: NodeHistory,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'node-history/new',
+      name: 'NodeHistoryCreate',
+      component: NodeHistoryUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'node-history/:nodeHistoryId/edit',
+      name: 'NodeHistoryEdit',
+      component: NodeHistoryUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'node-history/:nodeHistoryId/view',
+      name: 'NodeHistoryView',
+      component: NodeHistoryDetails,
       meta: { authorities: [Authority.ADMIN] },
     },
     // jhipster-needle-add-entity-to-router - JHipster will add entities to the router here

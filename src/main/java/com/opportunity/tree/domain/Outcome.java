@@ -1,13 +1,11 @@
 package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.opportunity.tree.domain.enumeration.OutcomeStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
-import java.time.LocalDate;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
@@ -37,29 +35,6 @@ public class Outcome implements Serializable {
     @Lob
     @Column(name = "description")
     private String description;
-
-    @Size(max = 200)
-    @Column(name = "metric", length = 200)
-    private String metric;
-
-    @Size(max = 100)
-    @Column(name = "target_value", length = 100)
-    private String targetValue;
-
-    @Size(max = 100)
-    @Column(name = "current_value", length = 100)
-    private String currentValue;
-
-    @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private OutcomeStatus status;
-
-    @Column(name = "start_date")
-    private LocalDate startDate;
-
-    @Column(name = "target_date")
-    private LocalDate targetDate;
 
     @NotNull
     @Column(name = "sort_order", nullable = false)
@@ -119,84 +94,6 @@ public class Outcome implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public String getMetric() {
-        return this.metric;
-    }
-
-    public Outcome metric(String metric) {
-        this.setMetric(metric);
-        return this;
-    }
-
-    public void setMetric(String metric) {
-        this.metric = metric;
-    }
-
-    public String getTargetValue() {
-        return this.targetValue;
-    }
-
-    public Outcome targetValue(String targetValue) {
-        this.setTargetValue(targetValue);
-        return this;
-    }
-
-    public void setTargetValue(String targetValue) {
-        this.targetValue = targetValue;
-    }
-
-    public String getCurrentValue() {
-        return this.currentValue;
-    }
-
-    public Outcome currentValue(String currentValue) {
-        this.setCurrentValue(currentValue);
-        return this;
-    }
-
-    public void setCurrentValue(String currentValue) {
-        this.currentValue = currentValue;
-    }
-
-    public OutcomeStatus getStatus() {
-        return this.status;
-    }
-
-    public Outcome status(OutcomeStatus status) {
-        this.setStatus(status);
-        return this;
-    }
-
-    public void setStatus(OutcomeStatus status) {
-        this.status = status;
-    }
-
-    public LocalDate getStartDate() {
-        return this.startDate;
-    }
-
-    public Outcome startDate(LocalDate startDate) {
-        this.setStartDate(startDate);
-        return this;
-    }
-
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
-    }
-
-    public LocalDate getTargetDate() {
-        return this.targetDate;
-    }
-
-    public Outcome targetDate(LocalDate targetDate) {
-        this.setTargetDate(targetDate);
-        return this;
-    }
-
-    public void setTargetDate(LocalDate targetDate) {
-        this.targetDate = targetDate;
     }
 
     public Integer getSortOrder() {
@@ -290,12 +187,6 @@ public class Outcome implements Serializable {
             "id=" + getId() +
             ", title='" + getTitle() + "'" +
             ", description='" + getDescription() + "'" +
-            ", metric='" + getMetric() + "'" +
-            ", targetValue='" + getTargetValue() + "'" +
-            ", currentValue='" + getCurrentValue() + "'" +
-            ", status='" + getStatus() + "'" +
-            ", startDate='" + getStartDate() + "'" +
-            ", targetDate='" + getTargetDate() + "'" +
             ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
             ", lastModifiedDate='" + getLastModifiedDate() + "'" +

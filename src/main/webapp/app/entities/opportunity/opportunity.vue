@@ -43,12 +43,12 @@
               <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'status'"></jhi-sort-indicator>
             </th>
             <th scope="col" @click="changeOrder('valuerating')">
-              <span>Value</span>
+              <span>Valuerating</span>
               <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'valuerating'"></jhi-sort-indicator>
             </th>
-            <th scope="col" @click="changeOrder('complexity')">
-              <span>Complexity</span>
-              <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'complexity'"></jhi-sort-indicator>
+            <th scope="col" @click="changeOrder('priority')">
+              <span>Priority</span>
+              <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'priority'"></jhi-sort-indicator>
             </th>
             <th scope="col" @click="changeOrder('sortOrder')">
               <span>Sort Order</span>
@@ -86,7 +86,7 @@
             <td>{{ opportunity.description }}</td>
             <td>{{ opportunity.status }}</td>
             <td>{{ opportunity.valuerating }}</td>
-            <td>{{ opportunity.complexity }}</td>
+            <td>{{ opportunity.priority }}</td>
             <td>{{ opportunity.sortOrder }}</td>
             <td>{{ formatDateShort(opportunity.createdDate) || '' }}</td>
             <td>{{ formatDateShort(opportunity.lastModifiedDate) || '' }}</td>

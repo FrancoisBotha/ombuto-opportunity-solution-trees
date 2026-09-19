@@ -14,33 +14,35 @@
       "fieldValidateRulesMinlength": "2"
     },
     {
-      "fieldName": "category",
-      "fieldType": "AssumptionCategory",
+      "fieldName": "description",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "AssumptionStatus",
       "fieldValidateRules": ["required"],
-      "fieldValues": "DESIRABILITY,VIABILITY,FEASIBILITY,USABILITY,ETHICAL"
+      "fieldValues": "UNTESTED,TESTING,SUPPORTED,REFUTED"
     },
     {
-      "fieldName": "importance",
+      "fieldName": "confidence",
       "fieldType": "Integer",
       "fieldValidateRules": ["required", "min", "max"],
-      "fieldValidateRulesMax": "5",
-      "fieldValidateRulesMin": "1"
+      "fieldValidateRulesMax": "100",
+      "fieldValidateRulesMin": "0"
     },
     {
-      "fieldName": "evidence",
+      "fieldName": "sortOrder",
       "fieldType": "Integer",
-      "fieldValidateRules": ["required", "min", "max"],
-      "fieldValidateRulesMax": "5",
-      "fieldValidateRulesMin": "1"
-    },
-    {
-      "fieldName": "validated",
-      "fieldType": "Boolean"
+      "fieldValidateRules": ["required"]
     },
     {
       "fieldName": "createdDate",
       "fieldType": "Instant",
       "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "lastModifiedDate",
+      "fieldType": "Instant"
     }
   ],
   "name": "Assumption",
@@ -54,12 +56,12 @@
       "relationshipValidateRules": "required"
     },
     {
-      "otherEntityField": "title",
-      "otherEntityName": "experiment",
-      "otherEntityRelationshipName": "assumption",
-      "relationshipName": "experiment",
-      "relationshipSide": "right",
-      "relationshipType": "many-to-many"
+      "otherEntityField": "login",
+      "otherEntityName": "user",
+      "relationshipName": "owner",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one",
+      "relationshipWithBuiltInEntity": true
     }
   ],
   "searchEngine": "no",

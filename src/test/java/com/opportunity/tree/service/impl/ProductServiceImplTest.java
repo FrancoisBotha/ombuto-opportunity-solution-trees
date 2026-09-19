@@ -12,9 +12,13 @@ import static org.mockito.Mockito.when;
 import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.repository.ProductRepository;
+import com.opportunity.tree.repository.TeamRepository;
+import com.opportunity.tree.service.DefaultNodeLinks;
 import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
+import com.opportunity.tree.service.TreeNodeCascadeService;
+import com.opportunity.tree.service.TreeStructureLock;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.mapper.ProductMapper;
@@ -53,7 +57,15 @@ class ProductServiceImplTest {
     @BeforeEach
     void setUp() {
         productMapper = mock(ProductMapper.class);
-        service = new ProductServiceImpl(productRepository, productMapper, teamAccessService);
+        service = new ProductServiceImpl(
+            productRepository,
+            productMapper,
+            teamAccessService,
+            mock(DefaultNodeLinks.class),
+            mock(TreeNodeCascadeService.class),
+            mock(TreeStructureLock.class),
+            mock(TeamRepository.class)
+        );
 
         team = new Team();
         team.setId(TEAM_ID);

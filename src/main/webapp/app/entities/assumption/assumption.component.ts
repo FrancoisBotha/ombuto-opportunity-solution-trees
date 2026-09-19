@@ -2,6 +2,7 @@ import { type Ref, defineComponent, inject, onMounted, ref } from 'vue';
 
 import { useAlertService } from '@/shared/alert/alert.service';
 import { useDateFormat } from '@/shared/composables';
+import useDataUtils from '@/shared/data/data-utils.service';
 import { type IAssumption } from '@/shared/model/assumption.model';
 
 import AssumptionService from './assumption.service';
@@ -10,6 +11,7 @@ export default defineComponent({
   name: 'Assumption',
   setup() {
     const dateFormat = useDateFormat();
+    const dataUtils = useDataUtils();
     const assumptionService = inject('assumptionService', () => new AssumptionService());
     const alertService = inject('alertService', () => useAlertService(), true);
 
@@ -73,6 +75,7 @@ export default defineComponent({
       prepareRemove,
       closeDialog,
       removeAssumption,
+      ...dataUtils,
     };
   },
 });

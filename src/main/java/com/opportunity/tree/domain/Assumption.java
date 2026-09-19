@@ -1,14 +1,12 @@
 package com.opportunity.tree.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.opportunity.tree.domain.enumeration.AssumptionCategory;
+import com.opportunity.tree.domain.enumeration.AssumptionStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
@@ -35,39 +33,39 @@ public class Assumption implements Serializable {
     @Column(name = "statement", length = 500, nullable = false)
     private String statement;
 
+    @Lob
+    @Column(name = "description")
+    private String description;
+
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "category", nullable = false)
-    private AssumptionCategory category;
+    @Column(name = "status", nullable = false)
+    private AssumptionStatus status;
 
     @NotNull
-    @Min(value = 1)
-    @Max(value = 5)
-    @Column(name = "importance", nullable = false)
-    private Integer importance;
+    @Min(value = 0)
+    @Max(value = 100)
+    @Column(name = "confidence", nullable = false)
+    private Integer confidence;
 
     @NotNull
-    @Min(value = 1)
-    @Max(value = 5)
-    @Column(name = "evidence", nullable = false)
-    private Integer evidence;
-
-    @Column(name = "validated")
-    private Boolean validated;
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder;
 
     @NotNull
     @Column(name = "created_date", nullable = false)
     private Instant createdDate;
+
+    @Column(name = "last_modified_date")
+    private Instant lastModifiedDate;
 
     @ManyToOne(optional = false)
     @NotNull
     @JsonIgnoreProperties(value = { "opportunity", "owner", "tags" }, allowSetters = true)
     private Solution solution;
 
-    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "assumptions")
-    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-    @JsonIgnoreProperties(value = { "solution", "assumptions" }, allowSetters = true)
-    private Set<Experiment> experiments = new HashSet<>();
+    @ManyToOne(fetch = FetchType.LAZY)
+    private User owner;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -97,56 +95,56 @@ public class Assumption implements Serializable {
         this.statement = statement;
     }
 
-    public AssumptionCategory getCategory() {
-        return this.category;
+    public String getDescription() {
+        return this.description;
     }
 
-    public Assumption category(AssumptionCategory category) {
-        this.setCategory(category);
+    public Assumption description(String description) {
+        this.setDescription(description);
         return this;
     }
 
-    public void setCategory(AssumptionCategory category) {
-        this.category = category;
+    public void setDescription(String description) {
+        this.description = description;
     }
 
-    public Integer getImportance() {
-        return this.importance;
+    public AssumptionStatus getStatus() {
+        return this.status;
     }
 
-    public Assumption importance(Integer importance) {
-        this.setImportance(importance);
+    public Assumption status(AssumptionStatus status) {
+        this.setStatus(status);
         return this;
     }
 
-    public void setImportance(Integer importance) {
-        this.importance = importance;
+    public void setStatus(AssumptionStatus status) {
+        this.status = status;
     }
 
-    public Integer getEvidence() {
-        return this.evidence;
+    public Integer getConfidence() {
+        return this.confidence;
     }
 
-    public Assumption evidence(Integer evidence) {
-        this.setEvidence(evidence);
+    public Assumption confidence(Integer confidence) {
+        this.setConfidence(confidence);
         return this;
     }
 
-    public void setEvidence(Integer evidence) {
-        this.evidence = evidence;
+    public void setConfidence(Integer confidence) {
+        this.confidence = confidence;
     }
 
-    public Boolean getValidated() {
-        return this.validated;
+    public Integer getSortOrder() {
+        return this.sortOrder;
     }
 
-    public Assumption validated(Boolean validated) {
-        this.setValidated(validated);
+    public Assumption sortOrder(Integer sortOrder) {
+        this.setSortOrder(sortOrder);
         return this;
     }
 
-    public void setValidated(Boolean validated) {
-        this.validated = validated;
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
     }
 
     public Instant getCreatedDate() {
@@ -162,6 +160,19 @@ public class Assumption implements Serializable {
         this.createdDate = createdDate;
     }
 
+    public Instant getLastModifiedDate() {
+        return this.lastModifiedDate;
+    }
+
+    public Assumption lastModifiedDate(Instant lastModifiedDate) {
+        this.setLastModifiedDate(lastModifiedDate);
+        return this;
+    }
+
+    public void setLastModifiedDate(Instant lastModifiedDate) {
+        this.lastModifiedDate = lastModifiedDate;
+    }
+
     public Solution getSolution() {
         return this.solution;
     }
@@ -175,34 +186,16 @@ public class Assumption implements Serializable {
         return this;
     }
 
-    public Set<Experiment> getExperiments() {
-        return this.experiments;
+    public User getOwner() {
+        return this.owner;
     }
 
-    public void setExperiments(Set<Experiment> experiments) {
-        if (this.experiments != null) {
-            this.experiments.forEach(i -> i.removeAssumption(this));
-        }
-        if (experiments != null) {
-            experiments.forEach(i -> i.addAssumption(this));
-        }
-        this.experiments = experiments;
+    public void setOwner(User user) {
+        this.owner = user;
     }
 
-    public Assumption experiments(Set<Experiment> experiments) {
-        this.setExperiments(experiments);
-        return this;
-    }
-
-    public Assumption addExperiment(Experiment experiment) {
-        this.experiments.add(experiment);
-        experiment.getAssumptions().add(this);
-        return this;
-    }
-
-    public Assumption removeExperiment(Experiment experiment) {
-        this.experiments.remove(experiment);
-        experiment.getAssumptions().remove(this);
+    public Assumption owner(User user) {
+        this.setOwner(user);
         return this;
     }
 
@@ -231,11 +224,12 @@ public class Assumption implements Serializable {
         return "Assumption{" +
             "id=" + getId() +
             ", statement='" + getStatement() + "'" +
-            ", category='" + getCategory() + "'" +
-            ", importance=" + getImportance() +
-            ", evidence=" + getEvidence() +
-            ", validated='" + getValidated() + "'" +
+            ", description='" + getDescription() + "'" +
+            ", status='" + getStatus() + "'" +
+            ", confidence=" + getConfidence() +
+            ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
+            ", lastModifiedDate='" + getLastModifiedDate() + "'" +
             "}";
     }
 }

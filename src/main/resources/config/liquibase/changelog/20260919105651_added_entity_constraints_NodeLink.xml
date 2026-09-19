@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        Added the constraints for entity NodeLink.
+    -->
+    <changeSet id="20260919105651-2" author="jhipster">
+
+        <addForeignKeyConstraint baseColumnNames="product_id"
+                                 baseTableName="node_link"
+                                 constraintName="fk_node_link__product_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="product"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="outcome_id"
+                                 baseTableName="node_link"
+                                 constraintName="fk_node_link__outcome_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="outcome"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="opportunity_id"
+                                 baseTableName="node_link"
+                                 constraintName="fk_node_link__opportunity_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="opportunity"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="solution_id"
+                                 baseTableName="node_link"
+                                 constraintName="fk_node_link__solution_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="solution"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="assumption_id"
+                                 baseTableName="node_link"
+                                 constraintName="fk_node_link__assumption_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="assumption"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="evidence_id"
+                                 baseTableName="node_link"
+                                 constraintName="fk_node_link__evidence_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="evidence"
+                                 />
+    </changeSet>
+</databaseChangeLog>

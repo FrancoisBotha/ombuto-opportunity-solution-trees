@@ -35,6 +35,10 @@ public class CommentDTO implements Serializable {
 
     private SolutionDTO solution;
 
+    private AssumptionDTO assumption;
+
+    private EvidenceDTO evidence;
+
     public Long getId() {
         return id;
     }
@@ -107,6 +111,22 @@ public class CommentDTO implements Serializable {
         this.solution = solution;
     }
 
+    public AssumptionDTO getAssumption() {
+        return assumption;
+    }
+
+    public void setAssumption(AssumptionDTO assumption) {
+        this.assumption = assumption;
+    }
+
+    public EvidenceDTO getEvidence() {
+        return evidence;
+    }
+
+    public void setEvidence(EvidenceDTO evidence) {
+        this.evidence = evidence;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -141,6 +161,8 @@ public class CommentDTO implements Serializable {
             ", outcome=" + getOutcome() +
             ", opportunity=" + getOpportunity() +
             ", solution=" + getSolution() +
+            ", assumption=" + getAssumption() +
+            ", evidence=" + getEvidence() +
             "}";
     }
 }

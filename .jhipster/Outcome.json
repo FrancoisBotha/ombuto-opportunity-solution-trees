@@ -18,38 +18,6 @@
       "fieldType": "TextBlob"
     },
     {
-      "fieldName": "metric",
-      "fieldType": "String",
-      "fieldValidateRules": ["maxlength"],
-      "fieldValidateRulesMaxlength": "200"
-    },
-    {
-      "fieldName": "targetValue",
-      "fieldType": "String",
-      "fieldValidateRules": ["maxlength"],
-      "fieldValidateRulesMaxlength": "100"
-    },
-    {
-      "fieldName": "currentValue",
-      "fieldType": "String",
-      "fieldValidateRules": ["maxlength"],
-      "fieldValidateRulesMaxlength": "100"
-    },
-    {
-      "fieldName": "status",
-      "fieldType": "OutcomeStatus",
-      "fieldValidateRules": ["required"],
-      "fieldValues": "DRAFT,ACTIVE,ACHIEVED,ABANDONED"
-    },
-    {
-      "fieldName": "startDate",
-      "fieldType": "LocalDate"
-    },
-    {
-      "fieldName": "targetDate",
-      "fieldType": "LocalDate"
-    },
-    {
       "fieldName": "sortOrder",
       "fieldType": "Integer",
       "fieldValidateRules": ["required"]

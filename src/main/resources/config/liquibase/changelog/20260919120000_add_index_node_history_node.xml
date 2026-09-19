@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        OST-1 — NodeHistory is keyed by (node_type, node_id) with no foreign keys. The history tab
+        reads one node's rows and the cascade delete removes rows by node id-set, so both look up by
+        this pair. Kept out of the generated NodeHistory changelog so regeneration cannot drop it.
+    -->
+    <changeSet id="20260919120000-1" author="ost-1">
+        <createIndex tableName="node_history" indexName="ix_node_history__node">
+            <column name="node_type"/>
+            <column name="node_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

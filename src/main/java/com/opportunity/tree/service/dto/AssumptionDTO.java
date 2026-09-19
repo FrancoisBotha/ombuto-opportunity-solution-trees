@@ -1,13 +1,12 @@
 package com.opportunity.tree.service.dto;
 
-import com.opportunity.tree.domain.enumeration.AssumptionCategory;
+import com.opportunity.tree.domain.enumeration.AssumptionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.Lob;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * A DTO for the {@link com.opportunity.tree.domain.Assumption} entity.
@@ -22,28 +21,29 @@ public class AssumptionDTO implements Serializable {
     @Size(min = 2, max = 500)
     private String statement;
 
-    @NotNull
-    private AssumptionCategory category;
+    @Lob
+    private String description;
 
     @NotNull
-    @Min(value = 1)
-    @Max(value = 5)
-    private Integer importance;
+    private AssumptionStatus status;
 
     @NotNull
-    @Min(value = 1)
-    @Max(value = 5)
-    private Integer evidence;
+    @Min(value = 0)
+    @Max(value = 100)
+    private Integer confidence;
 
-    private Boolean validated;
+    @NotNull
+    private Integer sortOrder;
 
     @NotNull
     private Instant createdDate;
 
+    private Instant lastModifiedDate;
+
     @NotNull
     private SolutionDTO solution;
 
-    private Set<ExperimentDTO> experiments = new HashSet<>();
+    private UserDTO owner;
 
     public Long getId() {
         return id;
@@ -61,36 +61,36 @@ public class AssumptionDTO implements Serializable {
         this.statement = statement;
     }
 
-    public AssumptionCategory getCategory() {
-        return category;
+    public String getDescription() {
+        return description;
     }
 
-    public void setCategory(AssumptionCategory category) {
-        this.category = category;
+    public void setDescription(String description) {
+        this.description = description;
     }
 
-    public Integer getImportance() {
-        return importance;
+    public AssumptionStatus getStatus() {
+        return status;
     }
 
-    public void setImportance(Integer importance) {
-        this.importance = importance;
+    public void setStatus(AssumptionStatus status) {
+        this.status = status;
     }
 
-    public Integer getEvidence() {
-        return evidence;
+    public Integer getConfidence() {
+        return confidence;
     }
 
-    public void setEvidence(Integer evidence) {
-        this.evidence = evidence;
+    public void setConfidence(Integer confidence) {
+        this.confidence = confidence;
     }
 
-    public Boolean getValidated() {
-        return validated;
+    public Integer getSortOrder() {
+        return sortOrder;
     }
 
-    public void setValidated(Boolean validated) {
-        this.validated = validated;
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
     }
 
     public Instant getCreatedDate() {
@@ -101,6 +101,14 @@ public class AssumptionDTO implements Serializable {
         this.createdDate = createdDate;
     }
 
+    public Instant getLastModifiedDate() {
+        return lastModifiedDate;
+    }
+
+    public void setLastModifiedDate(Instant lastModifiedDate) {
+        this.lastModifiedDate = lastModifiedDate;
+    }
+
     public SolutionDTO getSolution() {
         return solution;
     }
@@ -109,12 +117,12 @@ public class AssumptionDTO implements Serializable {
         this.solution = solution;
     }
 
-    public Set<ExperimentDTO> getExperiments() {
-        return experiments;
+    public UserDTO getOwner() {
+        return owner;
     }
 
-    public void setExperiments(Set<ExperimentDTO> experiments) {
-        this.experiments = experiments;
+    public void setOwner(UserDTO owner) {
+        this.owner = owner;
     }
 
     @Override
@@ -144,13 +152,14 @@ public class AssumptionDTO implements Serializable {
         return "AssumptionDTO{" +
             "id=" + getId() +
             ", statement='" + getStatement() + "'" +
-            ", category='" + getCategory() + "'" +
-            ", importance=" + getImportance() +
-            ", evidence=" + getEvidence() +
-            ", validated='" + getValidated() + "'" +
+            ", description='" + getDescription() + "'" +
+            ", status='" + getStatus() + "'" +
+            ", confidence=" + getConfidence() +
+            ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
+            ", lastModifiedDate='" + getLastModifiedDate() + "'" +
             ", solution=" + getSolution() +
-            ", experiments=" + getExperiments() +
+            ", owner=" + getOwner() +
             "}";
     }
 }

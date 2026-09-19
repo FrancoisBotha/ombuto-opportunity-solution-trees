@@ -16,12 +16,9 @@ import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.Outcome;
 import com.opportunity.tree.domain.Tag;
-import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.OpportunityStatus;
-import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.OpportunityRepository;
-import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.service.OpportunityService;
 import com.opportunity.tree.service.dto.OpportunityDTO;
@@ -62,16 +59,16 @@ class OpportunityResourceIT {
     private static final String DEFAULT_DESCRIPTION = "AAAAAAAAAA";
     private static final String UPDATED_DESCRIPTION = "BBBBBBBBBB";
 
-    private static final OpportunityStatus DEFAULT_STATUS = OpportunityStatus.IDENTIFIED;
+    private static final OpportunityStatus DEFAULT_STATUS = OpportunityStatus.UNEXPLORED;
     private static final OpportunityStatus UPDATED_STATUS = OpportunityStatus.EXPLORING;
 
     private static final Integer DEFAULT_VALUERATING = 1;
     private static final Integer UPDATED_VALUERATING = 2;
     private static final Integer SMALLER_VALUERATING = 1 - 1;
 
-    private static final Integer DEFAULT_COMPLEXITY = 1;
-    private static final Integer UPDATED_COMPLEXITY = 2;
-    private static final Integer SMALLER_COMPLEXITY = 1 - 1;
+    private static final Integer DEFAULT_PRIORITY = 1;
+    private static final Integer UPDATED_PRIORITY = 2;
+    private static final Integer SMALLER_PRIORITY = 1 - 1;
 
     private static final Integer DEFAULT_SORT_ORDER = 1;
     private static final Integer UPDATED_SORT_ORDER = 2;
@@ -97,11 +94,6 @@ class OpportunityResourceIT {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private TeamMemberRepository teamMemberRepository;
-
-    private TeamMember insertedMembership;
 
     @Mock
     private OpportunityRepository opportunityRepositoryMock;
@@ -134,7 +126,7 @@ class OpportunityResourceIT {
             .description(DEFAULT_DESCRIPTION)
             .status(DEFAULT_STATUS)
             .valuerating(DEFAULT_VALUERATING)
-            .complexity(DEFAULT_COMPLEXITY)
+            .priority(DEFAULT_PRIORITY)
             .sortOrder(DEFAULT_SORT_ORDER)
             .createdDate(DEFAULT_CREATED_DATE)
             .lastModifiedDate(DEFAULT_LAST_MODIFIED_DATE);
@@ -163,7 +155,7 @@ class OpportunityResourceIT {
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
             .valuerating(UPDATED_VALUERATING)
-            .complexity(UPDATED_COMPLEXITY)
+            .priority(UPDATED_PRIORITY)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -183,24 +175,6 @@ class OpportunityResourceIT {
     @BeforeEach
     void initTest() {
         opportunity = createEntity(em);
-        // The mock user ("user" — the @WithMockUser default) must be an OWNER of the
-        // opportunity's team so the team-scoped access checks in OpportunityServiceImpl let
-        // the generated CRUD calls through. Without this seed every write would 403.
-        User user = userRepository
-            .findOneByLogin("user")
-            .orElseGet(() -> {
-                User u = UserResourceIT.createEntity();
-                u.setLogin("user");
-                em.persist(u);
-                em.flush();
-                return u;
-            });
-        TeamMember membership = new TeamMember().role(TeamRole.OWNER).joinedDate(Instant.now());
-        membership.setTeam(opportunity.getOutcome().getProduct().getTeam());
-        membership.setUser(user);
-        em.persist(membership);
-        em.flush();
-        insertedMembership = membership;
     }
 
     @AfterEach
@@ -208,10 +182,6 @@ class OpportunityResourceIT {
         if (insertedOpportunity != null) {
             opportunityRepository.delete(insertedOpportunity);
             insertedOpportunity = null;
-        }
-        if (insertedMembership != null) {
-            teamMemberRepository.delete(insertedMembership);
-            insertedMembership = null;
         }
         userRepository.deleteAll();
     }
@@ -302,64 +272,78 @@ class OpportunityResourceIT {
 
     @Test
     @Transactional
-    void createOpportunityIgnoresClientSuppliedServerSetFields() throws Exception {
-        // An existing sibling, so append-last is observable
-        Opportunity sibling = opportunityRepository.saveAndFlush(createEntity(em).sortOrder(7));
+    void checkValueratingIsRequired() throws Exception {
+        long databaseSizeBeforeTest = getRepositoryCount();
+        // set the field null
+        opportunity.setValuerating(null);
 
-        // sortOrder, createdDate and lastModifiedDate are server-set (TREE-002)
-        opportunity.sortOrder(99).createdDate(DEFAULT_CREATED_DATE).lastModifiedDate(DEFAULT_LAST_MODIFIED_DATE);
-        OpportunityDTO opportunityDTO = opportunityMapper.toDto(opportunity);
-
-        var returnedOpportunityDTO = om.readValue(
-            restOpportunityMockMvc
-                .perform(
-                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityDTO))
-                )
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString(),
-            OpportunityDTO.class
-        );
-
-        Opportunity persisted = opportunityRepository.findById(returnedOpportunityDTO.getId()).orElseThrow();
-        assertThat(persisted.getSortOrder()).isEqualTo(sibling.getSortOrder() + 1);
-        assertThat(persisted.getCreatedDate()).isAfter(DEFAULT_CREATED_DATE);
-        assertThat(persisted.getLastModifiedDate()).isEqualTo(persisted.getCreatedDate());
-    }
-
-    @Test
-    @Transactional
-    void createOpportunityWithoutServerSetFields() throws Exception {
-        long databaseSizeBeforeCreate = getRepositoryCount();
-        opportunity.sortOrder(null).createdDate(null).lastModifiedDate(null);
+        // Create the Opportunity, which fails.
         OpportunityDTO opportunityDTO = opportunityMapper.toDto(opportunity);
 
         restOpportunityMockMvc
             .perform(
                 post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityDTO))
             )
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.sortOrder").isNumber())
-            .andExpect(jsonPath("$.createdDate").isNotEmpty())
-            .andExpect(jsonPath("$.lastModifiedDate").isNotEmpty());
+            .andExpect(status().isBadRequest());
 
-        assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
+        assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
     @Transactional
-    void createOpportunityDefaultsRatingsToThree() throws Exception {
-        opportunity.valuerating(null).complexity(null);
+    void checkPriorityIsRequired() throws Exception {
+        long databaseSizeBeforeTest = getRepositoryCount();
+        // set the field null
+        opportunity.setPriority(null);
+
+        // Create the Opportunity, which fails.
         OpportunityDTO opportunityDTO = opportunityMapper.toDto(opportunity);
 
         restOpportunityMockMvc
             .perform(
                 post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityDTO))
             )
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.valuerating").value(3))
-            .andExpect(jsonPath("$.complexity").value(3));
+            .andExpect(status().isBadRequest());
+
+        assertSameRepositoryCount(databaseSizeBeforeTest);
+    }
+
+    @Test
+    @Transactional
+    void checkSortOrderIsRequired() throws Exception {
+        long databaseSizeBeforeTest = getRepositoryCount();
+        // set the field null
+        opportunity.setSortOrder(null);
+
+        // Create the Opportunity, which fails.
+        OpportunityDTO opportunityDTO = opportunityMapper.toDto(opportunity);
+
+        restOpportunityMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityDTO))
+            )
+            .andExpect(status().isBadRequest());
+
+        assertSameRepositoryCount(databaseSizeBeforeTest);
+    }
+
+    @Test
+    @Transactional
+    void checkCreatedDateIsRequired() throws Exception {
+        long databaseSizeBeforeTest = getRepositoryCount();
+        // set the field null
+        opportunity.setCreatedDate(null);
+
+        // Create the Opportunity, which fails.
+        OpportunityDTO opportunityDTO = opportunityMapper.toDto(opportunity);
+
+        restOpportunityMockMvc
+            .perform(
+                post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(opportunityDTO))
+            )
+            .andExpect(status().isBadRequest());
+
+        assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
@@ -378,7 +362,7 @@ class OpportunityResourceIT {
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
             .andExpect(jsonPath("$.[*].valuerating").value(hasItem(DEFAULT_VALUERATING)))
-            .andExpect(jsonPath("$.[*].complexity").value(hasItem(DEFAULT_COMPLEXITY)))
+            .andExpect(jsonPath("$.[*].priority").value(hasItem(DEFAULT_PRIORITY)))
             .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
             .andExpect(jsonPath("$.[*].lastModifiedDate").value(hasItem(DEFAULT_LAST_MODIFIED_DATE.toString())));
@@ -417,7 +401,7 @@ class OpportunityResourceIT {
             .andExpect(jsonPath("$.description").value(DEFAULT_DESCRIPTION))
             .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
             .andExpect(jsonPath("$.valuerating").value(DEFAULT_VALUERATING))
-            .andExpect(jsonPath("$.complexity").value(DEFAULT_COMPLEXITY))
+            .andExpect(jsonPath("$.priority").value(DEFAULT_PRIORITY))
             .andExpect(jsonPath("$.sortOrder").value(DEFAULT_SORT_ORDER))
             .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()))
             .andExpect(jsonPath("$.lastModifiedDate").value(DEFAULT_LAST_MODIFIED_DATE.toString()));
@@ -599,78 +583,75 @@ class OpportunityResourceIT {
 
     @Test
     @Transactional
-    void getAllOpportunitiesByComplexityIsEqualToSomething() throws Exception {
+    void getAllOpportunitiesByPriorityIsEqualToSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where complexity equals to
-        defaultOpportunityFiltering("complexity.equals=" + DEFAULT_COMPLEXITY, "complexity.equals=" + UPDATED_COMPLEXITY);
+        // Get all the opportunityList where priority equals to
+        defaultOpportunityFiltering("priority.equals=" + DEFAULT_PRIORITY, "priority.equals=" + UPDATED_PRIORITY);
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByComplexityIsInShouldWork() throws Exception {
+    void getAllOpportunitiesByPriorityIsInShouldWork() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where complexity in
+        // Get all the opportunityList where priority in
+        defaultOpportunityFiltering("priority.in=" + DEFAULT_PRIORITY + "," + UPDATED_PRIORITY, "priority.in=" + UPDATED_PRIORITY);
+    }
+
+    @Test
+    @Transactional
+    void getAllOpportunitiesByPriorityIsNullOrNotNull() throws Exception {
+        // Initialize the database
+        insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
+
+        // Get all the opportunityList where priority is not null
+        defaultOpportunityFiltering("priority.specified=true", "priority.specified=false");
+    }
+
+    @Test
+    @Transactional
+    void getAllOpportunitiesByPriorityIsGreaterThanOrEqualToSomething() throws Exception {
+        // Initialize the database
+        insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
+
+        // Get all the opportunityList where priority is greater than or equal to
         defaultOpportunityFiltering(
-            "complexity.in=" + DEFAULT_COMPLEXITY + "," + UPDATED_COMPLEXITY,
-            "complexity.in=" + UPDATED_COMPLEXITY
+            "priority.greaterThanOrEqual=" + DEFAULT_PRIORITY,
+            "priority.greaterThanOrEqual=" + (DEFAULT_PRIORITY + 1)
         );
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByComplexityIsNullOrNotNull() throws Exception {
+    void getAllOpportunitiesByPriorityIsLessThanOrEqualToSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where complexity is not null
-        defaultOpportunityFiltering("complexity.specified=true", "complexity.specified=false");
+        // Get all the opportunityList where priority is less than or equal to
+        defaultOpportunityFiltering("priority.lessThanOrEqual=" + DEFAULT_PRIORITY, "priority.lessThanOrEqual=" + SMALLER_PRIORITY);
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByComplexityIsGreaterThanOrEqualToSomething() throws Exception {
+    void getAllOpportunitiesByPriorityIsLessThanSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where complexity is greater than or equal to
-        defaultOpportunityFiltering(
-            "complexity.greaterThanOrEqual=" + DEFAULT_COMPLEXITY,
-            "complexity.greaterThanOrEqual=" + (DEFAULT_COMPLEXITY + 1)
-        );
+        // Get all the opportunityList where priority is less than
+        defaultOpportunityFiltering("priority.lessThan=" + (DEFAULT_PRIORITY + 1), "priority.lessThan=" + DEFAULT_PRIORITY);
     }
 
     @Test
     @Transactional
-    void getAllOpportunitiesByComplexityIsLessThanOrEqualToSomething() throws Exception {
+    void getAllOpportunitiesByPriorityIsGreaterThanSomething() throws Exception {
         // Initialize the database
         insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
 
-        // Get all the opportunityList where complexity is less than or equal to
-        defaultOpportunityFiltering("complexity.lessThanOrEqual=" + DEFAULT_COMPLEXITY, "complexity.lessThanOrEqual=" + SMALLER_COMPLEXITY);
-    }
-
-    @Test
-    @Transactional
-    void getAllOpportunitiesByComplexityIsLessThanSomething() throws Exception {
-        // Initialize the database
-        insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
-
-        // Get all the opportunityList where complexity is less than
-        defaultOpportunityFiltering("complexity.lessThan=" + (DEFAULT_COMPLEXITY + 1), "complexity.lessThan=" + DEFAULT_COMPLEXITY);
-    }
-
-    @Test
-    @Transactional
-    void getAllOpportunitiesByComplexityIsGreaterThanSomething() throws Exception {
-        // Initialize the database
-        insertedOpportunity = opportunityRepository.saveAndFlush(opportunity);
-
-        // Get all the opportunityList where complexity is greater than
-        defaultOpportunityFiltering("complexity.greaterThan=" + SMALLER_COMPLEXITY, "complexity.greaterThan=" + DEFAULT_COMPLEXITY);
+        // Get all the opportunityList where priority is greater than
+        defaultOpportunityFiltering("priority.greaterThan=" + SMALLER_PRIORITY, "priority.greaterThan=" + DEFAULT_PRIORITY);
     }
 
     @Test
@@ -943,7 +924,7 @@ class OpportunityResourceIT {
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
             .andExpect(jsonPath("$.[*].valuerating").value(hasItem(DEFAULT_VALUERATING)))
-            .andExpect(jsonPath("$.[*].complexity").value(hasItem(DEFAULT_COMPLEXITY)))
+            .andExpect(jsonPath("$.[*].priority").value(hasItem(DEFAULT_PRIORITY)))
             .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
             .andExpect(jsonPath("$.[*].lastModifiedDate").value(hasItem(DEFAULT_LAST_MODIFIED_DATE.toString())));
@@ -999,7 +980,7 @@ class OpportunityResourceIT {
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
             .valuerating(UPDATED_VALUERATING)
-            .complexity(UPDATED_COMPLEXITY)
+            .priority(UPDATED_PRIORITY)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -1016,7 +997,6 @@ class OpportunityResourceIT {
 
         // Validate the Opportunity in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(updatedOpportunity);
         assertPersistedOpportunityToMatchAllProperties(updatedOpportunity);
     }
 
@@ -1029,8 +1009,7 @@ class OpportunityResourceIT {
         // Create the Opportunity
         OpportunityDTO opportunityDTO = opportunityMapper.toDto(opportunity);
 
-        // A non-existent id must return the same 403 as an id the caller cannot
-        // edit, so existence is never revealed (NFR-002).
+        // If the entity doesn't have an ID, it will throw BadRequestAlertException
         restOpportunityMockMvc
             .perform(
                 put(ENTITY_API_URL_ID, opportunityDTO.getId())
@@ -1038,7 +1017,7 @@ class OpportunityResourceIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(om.writeValueAsBytes(opportunityDTO))
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isBadRequest());
 
         // Validate the Opportunity in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -1099,7 +1078,7 @@ class OpportunityResourceIT {
 
         partialUpdatedOpportunity
             .valuerating(UPDATED_VALUERATING)
-            .complexity(UPDATED_COMPLEXITY)
+            .priority(UPDATED_PRIORITY)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE);
 
@@ -1115,7 +1094,6 @@ class OpportunityResourceIT {
         // Validate the Opportunity in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(partialUpdatedOpportunity);
         assertOpportunityUpdatableFieldsEquals(
             createUpdateProxyForBean(partialUpdatedOpportunity, opportunity),
             getPersistedOpportunity(opportunity)
@@ -1139,7 +1117,7 @@ class OpportunityResourceIT {
             .description(UPDATED_DESCRIPTION)
             .status(UPDATED_STATUS)
             .valuerating(UPDATED_VALUERATING)
-            .complexity(UPDATED_COMPLEXITY)
+            .priority(UPDATED_PRIORITY)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -1156,7 +1134,6 @@ class OpportunityResourceIT {
         // Validate the Opportunity in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(partialUpdatedOpportunity);
         assertOpportunityUpdatableFieldsEquals(partialUpdatedOpportunity, getPersistedOpportunity(partialUpdatedOpportunity));
     }
 
@@ -1169,8 +1146,7 @@ class OpportunityResourceIT {
         // Create the Opportunity
         OpportunityDTO opportunityDTO = opportunityMapper.toDto(opportunity);
 
-        // A non-existent id must return the same 403 as an id the caller cannot
-        // edit, so existence is never revealed (NFR-002).
+        // If the entity doesn't have an ID, it will throw BadRequestAlertException
         restOpportunityMockMvc
             .perform(
                 patch(ENTITY_API_URL_ID, opportunityDTO.getId())
@@ -1178,7 +1154,7 @@ class OpportunityResourceIT {
                     .contentType("application/merge-patch+json")
                     .content(om.writeValueAsBytes(opportunityDTO))
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isBadRequest());
 
         // Validate the Opportunity in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -1242,16 +1218,6 @@ class OpportunityResourceIT {
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
-    }
-
-    /**
-     * sortOrder and createdDate are server-owned and lastModifiedDate is stamped by the
-     * server on every update (TREE-002), whatever the client sent.
-     */
-    private void expectServerSetFields(Opportunity expected) {
-        Opportunity persisted = getPersistedOpportunity(expected);
-        assertThat(persisted.getLastModifiedDate()).isAfter(DEFAULT_LAST_MODIFIED_DATE);
-        expected.sortOrder(DEFAULT_SORT_ORDER).createdDate(DEFAULT_CREATED_DATE).lastModifiedDate(persisted.getLastModifiedDate());
     }
 
     protected long getRepositoryCount() {

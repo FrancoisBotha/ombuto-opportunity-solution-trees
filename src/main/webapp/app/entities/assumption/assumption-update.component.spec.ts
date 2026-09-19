@@ -5,8 +5,8 @@ import { type MountingOptions, shallowMount } from '@vue/test-utils';
 import dayjs from 'dayjs';
 import sinon, { type SinonStubbedInstance } from 'sinon';
 
-import ExperimentService from '@/entities/experiment/experiment.service';
 import SolutionService from '@/entities/solution/solution.service';
+import UserService from '@/entities/user/user.service';
 import AlertService from '@/shared/alert/alert.service';
 import { DATE_TIME_LONG_FORMAT } from '@/shared/composables/date-format';
 
@@ -59,8 +59,9 @@ describe('Component Tests', () => {
             sinon.createStubInstance<SolutionService>(SolutionService, {
               retrieve: sinon.stub().resolves({}),
             } as any),
-          experimentService: () =>
-            sinon.createStubInstance<ExperimentService>(ExperimentService, {
+
+          userService: () =>
+            sinon.createStubInstance<UserService>(UserService, {
               retrieve: sinon.stub().resolves({}),
             } as any),
         },

@@ -65,6 +65,26 @@
             </div>
           </div>
           <div class="mb-3">
+            <label class="form-control-label" for="product">Sort Order</label>
+            <input
+              type="number"
+              class="form-control"
+              name="sortOrder"
+              id="product-sortOrder"
+              data-cy="sortOrder"
+              :class="{ valid: !v$.sortOrder.$invalid, invalid: v$.sortOrder.$invalid }"
+              v-model.number="v$.sortOrder.$model"
+              readonly
+              aria-describedby="product-sortOrder-help"
+            />
+            <small id="product-sortOrder-help" class="form-text text-muted" data-cy="sortOrderHelp"
+              >Set automatically by the server — new products are added at the end of their team’s list.</small
+            >
+            <div v-if="v$.sortOrder.$anyDirty && v$.sortOrder.$invalid">
+              <small class="form-text text-danger" v-for="error of v$.sortOrder.$errors" :key="error.$uid">{{ error.$message }}</small>
+            </div>
+          </div>
+          <div class="mb-3">
             <label class="form-control-label" for="product">Created Date</label>
             <div class="d-flex">
               <input

@@ -127,6 +127,32 @@
               </option>
             </select>
           </div>
+          <div class="mb-3">
+            <label class="form-control-label" for="comment">Assumption</label>
+            <select class="form-control" id="comment-assumption" data-cy="assumption" name="assumption" v-model="comment.assumption">
+              <option :value="null"></option>
+              <option
+                :value="comment.assumption && assumptionOption.id === comment.assumption.id ? comment.assumption : assumptionOption"
+                v-for="assumptionOption in assumptions"
+                :key="assumptionOption.id"
+              >
+                {{ assumptionOption.statement }}
+              </option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-control-label" for="comment">Evidence</label>
+            <select class="form-control" id="comment-evidence" data-cy="evidence" name="evidence" v-model="comment.evidence">
+              <option :value="null"></option>
+              <option
+                :value="comment.evidence && evidenceOption.id === comment.evidence.id ? comment.evidence : evidenceOption"
+                v-for="evidenceOption in evidences"
+                :key="evidenceOption.id"
+              >
+                {{ evidenceOption.title }}
+              </option>
+            </select>
+          </div>
         </div>
         <div>
           <button type="button" id="cancel-save" data-cy="entityCreateCancelButton" class="btn btn-secondary" @click="previousState()">

@@ -38,6 +38,12 @@
             <column name="solution_id" type="bigint">
                 <constraints nullable="true" />
             </column>
+            <column name="assumption_id" type="bigint">
+                <constraints nullable="true" />
+            </column>
+            <column name="evidence_id" type="bigint">
+                <constraints nullable="true" />
+            </column>
             <!-- jhipster-needle-liquibase-add-column - JHipster will add columns here -->
         </createTable>
         <dropDefaultValue tableName="comment" columnName="created_date" columnDataType="${datetimeType}"/>

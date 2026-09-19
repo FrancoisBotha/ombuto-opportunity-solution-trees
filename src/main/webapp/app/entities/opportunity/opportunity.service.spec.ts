@@ -35,7 +35,7 @@ describe('Service Tests', () => {
     beforeEach(() => {
       service = new OpportunityService();
       currentDate = new Date();
-      elemDefault = new Opportunity(123, 'AAAAAAA', 'AAAAAAA', 'IDENTIFIED', 0, 0, 0, currentDate, currentDate);
+      elemDefault = new Opportunity(123, 'AAAAAAA', 'AAAAAAA', 'UNEXPLORED', 0, 0, 0, currentDate, currentDate);
     });
 
     describe('Service methods', () => {
@@ -94,7 +94,7 @@ describe('Service Tests', () => {
           description: 'BBBBBB',
           status: 'BBBBBB',
           valuerating: 1,
-          complexity: 1,
+          priority: 1,
           sortOrder: 1,
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
@@ -121,7 +121,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Opportunity', async () => {
-        const patchObject = { complexity: 1, ...new Opportunity() };
+        const patchObject = { priority: 1, ...new Opportunity() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
@@ -149,7 +149,7 @@ describe('Service Tests', () => {
           description: 'BBBBBB',
           status: 'BBBBBB',
           valuerating: 1,
-          complexity: 1,
+          priority: 1,
           sortOrder: 1,
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),

@@ -89,10 +89,22 @@ class TeamScopedProductAccessIT {
         persistMembership(team, editorUser, TeamRole.EDITOR);
         persistMembership(team, viewerUser, TeamRole.VIEWER);
 
-        product = new Product().name("Discovery").description("desc").archived(Boolean.FALSE).createdDate(Instant.now()).team(team);
+        product = new Product()
+            .name("Discovery")
+            .description("desc")
+            .archived(Boolean.FALSE)
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .team(team);
         em.persist(product);
 
-        archivedProduct = new Product().name("Legacy").description("old").archived(Boolean.TRUE).createdDate(Instant.now()).team(team);
+        archivedProduct = new Product()
+            .name("Legacy")
+            .description("old")
+            .archived(Boolean.TRUE)
+            .sortOrder(1)
+            .createdDate(Instant.now())
+            .team(team);
         em.persist(archivedProduct);
         em.flush();
     }
@@ -512,6 +524,116 @@ class TeamScopedProductAccessIT {
         // Product still belongs to the original team.
         Product reloaded = productRepository.findById(product.getId()).orElseThrow();
         assertThat(reloaded.getTeam().getId()).isEqualTo(team.getId());
+    }
+
+    @Test
+    @Transactional
+    void editorOfBothTeamsCanMoveAProductWhichIsAppendedToTheNewTeam() throws Exception {
+        persistMembership(otherTeam, ownerUser, TeamRole.EDITOR);
+        Product existing = new Product()
+            .name("Already there")
+            .archived(Boolean.FALSE)
+            .sortOrder(4)
+            .createdDate(Instant.now())
+            .team(otherTeam);
+        em.persist(existing);
+        em.flush();
+
+        // PUT sends the product's old sortOrder back; a team change appends it after the new team's products instead.
+        ProductDTO dto = toDto(product);
+        dto.setSortOrder(0);
+        TeamDTO otherTeamDto = new TeamDTO();
+        otherTeamDto.setId(otherTeam.getId());
+        otherTeamDto.setName(otherTeam.getName());
+        dto.setTeam(otherTeamDto);
+        mvc
+            .perform(
+                put("/api/products/{id}", dto.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(dto))
+            )
+            .andExpect(status().isOk());
+        em.flush();
+        em.clear();
+        Product reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getTeam().getId()).isEqualTo(otherTeam.getId());
+        assertThat(reloaded.getSortOrder()).isEqualTo(5);
+
+        // PATCH back to the first team: appended after its remaining (archived) product.
+        mvc
+            .perform(
+                patch("/api/products/{id}", product.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content("{\"id\": " + product.getId() + ", \"team\": {\"id\": " + team.getId() + "}}")
+            )
+            .andExpect(status().isOk());
+        em.flush();
+        em.clear();
+        reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(reloaded.getSortOrder()).isEqualTo(2);
+    }
+
+    // ---------------------------------------------------------------
+    // Server-owned fields (OST-13a, C14)
+    // ---------------------------------------------------------------
+
+    @Test
+    @Transactional
+    void putAndPatchWithAnUnchangedTeamKeepTheServerSortOrder() throws Exception {
+        ProductDTO dto = toDto(product);
+        dto.setName("Renamed by PUT");
+        dto.setSortOrder(99);
+        mvc
+            .perform(
+                put("/api/products/{id}", dto.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(dto))
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sortOrder").value(0));
+        mvc
+            .perform(
+                patch("/api/products/{id}", product.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content("{\"id\": " + product.getId() + ", \"name\": \"Renamed by PATCH\", \"sortOrder\": 42}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sortOrder").value(0));
+        em.flush();
+        em.clear();
+        Product reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getName()).isEqualTo("Renamed by PATCH");
+        assertThat(reloaded.getSortOrder()).isZero();
+    }
+
+    @Test
+    @Transactional
+    void patchWithTheSameTeamIdAndAnotherTeamNameDoesNotRenameTheTeam() throws Exception {
+        String originalName = team.getName();
+        mvc
+            .perform(
+                patch("/api/products/{id}", product.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content("{\"id\": " + product.getId() + ", \"team\": {\"id\": " + team.getId() + ", \"name\": \"Hijacked\"}}")
+            )
+            .andExpect(status().isOk());
+        em.flush();
+        em.clear();
+        assertThat(em.find(Team.class, team.getId()).getName()).isEqualTo(originalName);
+        Product reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(reloaded.getSortOrder()).isZero();
     }
 
     // ---------------------------------------------------------------

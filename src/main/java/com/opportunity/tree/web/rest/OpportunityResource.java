@@ -33,6 +33,7 @@ import tech.jhipster.web.util.ResponseUtil;
  */
 @RestController
 @RequestMapping("/api/opportunities")
+@PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
 public class OpportunityResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpportunityResource.class);
@@ -100,9 +101,9 @@ public class OpportunityResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        // Existence is checked in the service AFTER authorisation so that
-        // non-members receive the same 403 whether or not the id exists
-        // (NFR-002: never reveal existence to non-members).
+        if (!opportunityRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
         opportunityDTO = opportunityService.update(opportunityDTO);
         return ResponseEntity.ok()
@@ -134,9 +135,9 @@ public class OpportunityResource {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
 
-        // Existence is checked in the service AFTER authorisation so that
-        // non-members receive the same 403 whether or not the id exists
-        // (NFR-002: never reveal existence to non-members).
+        if (!opportunityRepository.existsById(id)) {
+            throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
+        }
 
         Optional<OpportunityDTO> result = opportunityService.partialUpdate(opportunityDTO);
 
@@ -154,7 +155,6 @@ public class OpportunityResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of Opportunities in body.
      */
     @GetMapping("")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<List<OpportunityDTO>> getAllOpportunities(
         OpportunityCriteria criteria,
         @org.springdoc.core.annotations.ParameterObject Pageable pageable
@@ -173,7 +173,6 @@ public class OpportunityResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the count in body.
      */
     @GetMapping("/count")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<Long> countOpportunities(OpportunityCriteria criteria) {
         LOG.debug("REST request to count Opportunities by criteria: {}", criteria);
         return ResponseEntity.ok().body(opportunityQueryService.countByCriteria(criteria));
@@ -186,7 +185,6 @@ public class OpportunityResource {
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the opportunityDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<OpportunityDTO> getOpportunity(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Opportunity : {}", id);
         Optional<OpportunityDTO> opportunityDTO = opportunityService.findOne(id);
@@ -200,7 +198,6 @@ public class OpportunityResource {
      * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     public ResponseEntity<Void> deleteOpportunity(@PathVariable("id") Long id) {
         LOG.debug("REST request to delete Opportunity : {}", id);
         opportunityService.delete(id);

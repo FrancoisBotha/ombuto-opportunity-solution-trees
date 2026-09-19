@@ -35,12 +35,16 @@ describe('Service Tests', () => {
     beforeEach(() => {
       service = new AssumptionService();
       currentDate = new Date();
-      elemDefault = new Assumption(123, 'AAAAAAA', 'DESIRABILITY', 0, 0, false, currentDate);
+      elemDefault = new Assumption(123, 'AAAAAAA', 'AAAAAAA', 'UNTESTED', 0, 0, currentDate, currentDate);
     });
 
     describe('Service methods', () => {
       it('should find an element', async () => {
-        const returnedFromService = { createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT), ...elemDefault };
+        const returnedFromService = {
+          createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          ...elemDefault,
+        };
         axiosStub.get.resolves({ data: returnedFromService });
 
         return service.find(123).then(res => {
@@ -59,8 +63,13 @@ describe('Service Tests', () => {
       });
 
       it('should create a Assumption', async () => {
-        const returnedFromService = { id: 123, createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT), ...elemDefault };
-        const expected = { createdDate: currentDate, ...returnedFromService };
+        const returnedFromService = {
+          id: 123,
+          createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          ...elemDefault,
+        };
+        const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
 
         axiosStub.post.resolves({ data: returnedFromService });
         return service.create({}).then(res => {
@@ -82,15 +91,16 @@ describe('Service Tests', () => {
       it('should update a Assumption', async () => {
         const returnedFromService = {
           statement: 'BBBBBB',
-          category: 'BBBBBB',
-          importance: 1,
-          evidence: 1,
-          validated: true,
+          description: 'BBBBBB',
+          status: 'BBBBBB',
+          confidence: 1,
+          sortOrder: 1,
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           ...elemDefault,
         };
 
-        const expected = { createdDate: currentDate, ...returnedFromService };
+        const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
         axiosStub.put.resolves({ data: returnedFromService });
 
         return service.update(expected).then(res => {
@@ -110,10 +120,16 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Assumption', async () => {
-        const patchObject = { statement: 'BBBBBB', importance: 1, validated: true, ...new Assumption() };
+        const patchObject = {
+          statement: 'BBBBBB',
+          status: 'BBBBBB',
+          sortOrder: 1,
+          lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          ...new Assumption(),
+        };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
-        const expected = { createdDate: currentDate, ...returnedFromService };
+        const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
         axiosStub.patch.resolves({ data: returnedFromService });
 
         return service.partialUpdate(patchObject).then(res => {
@@ -135,14 +151,15 @@ describe('Service Tests', () => {
       it('should return a list of Assumption', async () => {
         const returnedFromService = {
           statement: 'BBBBBB',
-          category: 'BBBBBB',
-          importance: 1,
-          evidence: 1,
-          validated: true,
+          description: 'BBBBBB',
+          status: 'BBBBBB',
+          confidence: 1,
+          sortOrder: 1,
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
+          lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           ...elemDefault,
         };
-        const expected = { createdDate: currentDate, ...returnedFromService };
+        const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
         axiosStub.get.resolves([returnedFromService]);
         return service.retrieve().then(res => {
           expect(res).toContainEqual(expected);

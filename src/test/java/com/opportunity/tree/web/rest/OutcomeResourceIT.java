@@ -13,20 +13,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Outcome;
 import com.opportunity.tree.domain.Product;
-import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
-import com.opportunity.tree.domain.enumeration.OutcomeStatus;
-import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.OutcomeRepository;
-import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.service.OutcomeService;
 import com.opportunity.tree.service.dto.OutcomeDTO;
 import com.opportunity.tree.service.mapper.OutcomeMapper;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Random;
@@ -61,26 +55,6 @@ class OutcomeResourceIT {
     private static final String DEFAULT_DESCRIPTION = "AAAAAAAAAA";
     private static final String UPDATED_DESCRIPTION = "BBBBBBBBBB";
 
-    private static final String DEFAULT_METRIC = "AAAAAAAAAA";
-    private static final String UPDATED_METRIC = "BBBBBBBBBB";
-
-    private static final String DEFAULT_TARGET_VALUE = "AAAAAAAAAA";
-    private static final String UPDATED_TARGET_VALUE = "BBBBBBBBBB";
-
-    private static final String DEFAULT_CURRENT_VALUE = "AAAAAAAAAA";
-    private static final String UPDATED_CURRENT_VALUE = "BBBBBBBBBB";
-
-    private static final OutcomeStatus DEFAULT_STATUS = OutcomeStatus.DRAFT;
-    private static final OutcomeStatus UPDATED_STATUS = OutcomeStatus.ACTIVE;
-
-    private static final LocalDate DEFAULT_START_DATE = LocalDate.ofEpochDay(0L);
-    private static final LocalDate UPDATED_START_DATE = LocalDate.now(ZoneId.systemDefault());
-    private static final LocalDate SMALLER_START_DATE = LocalDate.ofEpochDay(-1L);
-
-    private static final LocalDate DEFAULT_TARGET_DATE = LocalDate.ofEpochDay(0L);
-    private static final LocalDate UPDATED_TARGET_DATE = LocalDate.now(ZoneId.systemDefault());
-    private static final LocalDate SMALLER_TARGET_DATE = LocalDate.ofEpochDay(-1L);
-
     private static final Integer DEFAULT_SORT_ORDER = 1;
     private static final Integer UPDATED_SORT_ORDER = 2;
     private static final Integer SMALLER_SORT_ORDER = 1 - 1;
@@ -105,11 +79,6 @@ class OutcomeResourceIT {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private TeamMemberRepository teamMemberRepository;
-
-    private TeamMember insertedMembership;
 
     @Mock
     private OutcomeRepository outcomeRepositoryMock;
@@ -140,12 +109,6 @@ class OutcomeResourceIT {
         Outcome outcome = new Outcome()
             .title(DEFAULT_TITLE)
             .description(DEFAULT_DESCRIPTION)
-            .metric(DEFAULT_METRIC)
-            .targetValue(DEFAULT_TARGET_VALUE)
-            .currentValue(DEFAULT_CURRENT_VALUE)
-            .status(DEFAULT_STATUS)
-            .startDate(DEFAULT_START_DATE)
-            .targetDate(DEFAULT_TARGET_DATE)
             .sortOrder(DEFAULT_SORT_ORDER)
             .createdDate(DEFAULT_CREATED_DATE)
             .lastModifiedDate(DEFAULT_LAST_MODIFIED_DATE);
@@ -172,12 +135,6 @@ class OutcomeResourceIT {
         Outcome updatedOutcome = new Outcome()
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
-            .metric(UPDATED_METRIC)
-            .targetValue(UPDATED_TARGET_VALUE)
-            .currentValue(UPDATED_CURRENT_VALUE)
-            .status(UPDATED_STATUS)
-            .startDate(UPDATED_START_DATE)
-            .targetDate(UPDATED_TARGET_DATE)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -197,24 +154,6 @@ class OutcomeResourceIT {
     @BeforeEach
     void initTest() {
         outcome = createEntity(em);
-        // The mock user ("user" — the @WithMockUser default) must be an OWNER of the
-        // outcome's team so the team-scoped access checks in OutcomeServiceImpl let
-        // the generated CRUD calls through. Without this seed every write would 403.
-        User user = userRepository
-            .findOneByLogin("user")
-            .orElseGet(() -> {
-                User u = UserResourceIT.createEntity();
-                u.setLogin("user");
-                em.persist(u);
-                em.flush();
-                return u;
-            });
-        TeamMember membership = new TeamMember().role(TeamRole.OWNER).joinedDate(Instant.now());
-        membership.setTeam(outcome.getProduct().getTeam());
-        membership.setUser(user);
-        em.persist(membership);
-        em.flush();
-        insertedMembership = membership;
     }
 
     @AfterEach
@@ -222,10 +161,6 @@ class OutcomeResourceIT {
         if (insertedOutcome != null) {
             outcomeRepository.delete(insertedOutcome);
             insertedOutcome = null;
-        }
-        if (insertedMembership != null) {
-            teamMemberRepository.delete(insertedMembership);
-            insertedMembership = null;
         }
         userRepository.deleteAll();
     }
@@ -293,10 +228,10 @@ class OutcomeResourceIT {
 
     @Test
     @Transactional
-    void checkStatusIsRequired() throws Exception {
+    void checkSortOrderIsRequired() throws Exception {
         long databaseSizeBeforeTest = getRepositoryCount();
         // set the field null
-        outcome.setStatus(null);
+        outcome.setSortOrder(null);
 
         // Create the Outcome, which fails.
         OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
@@ -310,47 +245,19 @@ class OutcomeResourceIT {
 
     @Test
     @Transactional
-    void createOutcomeIgnoresClientSuppliedServerSetFields() throws Exception {
-        // An existing sibling, so append-last is observable
-        Outcome sibling = outcomeRepository.saveAndFlush(createEntity(em).sortOrder(7));
+    void checkCreatedDateIsRequired() throws Exception {
+        long databaseSizeBeforeTest = getRepositoryCount();
+        // set the field null
+        outcome.setCreatedDate(null);
 
-        // sortOrder, createdDate and lastModifiedDate are server-set (TREE-002)
-        outcome.sortOrder(99).createdDate(DEFAULT_CREATED_DATE).lastModifiedDate(DEFAULT_LAST_MODIFIED_DATE);
-        OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
-
-        var returnedOutcomeDTO = om.readValue(
-            restOutcomeMockMvc
-                .perform(
-                    post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(outcomeDTO))
-                )
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString(),
-            OutcomeDTO.class
-        );
-
-        Outcome persisted = outcomeRepository.findById(returnedOutcomeDTO.getId()).orElseThrow();
-        assertThat(persisted.getSortOrder()).isEqualTo(sibling.getSortOrder() + 1);
-        assertThat(persisted.getCreatedDate()).isAfter(DEFAULT_CREATED_DATE);
-        assertThat(persisted.getLastModifiedDate()).isEqualTo(persisted.getCreatedDate());
-    }
-
-    @Test
-    @Transactional
-    void createOutcomeWithoutServerSetFields() throws Exception {
-        long databaseSizeBeforeCreate = getRepositoryCount();
-        outcome.sortOrder(null).createdDate(null).lastModifiedDate(null);
+        // Create the Outcome, which fails.
         OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
 
         restOutcomeMockMvc
             .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(outcomeDTO)))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.sortOrder").isNumber())
-            .andExpect(jsonPath("$.createdDate").isNotEmpty())
-            .andExpect(jsonPath("$.lastModifiedDate").isNotEmpty());
+            .andExpect(status().isBadRequest());
 
-        assertIncrementedRepositoryCount(databaseSizeBeforeCreate);
+        assertSameRepositoryCount(databaseSizeBeforeTest);
     }
 
     @Test
@@ -367,12 +274,6 @@ class OutcomeResourceIT {
             .andExpect(jsonPath("$.[*].id").value(hasItem(outcome.getId().intValue())))
             .andExpect(jsonPath("$.[*].title").value(hasItem(DEFAULT_TITLE)))
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
-            .andExpect(jsonPath("$.[*].metric").value(hasItem(DEFAULT_METRIC)))
-            .andExpect(jsonPath("$.[*].targetValue").value(hasItem(DEFAULT_TARGET_VALUE)))
-            .andExpect(jsonPath("$.[*].currentValue").value(hasItem(DEFAULT_CURRENT_VALUE)))
-            .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
-            .andExpect(jsonPath("$.[*].startDate").value(hasItem(DEFAULT_START_DATE.toString())))
-            .andExpect(jsonPath("$.[*].targetDate").value(hasItem(DEFAULT_TARGET_DATE.toString())))
             .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
             .andExpect(jsonPath("$.[*].lastModifiedDate").value(hasItem(DEFAULT_LAST_MODIFIED_DATE.toString())));
@@ -409,12 +310,6 @@ class OutcomeResourceIT {
             .andExpect(jsonPath("$.id").value(outcome.getId().intValue()))
             .andExpect(jsonPath("$.title").value(DEFAULT_TITLE))
             .andExpect(jsonPath("$.description").value(DEFAULT_DESCRIPTION))
-            .andExpect(jsonPath("$.metric").value(DEFAULT_METRIC))
-            .andExpect(jsonPath("$.targetValue").value(DEFAULT_TARGET_VALUE))
-            .andExpect(jsonPath("$.currentValue").value(DEFAULT_CURRENT_VALUE))
-            .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
-            .andExpect(jsonPath("$.startDate").value(DEFAULT_START_DATE.toString()))
-            .andExpect(jsonPath("$.targetDate").value(DEFAULT_TARGET_DATE.toString()))
             .andExpect(jsonPath("$.sortOrder").value(DEFAULT_SORT_ORDER))
             .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()))
             .andExpect(jsonPath("$.lastModifiedDate").value(DEFAULT_LAST_MODIFIED_DATE.toString()));
@@ -483,338 +378,6 @@ class OutcomeResourceIT {
 
         // Get all the outcomeList where title does not contain
         defaultOutcomeFiltering("title.doesNotContain=" + UPDATED_TITLE, "title.doesNotContain=" + DEFAULT_TITLE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByMetricIsEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where metric equals to
-        defaultOutcomeFiltering("metric.equals=" + DEFAULT_METRIC, "metric.equals=" + UPDATED_METRIC);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByMetricIsInShouldWork() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where metric in
-        defaultOutcomeFiltering("metric.in=" + DEFAULT_METRIC + "," + UPDATED_METRIC, "metric.in=" + UPDATED_METRIC);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByMetricIsNullOrNotNull() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where metric is not null
-        defaultOutcomeFiltering("metric.specified=true", "metric.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByMetricContainsSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where metric contains
-        defaultOutcomeFiltering("metric.contains=" + DEFAULT_METRIC, "metric.contains=" + UPDATED_METRIC);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByMetricNotContainsSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where metric does not contain
-        defaultOutcomeFiltering("metric.doesNotContain=" + UPDATED_METRIC, "metric.doesNotContain=" + DEFAULT_METRIC);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetValueIsEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetValue equals to
-        defaultOutcomeFiltering("targetValue.equals=" + DEFAULT_TARGET_VALUE, "targetValue.equals=" + UPDATED_TARGET_VALUE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetValueIsInShouldWork() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetValue in
-        defaultOutcomeFiltering(
-            "targetValue.in=" + DEFAULT_TARGET_VALUE + "," + UPDATED_TARGET_VALUE,
-            "targetValue.in=" + UPDATED_TARGET_VALUE
-        );
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetValueIsNullOrNotNull() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetValue is not null
-        defaultOutcomeFiltering("targetValue.specified=true", "targetValue.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetValueContainsSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetValue contains
-        defaultOutcomeFiltering("targetValue.contains=" + DEFAULT_TARGET_VALUE, "targetValue.contains=" + UPDATED_TARGET_VALUE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetValueNotContainsSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetValue does not contain
-        defaultOutcomeFiltering("targetValue.doesNotContain=" + UPDATED_TARGET_VALUE, "targetValue.doesNotContain=" + DEFAULT_TARGET_VALUE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByCurrentValueIsEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where currentValue equals to
-        defaultOutcomeFiltering("currentValue.equals=" + DEFAULT_CURRENT_VALUE, "currentValue.equals=" + UPDATED_CURRENT_VALUE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByCurrentValueIsInShouldWork() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where currentValue in
-        defaultOutcomeFiltering(
-            "currentValue.in=" + DEFAULT_CURRENT_VALUE + "," + UPDATED_CURRENT_VALUE,
-            "currentValue.in=" + UPDATED_CURRENT_VALUE
-        );
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByCurrentValueIsNullOrNotNull() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where currentValue is not null
-        defaultOutcomeFiltering("currentValue.specified=true", "currentValue.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByCurrentValueContainsSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where currentValue contains
-        defaultOutcomeFiltering("currentValue.contains=" + DEFAULT_CURRENT_VALUE, "currentValue.contains=" + UPDATED_CURRENT_VALUE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByCurrentValueNotContainsSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where currentValue does not contain
-        defaultOutcomeFiltering(
-            "currentValue.doesNotContain=" + UPDATED_CURRENT_VALUE,
-            "currentValue.doesNotContain=" + DEFAULT_CURRENT_VALUE
-        );
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStatusIsEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where status equals to
-        defaultOutcomeFiltering("status.equals=" + DEFAULT_STATUS, "status.equals=" + UPDATED_STATUS);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStatusIsInShouldWork() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where status in
-        defaultOutcomeFiltering("status.in=" + DEFAULT_STATUS + "," + UPDATED_STATUS, "status.in=" + UPDATED_STATUS);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStatusIsNullOrNotNull() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where status is not null
-        defaultOutcomeFiltering("status.specified=true", "status.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStartDateIsEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where startDate equals to
-        defaultOutcomeFiltering("startDate.equals=" + DEFAULT_START_DATE, "startDate.equals=" + UPDATED_START_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStartDateIsInShouldWork() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where startDate in
-        defaultOutcomeFiltering("startDate.in=" + DEFAULT_START_DATE + "," + UPDATED_START_DATE, "startDate.in=" + UPDATED_START_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStartDateIsNullOrNotNull() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where startDate is not null
-        defaultOutcomeFiltering("startDate.specified=true", "startDate.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStartDateIsGreaterThanOrEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where startDate is greater than or equal to
-        defaultOutcomeFiltering("startDate.greaterThanOrEqual=" + DEFAULT_START_DATE, "startDate.greaterThanOrEqual=" + UPDATED_START_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStartDateIsLessThanOrEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where startDate is less than or equal to
-        defaultOutcomeFiltering("startDate.lessThanOrEqual=" + DEFAULT_START_DATE, "startDate.lessThanOrEqual=" + SMALLER_START_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStartDateIsLessThanSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where startDate is less than
-        defaultOutcomeFiltering("startDate.lessThan=" + UPDATED_START_DATE, "startDate.lessThan=" + DEFAULT_START_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByStartDateIsGreaterThanSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where startDate is greater than
-        defaultOutcomeFiltering("startDate.greaterThan=" + SMALLER_START_DATE, "startDate.greaterThan=" + DEFAULT_START_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetDateIsEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetDate equals to
-        defaultOutcomeFiltering("targetDate.equals=" + DEFAULT_TARGET_DATE, "targetDate.equals=" + UPDATED_TARGET_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetDateIsInShouldWork() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetDate in
-        defaultOutcomeFiltering("targetDate.in=" + DEFAULT_TARGET_DATE + "," + UPDATED_TARGET_DATE, "targetDate.in=" + UPDATED_TARGET_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetDateIsNullOrNotNull() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetDate is not null
-        defaultOutcomeFiltering("targetDate.specified=true", "targetDate.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetDateIsGreaterThanOrEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetDate is greater than or equal to
-        defaultOutcomeFiltering(
-            "targetDate.greaterThanOrEqual=" + DEFAULT_TARGET_DATE,
-            "targetDate.greaterThanOrEqual=" + UPDATED_TARGET_DATE
-        );
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetDateIsLessThanOrEqualToSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetDate is less than or equal to
-        defaultOutcomeFiltering("targetDate.lessThanOrEqual=" + DEFAULT_TARGET_DATE, "targetDate.lessThanOrEqual=" + SMALLER_TARGET_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetDateIsLessThanSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetDate is less than
-        defaultOutcomeFiltering("targetDate.lessThan=" + UPDATED_TARGET_DATE, "targetDate.lessThan=" + DEFAULT_TARGET_DATE);
-    }
-
-    @Test
-    @Transactional
-    void getAllOutcomesByTargetDateIsGreaterThanSomething() throws Exception {
-        // Initialize the database
-        insertedOutcome = outcomeRepository.saveAndFlush(outcome);
-
-        // Get all the outcomeList where targetDate is greater than
-        defaultOutcomeFiltering("targetDate.greaterThan=" + SMALLER_TARGET_DATE, "targetDate.greaterThan=" + DEFAULT_TARGET_DATE);
     }
 
     @Test
@@ -1016,12 +579,6 @@ class OutcomeResourceIT {
             .andExpect(jsonPath("$.[*].id").value(hasItem(outcome.getId().intValue())))
             .andExpect(jsonPath("$.[*].title").value(hasItem(DEFAULT_TITLE)))
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
-            .andExpect(jsonPath("$.[*].metric").value(hasItem(DEFAULT_METRIC)))
-            .andExpect(jsonPath("$.[*].targetValue").value(hasItem(DEFAULT_TARGET_VALUE)))
-            .andExpect(jsonPath("$.[*].currentValue").value(hasItem(DEFAULT_CURRENT_VALUE)))
-            .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
-            .andExpect(jsonPath("$.[*].startDate").value(hasItem(DEFAULT_START_DATE.toString())))
-            .andExpect(jsonPath("$.[*].targetDate").value(hasItem(DEFAULT_TARGET_DATE.toString())))
             .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())))
             .andExpect(jsonPath("$.[*].lastModifiedDate").value(hasItem(DEFAULT_LAST_MODIFIED_DATE.toString())));
@@ -1075,12 +632,6 @@ class OutcomeResourceIT {
         updatedOutcome
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
-            .metric(UPDATED_METRIC)
-            .targetValue(UPDATED_TARGET_VALUE)
-            .currentValue(UPDATED_CURRENT_VALUE)
-            .status(UPDATED_STATUS)
-            .startDate(UPDATED_START_DATE)
-            .targetDate(UPDATED_TARGET_DATE)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -1097,7 +648,6 @@ class OutcomeResourceIT {
 
         // Validate the Outcome in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(updatedOutcome);
         assertPersistedOutcomeToMatchAllProperties(updatedOutcome);
     }
 
@@ -1110,8 +660,7 @@ class OutcomeResourceIT {
         // Create the Outcome
         OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
 
-        // A non-existent id must return the same 403 as an id the caller cannot
-        // edit, so existence is never revealed (NFR-002).
+        // If the entity doesn't have an ID, it will throw BadRequestAlertException
         restOutcomeMockMvc
             .perform(
                 put(ENTITY_API_URL_ID, outcomeDTO.getId())
@@ -1119,7 +668,7 @@ class OutcomeResourceIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(om.writeValueAsBytes(outcomeDTO))
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isBadRequest());
 
         // Validate the Outcome in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -1178,12 +727,7 @@ class OutcomeResourceIT {
         Outcome partialUpdatedOutcome = new Outcome();
         partialUpdatedOutcome.setId(outcome.getId());
 
-        partialUpdatedOutcome
-            .metric(UPDATED_METRIC)
-            .targetValue(UPDATED_TARGET_VALUE)
-            .currentValue(UPDATED_CURRENT_VALUE)
-            .targetDate(UPDATED_TARGET_DATE)
-            .createdDate(UPDATED_CREATED_DATE);
+        partialUpdatedOutcome.sortOrder(UPDATED_SORT_ORDER).createdDate(UPDATED_CREATED_DATE).lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
 
         restOutcomeMockMvc
             .perform(
@@ -1197,7 +741,6 @@ class OutcomeResourceIT {
         // Validate the Outcome in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(partialUpdatedOutcome);
         assertOutcomeUpdatableFieldsEquals(createUpdateProxyForBean(partialUpdatedOutcome, outcome), getPersistedOutcome(outcome));
     }
 
@@ -1216,12 +759,6 @@ class OutcomeResourceIT {
         partialUpdatedOutcome
             .title(UPDATED_TITLE)
             .description(UPDATED_DESCRIPTION)
-            .metric(UPDATED_METRIC)
-            .targetValue(UPDATED_TARGET_VALUE)
-            .currentValue(UPDATED_CURRENT_VALUE)
-            .status(UPDATED_STATUS)
-            .startDate(UPDATED_START_DATE)
-            .targetDate(UPDATED_TARGET_DATE)
             .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE)
             .lastModifiedDate(UPDATED_LAST_MODIFIED_DATE);
@@ -1238,7 +775,6 @@ class OutcomeResourceIT {
         // Validate the Outcome in the database
 
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
-        expectServerSetFields(partialUpdatedOutcome);
         assertOutcomeUpdatableFieldsEquals(partialUpdatedOutcome, getPersistedOutcome(partialUpdatedOutcome));
     }
 
@@ -1251,8 +787,7 @@ class OutcomeResourceIT {
         // Create the Outcome
         OutcomeDTO outcomeDTO = outcomeMapper.toDto(outcome);
 
-        // A non-existent id must return the same 403 as an id the caller cannot
-        // edit, so existence is never revealed (NFR-002).
+        // If the entity doesn't have an ID, it will throw BadRequestAlertException
         restOutcomeMockMvc
             .perform(
                 patch(ENTITY_API_URL_ID, outcomeDTO.getId())
@@ -1260,7 +795,7 @@ class OutcomeResourceIT {
                     .contentType("application/merge-patch+json")
                     .content(om.writeValueAsBytes(outcomeDTO))
             )
-            .andExpect(status().isForbidden());
+            .andExpect(status().isBadRequest());
 
         // Validate the Outcome in the database
         assertSameRepositoryCount(databaseSizeBeforeUpdate);
@@ -1324,16 +859,6 @@ class OutcomeResourceIT {
 
         // Validate the database contains one less item
         assertDecrementedRepositoryCount(databaseSizeBeforeDelete);
-    }
-
-    /**
-     * sortOrder and createdDate are server-owned and lastModifiedDate is stamped by the
-     * server on every update (TREE-002), whatever the client sent.
-     */
-    private void expectServerSetFields(Outcome expected) {
-        Outcome persisted = getPersistedOutcome(expected);
-        assertThat(persisted.getLastModifiedDate()).isAfter(DEFAULT_LAST_MODIFIED_DATE);
-        expected.sortOrder(DEFAULT_SORT_ORDER).createdDate(DEFAULT_CREATED_DATE).lastModifiedDate(persisted.getLastModifiedDate());
     }
 
     protected long getRepositoryCount() {

@@ -29,13 +29,14 @@
           <tr>
             <th scope="col"><span>ID</span></th>
             <th scope="col"><span>Statement</span></th>
-            <th scope="col"><span>Category</span></th>
-            <th scope="col"><span>Importance</span></th>
-            <th scope="col"><span>Evidence</span></th>
-            <th scope="col"><span>Validated</span></th>
+            <th scope="col"><span>Description</span></th>
+            <th scope="col"><span>Status</span></th>
+            <th scope="col"><span>Confidence</span></th>
+            <th scope="col"><span>Sort Order</span></th>
             <th scope="col"><span>Created Date</span></th>
+            <th scope="col"><span>Last Modified Date</span></th>
             <th scope="col"><span>Solution</span></th>
-            <th scope="col"><span>Experiment</span></th>
+            <th scope="col"><span>Owner</span></th>
             <th scope="col"></th>
           </tr>
         </thead>
@@ -45,11 +46,12 @@
               <router-link :to="{ name: 'AssumptionView', params: { assumptionId: assumption.id } }">{{ assumption.id }}</router-link>
             </td>
             <td>{{ assumption.statement }}</td>
-            <td>{{ assumption.category }}</td>
-            <td>{{ assumption.importance }}</td>
-            <td>{{ assumption.evidence }}</td>
-            <td>{{ assumption.validated }}</td>
+            <td>{{ assumption.description }}</td>
+            <td>{{ assumption.status }}</td>
+            <td>{{ assumption.confidence }}</td>
+            <td>{{ assumption.sortOrder }}</td>
             <td>{{ formatDateShort(assumption.createdDate) || '' }}</td>
+            <td>{{ formatDateShort(assumption.lastModifiedDate) || '' }}</td>
             <td>
               <div v-if="assumption.solution">
                 <router-link :to="{ name: 'SolutionView', params: { solutionId: assumption.solution.id } }">{{
@@ -58,12 +60,7 @@
               </div>
             </td>
             <td>
-              <span v-for="(experiment, i) in assumption.experiments" :key="experiment.id"
-                >{{ i > 0 ? ', ' : '' }}
-                <router-link class="form-control-static" :to="{ name: 'ExperimentView', params: { experimentId: experiment.id } }">{{
-                  experiment.title
-                }}</router-link>
-              </span>
+              {{ assumption.owner ? assumption.owner.login : '' }}
             </td>
             <td class="text-end">
               <div class="btn-group">

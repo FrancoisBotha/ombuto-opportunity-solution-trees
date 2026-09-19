@@ -1,5 +1,6 @@
 package com.opportunity.tree.service;
 
+import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
@@ -12,8 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cascade delete for the four tree node types (Product, Outcome, Opportunity,
- * Solution) — see TREE-003 / FR-016.
+ * Cascade delete for all six tree node types (Product, Outcome, Opportunity,
+ * Solution, Assumption, Evidence) — see TREE-003 / FR-016. Every descendant
+ * node is removed with it, together with the node links, open questions,
+ * comments and NodeHistory rows of every deleted node.
  *
  * <p>Lives in its own class (rather than in the JHipster-generated
  * {@code *ServiceImpl} classes) so the logic survives entity regeneration and
@@ -32,17 +35,19 @@ public class TreeNodeCascadeService {
     private static final Logger LOG = LoggerFactory.getLogger(TreeNodeCascadeService.class);
 
     private final TeamAccessService teamAccessService;
+    private final TreeStructureLock structureLock;
 
     @PersistenceContext
     private EntityManager em;
 
-    public TreeNodeCascadeService(TeamAccessService teamAccessService) {
+    public TreeNodeCascadeService(TeamAccessService teamAccessService, TreeStructureLock structureLock) {
         this.teamAccessService = teamAccessService;
+        this.structureLock = structureLock;
     }
 
     public void deleteProduct(Long productId) {
         LOG.debug("Cascade delete Product {}", productId);
-        teamAccessService.requireEditProduct(productId);
+        teamAccessService.requireEditNode(TreeNodeType.PRODUCT, productId);
         List<Long> outcomeIds = em
             .createQuery("select o.id from Outcome o where o.product.id = :pid", Long.class)
             .setParameter("pid", productId)
@@ -57,29 +62,71 @@ public class TreeNodeCascadeService {
             .setParameter("pid", productId)
             .executeUpdate();
         em.createQuery("delete from Interview i where i.product.id = :pid").setParameter("pid", productId).executeUpdate();
+        em.createQuery("delete from NodeLink l where l.product.id = :pid").setParameter("pid", productId).executeUpdate();
+        deleteHistoryFor(TreeNodeType.PRODUCT, List.of(productId));
         em.createQuery("delete from Product p where p.id = :id").setParameter("id", productId).executeUpdate();
         em.flush();
     }
 
     public void deleteOutcome(Long outcomeId) {
         LOG.debug("Cascade delete Outcome {}", outcomeId);
-        teamAccessService.requireEditOutcome(outcomeId);
+        teamAccessService.requireEditNode(TreeNodeType.OUTCOME, outcomeId);
         deleteOutcomesInternal(List.of(outcomeId));
         em.flush();
     }
 
     public void deleteOpportunity(Long opportunityId) {
         LOG.debug("Cascade delete Opportunity {}", opportunityId);
-        teamAccessService.requireEditOpportunity(opportunityId);
+        teamAccessService.requireEditNode(TreeNodeType.OPPORTUNITY, opportunityId);
         deleteOpportunitiesInternal(List.of(opportunityId));
         em.flush();
     }
 
     public void deleteSolution(Long solutionId) {
         LOG.debug("Cascade delete Solution {}", solutionId);
-        teamAccessService.requireEditSolution(solutionId);
+        teamAccessService.requireEditNode(TreeNodeType.SOLUTION, solutionId);
         deleteSolutionsInternal(List.of(solutionId));
         em.flush();
+    }
+
+    public void deleteAssumption(Long assumptionId) {
+        LOG.debug("Cascade delete Assumption {}", assumptionId);
+        teamAccessService.requireEditNode(TreeNodeType.ASSUMPTION, assumptionId);
+        deleteAssumptionsInternal(List.of(assumptionId));
+        em.flush();
+    }
+
+    public void deleteEvidence(Long evidenceId) {
+        LOG.debug("Cascade delete Evidence {}", evidenceId);
+        teamAccessService.requireEditNode(TreeNodeType.EVIDENCE, evidenceId);
+        deleteEvidenceInternal(List.of(evidenceId));
+        em.flush();
+    }
+
+    /**
+     * Delete any node with its whole subtree. The caller must be OWNER or EDITOR
+     * of the node's team; otherwise (or when the node does not exist)
+     * {@link TeamAccessDeniedException} is thrown and nothing is deleted. A node deleted by a
+     * concurrent request while this one waited for the team's structure lock is a
+     * {@code ConcurrencyFailureException} (409).
+     */
+    public void deleteNode(TreeNodeType type, Long id) {
+        if (type == null) {
+            throw new TeamAccessDeniedException();
+        }
+        // Queue behind concurrent moves/creates in the same team (see TreeStructureLock).
+        Long teamId = teamAccessService.requireEditNode(type, id);
+        structureLock.lockTeam(teamId);
+        // Deleted by the previous lock holder while this request waited: 409, not a silent no-op.
+        structureLock.requireNode(type, id, teamId);
+        switch (type) {
+            case PRODUCT -> deleteProduct(id);
+            case OUTCOME -> deleteOutcome(id);
+            case OPPORTUNITY -> deleteOpportunity(id);
+            case SOLUTION -> deleteSolution(id);
+            case ASSUMPTION -> deleteAssumption(id);
+            case EVIDENCE -> deleteEvidence(id);
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -97,6 +144,8 @@ public class TreeNodeCascadeService {
         deleteOpportunitiesInternal(topOpps);
         // Comments hanging off the outcomes themselves.
         deleteCommentsFor("outcome", outcomeIds);
+        deleteHistoryFor(TreeNodeType.OUTCOME, outcomeIds);
+        em.createQuery("delete from NodeLink l where l.outcome.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
         em.createQuery("delete from Outcome o where o.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
     }
 
@@ -126,14 +175,23 @@ public class TreeNodeCascadeService {
             .getResultList();
         deleteSolutionsInternal(solutionIds);
 
+        // Evidence hanging directly off the collected opportunities.
+        List<Long> evidenceIds = em
+            .createQuery("select e.id from Evidence e where e.opportunity.id in :ids", Long.class)
+            .setParameter("ids", all)
+            .getResultList();
+        deleteEvidenceInternal(evidenceIds);
+
         // Clear dependents that reference opportunities.
         em
             .createNativeQuery("delete from rel_opportunity__interview where opportunity_id in (:ids)")
             .setParameter("ids", all)
             .executeUpdate();
         em.createNativeQuery("delete from rel_opportunity__tag where opportunity_id in (:ids)").setParameter("ids", all).executeUpdate();
-        em.createQuery("delete from OpportunityLink l where l.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
+        em.createQuery("delete from NodeLink l where l.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
+        em.createQuery("delete from OpenQuestion q where q.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
         deleteCommentsFor("opportunity", all);
+        deleteHistoryFor(TreeNodeType.OPPORTUNITY, all);
 
         // Break the self-referential parent link so we can bulk-delete without
         // caring about the deletion order.
@@ -146,31 +204,52 @@ public class TreeNodeCascadeService {
             return;
         }
         em.createNativeQuery("delete from rel_solution__tag where solution_id in (:ids)").setParameter("ids", solutionIds).executeUpdate();
-        em.createQuery("delete from SolutionLink sl where sl.solution.id in :ids").setParameter("ids", solutionIds).executeUpdate();
-        // Experiments and their assumption join rows.
-        List<Long> experimentIds = em
-            .createQuery("select e.id from Experiment e where e.solution.id in :ids", Long.class)
+        em.createQuery("delete from NodeLink l where l.solution.id in :ids").setParameter("ids", solutionIds).executeUpdate();
+        List<Long> assumptionIds = em
+            .createQuery("select a.id from Assumption a where a.solution.id in :ids", Long.class)
             .setParameter("ids", solutionIds)
             .getResultList();
-        if (!experimentIds.isEmpty()) {
-            em
-                .createNativeQuery("delete from rel_experiment__assumption where experiment_id in (:ids)")
-                .setParameter("ids", experimentIds)
-                .executeUpdate();
-            em.createQuery("delete from Experiment e where e.id in :ids").setParameter("ids", experimentIds).executeUpdate();
-        }
-        // Assumptions may also be referenced from experiments belonging to other
-        // solutions (via rel_experiment__assumption). Clear those join rows first
-        // so the assumption bulk-delete does not hit an FK violation.
-        em
-            .createNativeQuery(
-                "delete from rel_experiment__assumption where assumption_id in (select id from assumption where solution_id in (:ids))"
-            )
-            .setParameter("ids", solutionIds)
-            .executeUpdate();
-        em.createQuery("delete from Assumption a where a.solution.id in :ids").setParameter("ids", solutionIds).executeUpdate();
+        deleteAssumptionsInternal(assumptionIds);
         deleteCommentsFor("solution", solutionIds);
+        deleteHistoryFor(TreeNodeType.SOLUTION, solutionIds);
         em.createQuery("delete from Solution s where s.id in :ids").setParameter("ids", solutionIds).executeUpdate();
+    }
+
+    private void deleteAssumptionsInternal(List<Long> assumptionIds) {
+        if (assumptionIds.isEmpty()) {
+            return;
+        }
+        List<Long> evidenceIds = em
+            .createQuery("select e.id from Evidence e where e.assumption.id in :ids", Long.class)
+            .setParameter("ids", assumptionIds)
+            .getResultList();
+        deleteEvidenceInternal(evidenceIds);
+        em.createQuery("delete from NodeLink l where l.assumption.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
+        deleteCommentsFor("assumption", assumptionIds);
+        deleteHistoryFor(TreeNodeType.ASSUMPTION, assumptionIds);
+        em.createQuery("delete from Assumption a where a.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
+    }
+
+    private void deleteEvidenceInternal(List<Long> evidenceIds) {
+        if (evidenceIds.isEmpty()) {
+            return;
+        }
+        em.createQuery("delete from NodeLink l where l.evidence.id in :ids").setParameter("ids", evidenceIds).executeUpdate();
+        deleteCommentsFor("evidence", evidenceIds);
+        deleteHistoryFor(TreeNodeType.EVIDENCE, evidenceIds);
+        em.createQuery("delete from Evidence e where e.id in :ids").setParameter("ids", evidenceIds).executeUpdate();
+    }
+
+    /** Delete the NodeHistory rows of the given nodes (history has no FKs, so it is matched by type + id). */
+    private void deleteHistoryFor(TreeNodeType type, List<Long> nodeIds) {
+        if (nodeIds.isEmpty()) {
+            return;
+        }
+        em
+            .createQuery("delete from NodeHistory h where h.nodeType = :type and h.nodeId in :ids")
+            .setParameter("type", type)
+            .setParameter("ids", nodeIds)
+            .executeUpdate();
     }
 
     /**
@@ -186,6 +265,8 @@ public class TreeNodeCascadeService {
             case "outcome" -> "outcome_id";
             case "opportunity" -> "opportunity_id";
             case "solution" -> "solution_id";
+            case "assumption" -> "assumption_id";
+            case "evidence" -> "evidence_id";
             default -> throw new IllegalArgumentException("Unsupported comment column: " + column);
         };
         // Collect target comment ids first, then null out any comment.parent_id

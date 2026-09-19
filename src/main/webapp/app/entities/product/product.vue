@@ -32,6 +32,7 @@
             <th scope="col"><span>Description</span></th>
             <th scope="col"><span>Vision</span></th>
             <th scope="col"><span>Archived</span></th>
+            <th scope="col"><span>Sort Order</span></th>
             <th scope="col"><span>Created Date</span></th>
             <th scope="col"><span>Team</span></th>
             <th scope="col"></th>
@@ -46,6 +47,7 @@
             <td>{{ product.description }}</td>
             <td>{{ product.vision }}</td>
             <td>{{ product.archived }}</td>
+            <td>{{ product.sortOrder }}</td>
             <td>{{ formatDateShort(product.createdDate) || '' }}</td>
             <td>
               <div v-if="product.team">

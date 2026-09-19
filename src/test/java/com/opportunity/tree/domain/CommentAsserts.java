@@ -64,6 +64,8 @@ public class CommentAsserts {
             .satisfies(a -> assertThat(a.getParent()).as("check parent").isEqualTo(expected.getParent()))
             .satisfies(a -> assertThat(a.getOutcome()).as("check outcome").isEqualTo(expected.getOutcome()))
             .satisfies(a -> assertThat(a.getOpportunity()).as("check opportunity").isEqualTo(expected.getOpportunity()))
-            .satisfies(a -> assertThat(a.getSolution()).as("check solution").isEqualTo(expected.getSolution()));
+            .satisfies(a -> assertThat(a.getSolution()).as("check solution").isEqualTo(expected.getSolution()))
+            .satisfies(a -> assertThat(a.getAssumption()).as("check assumption").isEqualTo(expected.getAssumption()))
+            .satisfies(a -> assertThat(a.getEvidence()).as("check evidence").isEqualTo(expected.getEvidence()));
     }
 }

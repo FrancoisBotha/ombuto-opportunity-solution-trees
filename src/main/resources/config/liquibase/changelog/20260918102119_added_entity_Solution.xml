@@ -23,9 +23,6 @@
             <column name="status" type="varchar(255)">
                 <constraints nullable="false" />
             </column>
-            <column name="effort" type="integer">
-                <constraints nullable="true" />
-            </column>
             <column name="sort_order" type="integer">
                 <constraints nullable="false" />
             </column>
@@ -81,7 +78,6 @@
             <column name="title" type="string"/>
             <column name="description" type="clob"/>
             <column name="status" type="string"/>
-            <column name="effort" type="numeric"/>
             <column name="sort_order" type="numeric"/>
             <column name="created_date" type="date"/>
             <column name="last_modified_date" type="date"/>

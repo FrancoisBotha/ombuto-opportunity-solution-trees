@@ -3,6 +3,8 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { useVuelidate } from '@vuelidate/core';
 
+import AssumptionService from '@/entities/assumption/assumption.service';
+import EvidenceService from '@/entities/evidence/evidence.service';
 import OpportunityService from '@/entities/opportunity/opportunity.service';
 import OutcomeService from '@/entities/outcome/outcome.service';
 import SolutionService from '@/entities/solution/solution.service';
@@ -10,7 +12,9 @@ import UserService from '@/entities/user/user.service';
 import { useAlertService } from '@/shared/alert/alert.service';
 import { useDateFormat, useValidation } from '@/shared/composables';
 import useDataUtils from '@/shared/data/data-utils.service';
+import { type IAssumption } from '@/shared/model/assumption.model';
 import { Comment, type IComment } from '@/shared/model/comment.model';
+import { type IEvidence } from '@/shared/model/evidence.model';
 import { type IOpportunity } from '@/shared/model/opportunity.model';
 import { type IOutcome } from '@/shared/model/outcome.model';
 import { type ISolution } from '@/shared/model/solution.model';
@@ -40,6 +44,14 @@ export default defineComponent({
     const solutionService = inject('solutionService', () => new SolutionService());
 
     const solutions: Ref<ISolution[]> = ref([]);
+
+    const assumptionService = inject('assumptionService', () => new AssumptionService());
+
+    const assumptions: Ref<IAssumption[]> = ref([]);
+
+    const evidenceService = inject('evidenceService', () => new EvidenceService());
+
+    const evidences: Ref<IEvidence[]> = ref([]);
     const isSaving = ref(false);
     const currentLanguage = inject('currentLanguage', () => computed(() => navigator.language ?? 'en'), true);
 
@@ -89,6 +101,16 @@ export default defineComponent({
         .then(res => {
           solutions.value = res.data;
         });
+      assumptionService()
+        .retrieve()
+        .then(res => {
+          assumptions.value = res.data;
+        });
+      evidenceService()
+        .retrieve()
+        .then(res => {
+          evidences.value = res.data;
+        });
     };
 
     initRelationships();
@@ -111,6 +133,8 @@ export default defineComponent({
       outcome: {},
       opportunity: {},
       solution: {},
+      assumption: {},
+      evidence: {},
     };
     const v$ = useVuelidate(validationRules, comment as any);
     v$.value.$validate();
@@ -127,6 +151,8 @@ export default defineComponent({
       outcomes,
       opportunities,
       solutions,
+      assumptions,
+      evidences,
       ...dataUtils,
       v$,
       ...useDateFormat({ entityRef: comment }),

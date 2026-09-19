@@ -11,34 +11,40 @@
             <span>{{ assumption.statement }}</span>
           </dd>
           <dt>
-            <span>Category</span>
+            <span>Description</span>
           </dt>
           <dd>
-            <span>{{ assumption.category }}</span>
+            <span>{{ assumption.description }}</span>
           </dd>
           <dt>
-            <span>Importance</span>
+            <span>Status</span>
           </dt>
           <dd>
-            <span>{{ assumption.importance }}</span>
+            <span>{{ assumption.status }}</span>
           </dd>
           <dt>
-            <span>Evidence</span>
+            <span>Confidence</span>
           </dt>
           <dd>
-            <span>{{ assumption.evidence }}</span>
+            <span>{{ assumption.confidence }}</span>
           </dd>
           <dt>
-            <span>Validated</span>
+            <span>Sort Order</span>
           </dt>
           <dd>
-            <span>{{ assumption.validated }}</span>
+            <span>{{ assumption.sortOrder }}</span>
           </dd>
           <dt>
             <span>Created Date</span>
           </dt>
           <dd>
             <span v-if="assumption.createdDate">{{ formatDateLong(assumption.createdDate) }}</span>
+          </dd>
+          <dt>
+            <span>Last Modified Date</span>
+          </dt>
+          <dd>
+            <span v-if="assumption.lastModifiedDate">{{ formatDateLong(assumption.lastModifiedDate) }}</span>
           </dd>
           <dt>
             <span>Solution</span>
@@ -51,13 +57,10 @@
             </div>
           </dd>
           <dt>
-            <span>Experiment</span>
+            <span>Owner</span>
           </dt>
           <dd>
-            <span v-for="(experiment, i) in assumption.experiments" :key="experiment.id"
-              >{{ i > 0 ? ', ' : '' }}
-              <router-link :to="{ name: 'ExperimentView', params: { experimentId: experiment.id } }">{{ experiment.title }}</router-link>
-            </span>
+            {{ assumption.owner ? assumption.owner.login : '' }}
           </dd>
         </dl>
         <button type="submit" @click.prevent="previousState()" class="btn btn-info" data-cy="entityDetailsBackButton">

@@ -1,31 +1,31 @@
-id;name;description;vision;archived;created_date;team_id
-1;all ha anti;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T01:47:48;1
-2;misread phew till;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-17T23:36:15;2
-3;duh annual;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T00:27:11;3
-4;near likewise whose;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-17T13:55:57;4
-5;yum;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-17T14:39:28;5
-6;after;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-17T10:30:51;6
-7;but wire;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-17T13:08:56;7
-8;terribly;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T03:27:42;8
-9;yuck browse;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-17T11:37:54;9
-10;from altruistic supposing;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T03:47:23;10
-11;uh-huh;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T01:06:39;11
-12;casket given boldly;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-17T22:34:17;12
-13;fooey convoke;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-17T15:23:54;13
-14;while;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-17T18:33:10;14
-15;clinch including;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-18T03:52:38;15
-16;gosh juggernaut fooey;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-17T17:32:30;16
-17;hmph near following;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-18T06:20:51;17
-18;premium revitalise brr;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T05:32:45;18
-19;provided grumpy membership;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-17T10:40:20;19
-20;incidentally;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T05:59:52;20
-21;celebrate;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T08:05:49;21
-22;order phooey department;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T07:53:01;22
-23;kettledrum unfurl though;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T05:27:51;23
-24;without;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T08:57:16;24
-25;which anaesthetise economise;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-17T20:42:35;25
-26;mantua;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2026-09-18T02:46:41;26
-27;softly sadly against;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-18T09:19:09;27
-28;exploration far disrespect;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-17T20:06:25;28
-29;those mechanic geez;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-17T23:26:49;29
-30;ferociously;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;2026-09-17T18:55:08;30
+id;name;description;vision;archived;sort_order;created_date;team_id
+1;all ha anti;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;21173;2026-09-18T02:18:35;1
+2;emphasize steak delirious;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;19949;2026-09-17T12:31:50;2
+3;jury overwork;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;32307;2026-09-17T10:48:50;3
+4;that before greedily;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;11379;2026-09-17T21:15:45;4
+5;mozzarella furthermore;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;20148;2026-09-18T00:41:10;5
+6;whoever;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;4607;2026-09-17T23:24:52;6
+7;wetly mystify;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;22728;2026-09-18T08:10:30;7
+8;um for joyfully;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;26680;2026-09-17T19:51:00;8
+9;hence gladly pointless;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;9921;2026-09-17T21:30:01;9
+10;solace;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;25121;2026-09-17T11:14:40;10
+11;boldly overload;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;14329;2026-09-17T15:05:55;11
+12;psst;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;6161;2026-09-17T21:20:14;12
+13;foot positively anxiously;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;15552;2026-09-18T03:52:38;13
+14;gosh juggernaut fooey;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;9903;2026-09-18T05:28:43;14
+15;overplay;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;12932;2026-09-17T17:49:11;15
+16;roughly;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;11450;2026-09-17T15:49:45;16
+17;ew reproachfully until;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;16890;2026-09-18T05:32:45;17
+18;provided grumpy membership;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;524;2026-09-17T13:57:59;18
+19;reluctantly gleefully amidst;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;9507;2026-09-18T06:39:35;19
+20;healthily;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;4679;2026-09-17T20:17:01;20
+21;ouch kettledrum;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;4543;2026-09-17T10:22:41;21
+22;across loosely whereas;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;31786;2026-09-18T04:38:10;22
+23;director;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;16783;2026-09-18T04:21:38;23
+24;modulo;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;16696;2026-09-17T20:42:35;24
+25;mantua;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;22514;2026-09-18T03:07:09;25
+26;consequently;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;17274;2026-09-18T04:59:08;26
+27;yawningly;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;false;2864;2026-09-17T18:03:00;27
+28;yowza ecliptic lest;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;4102;2026-09-17T20:06:25;28
+29;those mechanic geez;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;17965;2026-09-17T16:35:17;29
+30;nor sweatshop worth;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;true;4608;2026-09-18T04:42:49;30

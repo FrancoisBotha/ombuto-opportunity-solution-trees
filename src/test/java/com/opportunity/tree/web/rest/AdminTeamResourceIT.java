@@ -318,6 +318,7 @@ class AdminTeamResourceIT {
         Product product = new Product();
         product.setName("P1");
         product.setArchived(false);
+        product.setSortOrder(0);
         product.setCreatedDate(Instant.now());
         product.setTeam(team);
         productRepository.saveAndFlush(product);

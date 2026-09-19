@@ -5,6 +5,8 @@ import { type MountingOptions, shallowMount } from '@vue/test-utils';
 import dayjs from 'dayjs';
 import sinon, { type SinonStubbedInstance } from 'sinon';
 
+import AssumptionService from '@/entities/assumption/assumption.service';
+import EvidenceService from '@/entities/evidence/evidence.service';
 import OpportunityService from '@/entities/opportunity/opportunity.service';
 import OutcomeService from '@/entities/outcome/outcome.service';
 import SolutionService from '@/entities/solution/solution.service';
@@ -72,6 +74,14 @@ describe('Component Tests', () => {
             } as any),
           solutionService: () =>
             sinon.createStubInstance<SolutionService>(SolutionService, {
+              retrieve: sinon.stub().resolves({}),
+            } as any),
+          assumptionService: () =>
+            sinon.createStubInstance<AssumptionService>(AssumptionService, {
+              retrieve: sinon.stub().resolves({}),
+            } as any),
+          evidenceService: () =>
+            sinon.createStubInstance<EvidenceService>(EvidenceService, {
               retrieve: sinon.stub().resolves({}),
             } as any),
         },

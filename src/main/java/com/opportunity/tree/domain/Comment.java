@@ -43,7 +43,10 @@ public class Comment implements Serializable {
     private User author;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JsonIgnoreProperties(value = { "author", "parent", "outcome", "opportunity", "solution" }, allowSetters = true)
+    @JsonIgnoreProperties(
+        value = { "author", "parent", "outcome", "opportunity", "solution", "assumption", "evidence" },
+        allowSetters = true
+    )
     private Comment parent;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -57,6 +60,14 @@ public class Comment implements Serializable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "opportunity", "owner", "tags" }, allowSetters = true)
     private Solution solution;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties(value = { "solution", "owner" }, allowSetters = true)
+    private Assumption assumption;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties(value = { "opportunity", "assumption" }, allowSetters = true)
+    private Evidence evidence;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -174,6 +185,32 @@ public class Comment implements Serializable {
 
     public Comment solution(Solution solution) {
         this.setSolution(solution);
+        return this;
+    }
+
+    public Assumption getAssumption() {
+        return this.assumption;
+    }
+
+    public void setAssumption(Assumption assumption) {
+        this.assumption = assumption;
+    }
+
+    public Comment assumption(Assumption assumption) {
+        this.setAssumption(assumption);
+        return this;
+    }
+
+    public Evidence getEvidence() {
+        return this.evidence;
+    }
+
+    public void setEvidence(Evidence evidence) {
+        this.evidence = evidence;
+    }
+
+    public Comment evidence(Evidence evidence) {
+        this.setEvidence(evidence);
         return this;
     }
 

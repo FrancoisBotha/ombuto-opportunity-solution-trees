@@ -29,6 +29,12 @@
             <span>{{ product.archived }}</span>
           </dd>
           <dt>
+            <span>Sort Order</span>
+          </dt>
+          <dd>
+            <span>{{ product.sortOrder }}</span>
+          </dd>
+          <dt>
             <span>Created Date</span>
           </dt>
           <dd>
