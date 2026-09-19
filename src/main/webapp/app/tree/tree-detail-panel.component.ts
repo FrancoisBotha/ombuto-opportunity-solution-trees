@@ -156,6 +156,9 @@ export default defineComponent({
       return false;
     };
 
+    // TREE-007 unsaved-changes decision: PROMPT (not silent discard). Switching selection
+    // while the form is dirty shows an in-panel prompt: 'Keep editing' reverts the selection
+    // and keeps the edits; 'Discard changes' drops them and switches to the new node.
     // Sync editing state with the store's selection unless there are unsaved changes.
     const adoptStoreSelection = () => {
       editingType.value = store.selectedNodeType;
