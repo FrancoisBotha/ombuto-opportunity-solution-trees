@@ -8,7 +8,6 @@ export interface ISolution {
   title?: string;
   description?: string | null;
   status?: keyof typeof SolutionStatus;
-  effort?: number | null;
   sortOrder?: number;
   createdDate?: Date;
   lastModifiedDate?: Date | null;
@@ -23,7 +22,6 @@ export class Solution implements ISolution {
     public title?: string,
     public description?: string | null,
     public status?: keyof typeof SolutionStatus,
-    public effort?: number | null,
     public sortOrder?: number,
     public createdDate?: Date,
     public lastModifiedDate?: Date | null,

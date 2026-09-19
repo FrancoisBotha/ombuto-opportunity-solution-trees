@@ -21,7 +21,7 @@
       "fieldName": "status",
       "fieldType": "OpportunityStatus",
       "fieldValidateRules": ["required"],
-      "fieldValues": "IDENTIFIED,EXPLORING,PRIORITISED,IN_PROGRESS,ADDRESSED,PARKED,DISCARDED"
+      "fieldValues": "UNEXPLORED,EXPLORING,VALIDATED,PARKED"
     },
     {
       "fieldName": "valuerating",
@@ -31,10 +31,10 @@
       "fieldValidateRulesMin": "1"
     },
     {
-      "fieldName": "complexity",
+      "fieldName": "priority",
       "fieldType": "Integer",
       "fieldValidateRules": ["required", "min", "max"],
-      "fieldValidateRulesMax": "5",
+      "fieldValidateRulesMax": "100",
       "fieldValidateRulesMin": "1"
     },
     {

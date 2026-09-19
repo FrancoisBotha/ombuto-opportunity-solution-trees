@@ -35,7 +35,7 @@ describe('Service Tests', () => {
     beforeEach(() => {
       service = new SolutionService();
       currentDate = new Date();
-      elemDefault = new Solution(123, 'AAAAAAA', 'AAAAAAA', 'IDEA', 0, 0, currentDate, currentDate);
+      elemDefault = new Solution(123, 'AAAAAAA', 'AAAAAAA', 'CANDIDATE', 0, currentDate, currentDate);
     });
 
     describe('Service methods', () => {
@@ -93,7 +93,6 @@ describe('Service Tests', () => {
           title: 'BBBBBB',
           description: 'BBBBBB',
           status: 'BBBBBB',
-          effort: 1,
           sortOrder: 1,
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
@@ -120,7 +119,7 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Solution', async () => {
-        const patchObject = { description: 'BBBBBB', lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT), ...new Solution() };
+        const patchObject = { description: 'BBBBBB', ...new Solution() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
         const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
@@ -147,7 +146,6 @@ describe('Service Tests', () => {
           title: 'BBBBBB',
           description: 'BBBBBB',
           status: 'BBBBBB',
-          effort: 1,
           sortOrder: 1,
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),

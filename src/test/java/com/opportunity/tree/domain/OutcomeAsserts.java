@@ -49,12 +49,6 @@ public class OutcomeAsserts {
             .as("Verify Outcome relevant properties")
             .satisfies(a -> assertThat(a.getTitle()).as("check title").isEqualTo(expected.getTitle()))
             .satisfies(a -> assertThat(a.getDescription()).as("check description").isEqualTo(expected.getDescription()))
-            .satisfies(a -> assertThat(a.getMetric()).as("check metric").isEqualTo(expected.getMetric()))
-            .satisfies(a -> assertThat(a.getTargetValue()).as("check targetValue").isEqualTo(expected.getTargetValue()))
-            .satisfies(a -> assertThat(a.getCurrentValue()).as("check currentValue").isEqualTo(expected.getCurrentValue()))
-            .satisfies(a -> assertThat(a.getStatus()).as("check status").isEqualTo(expected.getStatus()))
-            .satisfies(a -> assertThat(a.getStartDate()).as("check startDate").isEqualTo(expected.getStartDate()))
-            .satisfies(a -> assertThat(a.getTargetDate()).as("check targetDate").isEqualTo(expected.getTargetDate()))
             .satisfies(a -> assertThat(a.getSortOrder()).as("check sortOrder").isEqualTo(expected.getSortOrder()))
             .satisfies(a -> assertThat(a.getCreatedDate()).as("check createdDate").isEqualTo(expected.getCreatedDate()))
             .satisfies(a -> assertThat(a.getLastModifiedDate()).as("check lastModifiedDate").isEqualTo(expected.getLastModifiedDate()));

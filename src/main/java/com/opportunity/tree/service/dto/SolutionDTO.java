@@ -27,12 +27,10 @@ public class SolutionDTO implements Serializable {
     @NotNull
     private SolutionStatus status;
 
-    @Min(value = 1)
-    @Max(value = 5)
-    private Integer effort;
-
+    @NotNull
     private Integer sortOrder;
 
+    @NotNull
     private Instant createdDate;
 
     private Instant lastModifiedDate;
@@ -74,14 +72,6 @@ public class SolutionDTO implements Serializable {
 
     public void setStatus(SolutionStatus status) {
         this.status = status;
-    }
-
-    public Integer getEffort() {
-        return effort;
-    }
-
-    public void setEffort(Integer effort) {
-        this.effort = effort;
     }
 
     public Integer getSortOrder() {
@@ -161,7 +151,6 @@ public class SolutionDTO implements Serializable {
             ", title='" + getTitle() + "'" +
             ", description='" + getDescription() + "'" +
             ", status='" + getStatus() + "'" +
-            ", effort=" + getEffort() +
             ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
             ", lastModifiedDate='" + getLastModifiedDate() + "'" +

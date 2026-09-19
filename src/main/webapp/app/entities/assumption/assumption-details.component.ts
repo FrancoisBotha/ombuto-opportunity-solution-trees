@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { useAlertService } from '@/shared/alert/alert.service';
 import { useDateFormat } from '@/shared/composables';
+import useDataUtils from '@/shared/data/data-utils.service';
 import { type IAssumption } from '@/shared/model/assumption.model';
 
 import AssumptionService from './assumption.service';
@@ -13,6 +14,8 @@ export default defineComponent({
     const dateFormat = useDateFormat();
     const assumptionService = inject('assumptionService', () => new AssumptionService());
     const alertService = inject('alertService', () => useAlertService(), true);
+
+    const dataUtils = useDataUtils();
 
     const route = useRoute();
     const router = useRouter();
@@ -37,6 +40,8 @@ export default defineComponent({
       ...dateFormat,
       alertService,
       assumption,
+
+      ...dataUtils,
 
       previousState,
     };

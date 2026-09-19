@@ -42,10 +42,6 @@
               <span>Status</span>
               <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'status'"></jhi-sort-indicator>
             </th>
-            <th scope="col" @click="changeOrder('effort')">
-              <span>Effort</span>
-              <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'effort'"></jhi-sort-indicator>
-            </th>
             <th scope="col" @click="changeOrder('sortOrder')">
               <span>Sort Order</span>
               <jhi-sort-indicator :current-order="propOrder" :reverse="reverse" :field-name="'sortOrder'"></jhi-sort-indicator>
@@ -77,7 +73,6 @@
             <td>{{ solution.title }}</td>
             <td>{{ solution.description }}</td>
             <td>{{ solution.status }}</td>
-            <td>{{ solution.effort }}</td>
             <td>{{ solution.sortOrder }}</td>
             <td>{{ formatDateShort(solution.createdDate) || '' }}</td>
             <td>{{ formatDateShort(solution.lastModifiedDate) || '' }}</td>

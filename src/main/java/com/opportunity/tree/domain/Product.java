@@ -44,6 +44,10 @@ public class Product implements Serializable {
     private Boolean archived;
 
     @NotNull
+    @Column(name = "sort_order", nullable = false)
+    private Integer sortOrder;
+
+    @NotNull
     @Column(name = "created_date", nullable = false)
     private Instant createdDate;
 
@@ -118,6 +122,19 @@ public class Product implements Serializable {
         this.archived = archived;
     }
 
+    public Integer getSortOrder() {
+        return this.sortOrder;
+    }
+
+    public Product sortOrder(Integer sortOrder) {
+        this.setSortOrder(sortOrder);
+        return this;
+    }
+
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
     public Instant getCreatedDate() {
         return this.createdDate;
     }
@@ -172,6 +189,7 @@ public class Product implements Serializable {
             ", description='" + getDescription() + "'" +
             ", vision='" + getVision() + "'" +
             ", archived='" + getArchived() + "'" +
+            ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
             "}";
     }

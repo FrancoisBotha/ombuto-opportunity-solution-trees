@@ -23,12 +23,6 @@
             <span>{{ solution.status }}</span>
           </dd>
           <dt>
-            <span>Effort</span>
-          </dt>
-          <dd>
-            <span>{{ solution.effort }}</span>
-          </dd>
-          <dt>
             <span>Sort Order</span>
           </dt>
           <dd>

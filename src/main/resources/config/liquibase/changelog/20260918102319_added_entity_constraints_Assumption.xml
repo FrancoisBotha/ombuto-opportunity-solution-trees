@@ -16,5 +16,12 @@
                                  referencedColumnNames="id"
                                  referencedTableName="solution"
                                  />
+
+        <addForeignKeyConstraint baseColumnNames="owner_id"
+                                 baseTableName="assumption"
+                                 constraintName="fk_assumption__owner_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="jhi_user"
+                                 />
     </changeSet>
 </databaseChangeLog>

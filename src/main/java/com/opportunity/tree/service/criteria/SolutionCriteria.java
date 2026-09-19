@@ -48,8 +48,6 @@ public class SolutionCriteria implements Serializable, Criteria {
 
     private SolutionStatusFilter status;
 
-    private IntegerFilter effort;
-
     private IntegerFilter sortOrder;
 
     private InstantFilter createdDate;
@@ -70,7 +68,6 @@ public class SolutionCriteria implements Serializable, Criteria {
         this.id = other.optionalId().map(LongFilter::copy).orElse(null);
         this.title = other.optionalTitle().map(StringFilter::copy).orElse(null);
         this.status = other.optionalStatus().map(SolutionStatusFilter::copy).orElse(null);
-        this.effort = other.optionalEffort().map(IntegerFilter::copy).orElse(null);
         this.sortOrder = other.optionalSortOrder().map(IntegerFilter::copy).orElse(null);
         this.createdDate = other.optionalCreatedDate().map(InstantFilter::copy).orElse(null);
         this.lastModifiedDate = other.optionalLastModifiedDate().map(InstantFilter::copy).orElse(null);
@@ -140,25 +137,6 @@ public class SolutionCriteria implements Serializable, Criteria {
 
     public void setStatus(SolutionStatusFilter status) {
         this.status = status;
-    }
-
-    public IntegerFilter getEffort() {
-        return effort;
-    }
-
-    public Optional<IntegerFilter> optionalEffort() {
-        return Optional.ofNullable(effort);
-    }
-
-    public IntegerFilter effort() {
-        if (effort == null) {
-            setEffort(new IntegerFilter());
-        }
-        return effort;
-    }
-
-    public void setEffort(IntegerFilter effort) {
-        this.effort = effort;
     }
 
     public IntegerFilter getSortOrder() {
@@ -307,7 +285,6 @@ public class SolutionCriteria implements Serializable, Criteria {
             Objects.equals(id, that.id) &&
             Objects.equals(title, that.title) &&
             Objects.equals(status, that.status) &&
-            Objects.equals(effort, that.effort) &&
             Objects.equals(sortOrder, that.sortOrder) &&
             Objects.equals(createdDate, that.createdDate) &&
             Objects.equals(lastModifiedDate, that.lastModifiedDate) &&
@@ -320,7 +297,7 @@ public class SolutionCriteria implements Serializable, Criteria {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, title, status, effort, sortOrder, createdDate, lastModifiedDate, opportunityId, ownerId, tagId, distinct);
+        return Objects.hash(id, title, status, sortOrder, createdDate, lastModifiedDate, opportunityId, ownerId, tagId, distinct);
     }
 
     // prettier-ignore
@@ -330,7 +307,6 @@ public class SolutionCriteria implements Serializable, Criteria {
             optionalId().map(f -> "id=" + f + ", ").orElse("") +
             optionalTitle().map(f -> "title=" + f + ", ").orElse("") +
             optionalStatus().map(f -> "status=" + f + ", ").orElse("") +
-            optionalEffort().map(f -> "effort=" + f + ", ").orElse("") +
             optionalSortOrder().map(f -> "sortOrder=" + f + ", ").orElse("") +
             optionalCreatedDate().map(f -> "createdDate=" + f + ", ").orElse("") +
             optionalLastModifiedDate().map(f -> "lastModifiedDate=" + f + ", ").orElse("") +

@@ -69,6 +69,10 @@ export default defineComponent({
       archived: {
         required: validations.required('This field is required.'),
       },
+      sortOrder: {
+        required: validations.required('This field is required.'),
+        integer: validations.integer('This field should be a number.'),
+      },
       createdDate: {
         required: validations.required('This field is required.'),
       },

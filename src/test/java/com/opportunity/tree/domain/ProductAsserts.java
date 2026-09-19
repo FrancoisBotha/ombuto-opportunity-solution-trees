@@ -51,6 +51,7 @@ public class ProductAsserts {
             .satisfies(a -> assertThat(a.getDescription()).as("check description").isEqualTo(expected.getDescription()))
             .satisfies(a -> assertThat(a.getVision()).as("check vision").isEqualTo(expected.getVision()))
             .satisfies(a -> assertThat(a.getArchived()).as("check archived").isEqualTo(expected.getArchived()))
+            .satisfies(a -> assertThat(a.getSortOrder()).as("check sortOrder").isEqualTo(expected.getSortOrder()))
             .satisfies(a -> assertThat(a.getCreatedDate()).as("check createdDate").isEqualTo(expected.getCreatedDate()));
     }
 

@@ -51,20 +51,19 @@ public class CacheConfiguration {
             createCache(cm, com.opportunity.tree.domain.Opportunity.class.getName());
             createCache(cm, com.opportunity.tree.domain.Opportunity.class.getName() + ".interviews");
             createCache(cm, com.opportunity.tree.domain.Opportunity.class.getName() + ".tags");
-            createCache(cm, com.opportunity.tree.domain.OpportunityLink.class.getName());
             createCache(cm, com.opportunity.tree.domain.Solution.class.getName());
             createCache(cm, com.opportunity.tree.domain.Solution.class.getName() + ".tags");
-            createCache(cm, com.opportunity.tree.domain.SolutionLink.class.getName());
             createCache(cm, com.opportunity.tree.domain.Assumption.class.getName());
-            createCache(cm, com.opportunity.tree.domain.Assumption.class.getName() + ".experiments");
-            createCache(cm, com.opportunity.tree.domain.Experiment.class.getName());
-            createCache(cm, com.opportunity.tree.domain.Experiment.class.getName() + ".assumptions");
             createCache(cm, com.opportunity.tree.domain.Interview.class.getName());
             createCache(cm, com.opportunity.tree.domain.Interview.class.getName() + ".opportunities");
             createCache(cm, com.opportunity.tree.domain.Comment.class.getName());
             createCache(cm, com.opportunity.tree.domain.Tag.class.getName());
             createCache(cm, com.opportunity.tree.domain.Tag.class.getName() + ".opportunities");
             createCache(cm, com.opportunity.tree.domain.Tag.class.getName() + ".solutions");
+            createCache(cm, com.opportunity.tree.domain.Evidence.class.getName());
+            createCache(cm, com.opportunity.tree.domain.NodeLink.class.getName());
+            createCache(cm, com.opportunity.tree.domain.OpenQuestion.class.getName());
+            createCache(cm, com.opportunity.tree.domain.NodeHistory.class.getName());
             // jhipster-needle-ehcache-add-entry
         };
     }

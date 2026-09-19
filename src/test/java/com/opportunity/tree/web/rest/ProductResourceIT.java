@@ -64,6 +64,9 @@ class ProductResourceIT {
     private static final Boolean DEFAULT_ARCHIVED = false;
     private static final Boolean UPDATED_ARCHIVED = true;
 
+    private static final Integer DEFAULT_SORT_ORDER = 1;
+    private static final Integer UPDATED_SORT_ORDER = 2;
+
     private static final Instant DEFAULT_CREATED_DATE = Instant.ofEpochMilli(0L);
     private static final Instant UPDATED_CREATED_DATE = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 
@@ -120,6 +123,7 @@ class ProductResourceIT {
             .description(DEFAULT_DESCRIPTION)
             .vision(DEFAULT_VISION)
             .archived(DEFAULT_ARCHIVED)
+            .sortOrder(DEFAULT_SORT_ORDER)
             .createdDate(DEFAULT_CREATED_DATE);
         // Add required entity
         Team team;
@@ -146,6 +150,7 @@ class ProductResourceIT {
             .description(UPDATED_DESCRIPTION)
             .vision(UPDATED_VISION)
             .archived(UPDATED_ARCHIVED)
+            .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE);
         // Add required entity
         Team team;
@@ -332,6 +337,7 @@ class ProductResourceIT {
             .andExpect(jsonPath("$.[*].description").value(hasItem(DEFAULT_DESCRIPTION)))
             .andExpect(jsonPath("$.[*].vision").value(hasItem(DEFAULT_VISION)))
             .andExpect(jsonPath("$.[*].archived").value(hasItem(DEFAULT_ARCHIVED)))
+            .andExpect(jsonPath("$.[*].sortOrder").value(hasItem(DEFAULT_SORT_ORDER)))
             .andExpect(jsonPath("$.[*].createdDate").value(hasItem(DEFAULT_CREATED_DATE.toString())));
     }
 
@@ -368,6 +374,7 @@ class ProductResourceIT {
             .andExpect(jsonPath("$.description").value(DEFAULT_DESCRIPTION))
             .andExpect(jsonPath("$.vision").value(DEFAULT_VISION))
             .andExpect(jsonPath("$.archived").value(DEFAULT_ARCHIVED))
+            .andExpect(jsonPath("$.sortOrder").value(DEFAULT_SORT_ORDER))
             .andExpect(jsonPath("$.createdDate").value(DEFAULT_CREATED_DATE.toString()));
     }
 
@@ -395,6 +402,7 @@ class ProductResourceIT {
             .description(UPDATED_DESCRIPTION)
             .vision(UPDATED_VISION)
             .archived(UPDATED_ARCHIVED)
+            .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE);
         ProductDTO productDTO = productMapper.toDto(updatedProduct);
 
@@ -491,7 +499,11 @@ class ProductResourceIT {
         Product partialUpdatedProduct = new Product();
         partialUpdatedProduct.setId(product.getId());
 
-        partialUpdatedProduct.description(UPDATED_DESCRIPTION).archived(UPDATED_ARCHIVED).createdDate(UPDATED_CREATED_DATE);
+        partialUpdatedProduct
+            .description(UPDATED_DESCRIPTION)
+            .archived(UPDATED_ARCHIVED)
+            .sortOrder(UPDATED_SORT_ORDER)
+            .createdDate(UPDATED_CREATED_DATE);
 
         restProductMockMvc
             .perform(
@@ -527,6 +539,7 @@ class ProductResourceIT {
             .description(UPDATED_DESCRIPTION)
             .vision(UPDATED_VISION)
             .archived(UPDATED_ARCHIVED)
+            .sortOrder(UPDATED_SORT_ORDER)
             .createdDate(UPDATED_CREATED_DATE);
 
         restProductMockMvc

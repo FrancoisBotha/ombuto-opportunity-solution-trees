@@ -9,7 +9,7 @@ export interface IOpportunity {
   description?: string | null;
   status?: keyof typeof OpportunityStatus;
   valuerating?: number;
-  complexity?: number;
+  priority?: number;
   sortOrder?: number;
   createdDate?: Date;
   lastModifiedDate?: Date | null;
@@ -27,7 +27,7 @@ export class Opportunity implements IOpportunity {
     public description?: string | null,
     public status?: keyof typeof OpportunityStatus,
     public valuerating?: number,
-    public complexity?: number,
+    public priority?: number,
     public sortOrder?: number,
     public createdDate?: Date,
     public lastModifiedDate?: Date | null,

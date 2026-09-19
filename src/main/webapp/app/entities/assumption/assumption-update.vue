@@ -27,67 +27,66 @@
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-control-label" for="assumption">Category</label>
+            <label class="form-control-label" for="assumption">Description</label>
+            <textarea
+              class="form-control"
+              name="description"
+              id="assumption-description"
+              data-cy="description"
+              :class="{ valid: !v$.description.$invalid, invalid: v$.description.$invalid }"
+              v-model="v$.description.$model"
+            ></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-control-label" for="assumption">Status</label>
             <select
               class="form-control"
-              name="category"
-              :class="{ valid: !v$.category.$invalid, invalid: v$.category.$invalid }"
-              v-model="v$.category.$model"
-              id="assumption-category"
-              data-cy="category"
+              name="status"
+              :class="{ valid: !v$.status.$invalid, invalid: v$.status.$invalid }"
+              v-model="v$.status.$model"
+              id="assumption-status"
+              data-cy="status"
               required
             >
-              <option v-for="assumptionCategory in assumptionCategoryValues" :key="assumptionCategory" :value="assumptionCategory">
-                {{ assumptionCategory }}
+              <option v-for="assumptionStatus in assumptionStatusValues" :key="assumptionStatus" :value="assumptionStatus">
+                {{ assumptionStatus }}
               </option>
             </select>
-            <div v-if="v$.category.$anyDirty && v$.category.$invalid">
-              <small class="form-text text-danger" v-for="error of v$.category.$errors" :key="error.$uid">{{ error.$message }}</small>
+            <div v-if="v$.status.$anyDirty && v$.status.$invalid">
+              <small class="form-text text-danger" v-for="error of v$.status.$errors" :key="error.$uid">{{ error.$message }}</small>
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-control-label" for="assumption">Importance</label>
+            <label class="form-control-label" for="assumption">Confidence</label>
             <input
               type="number"
               class="form-control"
-              name="importance"
-              id="assumption-importance"
-              data-cy="importance"
-              :class="{ valid: !v$.importance.$invalid, invalid: v$.importance.$invalid }"
-              v-model.number="v$.importance.$model"
+              name="confidence"
+              id="assumption-confidence"
+              data-cy="confidence"
+              :class="{ valid: !v$.confidence.$invalid, invalid: v$.confidence.$invalid }"
+              v-model.number="v$.confidence.$model"
               required
             />
-            <div v-if="v$.importance.$anyDirty && v$.importance.$invalid">
-              <small class="form-text text-danger" v-for="error of v$.importance.$errors" :key="error.$uid">{{ error.$message }}</small>
+            <div v-if="v$.confidence.$anyDirty && v$.confidence.$invalid">
+              <small class="form-text text-danger" v-for="error of v$.confidence.$errors" :key="error.$uid">{{ error.$message }}</small>
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-control-label" for="assumption">Evidence</label>
+            <label class="form-control-label" for="assumption">Sort Order</label>
             <input
               type="number"
               class="form-control"
-              name="evidence"
-              id="assumption-evidence"
-              data-cy="evidence"
-              :class="{ valid: !v$.evidence.$invalid, invalid: v$.evidence.$invalid }"
-              v-model.number="v$.evidence.$model"
+              name="sortOrder"
+              id="assumption-sortOrder"
+              data-cy="sortOrder"
+              :class="{ valid: !v$.sortOrder.$invalid, invalid: v$.sortOrder.$invalid }"
+              v-model.number="v$.sortOrder.$model"
               required
             />
-            <div v-if="v$.evidence.$anyDirty && v$.evidence.$invalid">
-              <small class="form-text text-danger" v-for="error of v$.evidence.$errors" :key="error.$uid">{{ error.$message }}</small>
+            <div v-if="v$.sortOrder.$anyDirty && v$.sortOrder.$invalid">
+              <small class="form-text text-danger" v-for="error of v$.sortOrder.$errors" :key="error.$uid">{{ error.$message }}</small>
             </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-control-label" for="assumption">Validated</label>
-            <input
-              type="checkbox"
-              class="form-check"
-              name="validated"
-              id="assumption-validated"
-              data-cy="validated"
-              :class="{ valid: !v$.validated.$invalid, invalid: v$.validated.$invalid }"
-              v-model="v$.validated.$model"
-            />
           </div>
           <div class="mb-3">
             <label class="form-control-label" for="assumption">Created Date</label>
@@ -109,6 +108,21 @@
             </div>
           </div>
           <div class="mb-3">
+            <label class="form-control-label" for="assumption">Last Modified Date</label>
+            <div class="d-flex">
+              <input
+                id="assumption-lastModifiedDate"
+                data-cy="lastModifiedDate"
+                type="datetime-local"
+                class="form-control"
+                name="lastModifiedDate"
+                :class="{ valid: !v$.lastModifiedDate.$invalid, invalid: v$.lastModifiedDate.$invalid }"
+                :value="convertDateTimeFromServer(v$.lastModifiedDate.$model)"
+                @change="updateInstantField('lastModifiedDate', $event)"
+              />
+            </div>
+          </div>
+          <div class="mb-3">
             <label class="form-control-label" for="assumption">Solution</label>
             <select class="form-control" id="assumption-solution" data-cy="solution" name="solution" v-model="assumption.solution" required>
               <option v-if="!assumption.solution" :value="null" selected></option>
@@ -125,22 +139,15 @@
             <small class="form-text text-danger" v-for="error of v$.solution.$errors" :key="error.$uid">{{ error.$message }}</small>
           </div>
           <div class="mb-3">
-            <label for="assumption">Experiment</label>
-            <select
-              class="form-control"
-              id="assumption-experiments"
-              data-cy="experiment"
-              multiple
-              name="experiment"
-              v-if="assumption.experiments !== undefined"
-              v-model="assumption.experiments"
-            >
+            <label class="form-control-label" for="assumption">Owner</label>
+            <select class="form-control" id="assumption-owner" data-cy="owner" name="owner" v-model="assumption.owner">
+              <option :value="null"></option>
               <option
-                :value="getSelected(assumption.experiments, experimentOption, 'id')"
-                v-for="experimentOption in experiments"
-                :key="experimentOption.id"
+                :value="assumption.owner && userOption.id === assumption.owner.id ? assumption.owner : userOption"
+                v-for="userOption in users"
+                :key="userOption.id"
               >
-                {{ experimentOption.title }}
+                {{ userOption.login }}
               </option>
             </select>
           </div>

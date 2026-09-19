@@ -57,7 +57,7 @@
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-control-label" for="opportunity">Value</label>
+            <label class="form-control-label" for="opportunity">Valuerating</label>
             <input
               type="number"
               class="form-control"
@@ -73,19 +73,19 @@
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-control-label" for="opportunity">Complexity</label>
+            <label class="form-control-label" for="opportunity">Priority</label>
             <input
               type="number"
               class="form-control"
-              name="complexity"
-              id="opportunity-complexity"
-              data-cy="complexity"
-              :class="{ valid: !v$.complexity.$invalid, invalid: v$.complexity.$invalid }"
-              v-model.number="v$.complexity.$model"
+              name="priority"
+              id="opportunity-priority"
+              data-cy="priority"
+              :class="{ valid: !v$.priority.$invalid, invalid: v$.priority.$invalid }"
+              v-model.number="v$.priority.$model"
               required
             />
-            <div v-if="v$.complexity.$anyDirty && v$.complexity.$invalid">
-              <small class="form-text text-danger" v-for="error of v$.complexity.$errors" :key="error.$uid">{{ error.$message }}</small>
+            <div v-if="v$.priority.$anyDirty && v$.priority.$invalid">
+              <small class="form-text text-danger" v-for="error of v$.priority.$errors" :key="error.$uid">{{ error.$message }}</small>
             </div>
           </div>
           <div class="mb-3">

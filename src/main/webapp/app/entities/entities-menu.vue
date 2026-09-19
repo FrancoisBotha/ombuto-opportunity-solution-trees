@@ -20,25 +20,13 @@
       <font-awesome-icon icon="asterisk" />
       <span>Opportunity</span>
     </b-dropdown-item>
-    <b-dropdown-item to="/opportunity-link">
-      <font-awesome-icon icon="asterisk" />
-      <span>Opportunity Link</span>
-    </b-dropdown-item>
     <b-dropdown-item to="/solution">
       <font-awesome-icon icon="asterisk" />
       <span>Solution</span>
     </b-dropdown-item>
-    <b-dropdown-item to="/solution-link">
-      <font-awesome-icon icon="asterisk" />
-      <span>Solution Link</span>
-    </b-dropdown-item>
     <b-dropdown-item to="/assumption">
       <font-awesome-icon icon="asterisk" />
       <span>Assumption</span>
-    </b-dropdown-item>
-    <b-dropdown-item to="/experiment">
-      <font-awesome-icon icon="asterisk" />
-      <span>Experiment</span>
     </b-dropdown-item>
     <b-dropdown-item to="/interview">
       <font-awesome-icon icon="asterisk" />
@@ -51,6 +39,22 @@
     <b-dropdown-item to="/tag">
       <font-awesome-icon icon="asterisk" />
       <span>Tag</span>
+    </b-dropdown-item>
+    <b-dropdown-item to="/evidence">
+      <font-awesome-icon icon="asterisk" />
+      <span>Evidence</span>
+    </b-dropdown-item>
+    <b-dropdown-item to="/node-link">
+      <font-awesome-icon icon="asterisk" />
+      <span>Node Link</span>
+    </b-dropdown-item>
+    <b-dropdown-item to="/open-question">
+      <font-awesome-icon icon="asterisk" />
+      <span>Open Question</span>
+    </b-dropdown-item>
+    <b-dropdown-item to="/node-history">
+      <font-awesome-icon icon="asterisk" />
+      <span>Node History</span>
     </b-dropdown-item>
     <!-- jhipster-needle-add-entity-to-menu - JHipster will add entities to the menu here -->
   </div>

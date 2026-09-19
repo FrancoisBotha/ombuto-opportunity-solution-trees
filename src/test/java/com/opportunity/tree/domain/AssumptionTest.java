@@ -1,13 +1,10 @@
 package com.opportunity.tree.domain;
 
 import static com.opportunity.tree.domain.AssumptionTestSamples.*;
-import static com.opportunity.tree.domain.ExperimentTestSamples.*;
 import static com.opportunity.tree.domain.SolutionTestSamples.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.opportunity.tree.web.rest.TestUtil;
-import java.util.HashSet;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class AssumptionTest {
@@ -36,27 +33,5 @@ class AssumptionTest {
 
         assumption.solution(null);
         assertThat(assumption.getSolution()).isNull();
-    }
-
-    @Test
-    void experimentTest() {
-        Assumption assumption = getAssumptionRandomSampleGenerator();
-        Experiment experimentBack = getExperimentRandomSampleGenerator();
-
-        assumption.addExperiment(experimentBack);
-        assertThat(assumption.getExperiments()).containsOnly(experimentBack);
-        assertThat(experimentBack.getAssumptions()).containsOnly(assumption);
-
-        assumption.removeExperiment(experimentBack);
-        assertThat(assumption.getExperiments()).doesNotContain(experimentBack);
-        assertThat(experimentBack.getAssumptions()).doesNotContain(assumption);
-
-        assumption.experiments(new HashSet<>(Set.of(experimentBack)));
-        assertThat(assumption.getExperiments()).containsOnly(experimentBack);
-        assertThat(experimentBack.getAssumptions()).containsOnly(assumption);
-
-        assumption.setExperiments(new HashSet<>());
-        assertThat(assumption.getExperiments()).doesNotContain(experimentBack);
-        assertThat(experimentBack.getAssumptions()).doesNotContain(assumption);
     }
 }

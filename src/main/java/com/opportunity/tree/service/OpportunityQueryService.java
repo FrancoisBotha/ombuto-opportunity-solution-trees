@@ -79,7 +79,7 @@ public class OpportunityQueryService extends QueryService<Opportunity> {
                 buildStringSpecification(criteria.getTitle(), Opportunity_.title),
                 buildSpecification(criteria.getStatus(), Opportunity_.status),
                 buildRangeSpecification(criteria.getValuerating(), Opportunity_.valuerating),
-                buildRangeSpecification(criteria.getComplexity(), Opportunity_.complexity),
+                buildRangeSpecification(criteria.getPriority(), Opportunity_.priority),
                 buildRangeSpecification(criteria.getSortOrder(), Opportunity_.sortOrder),
                 buildRangeSpecification(criteria.getCreatedDate(), Opportunity_.createdDate),
                 buildRangeSpecification(criteria.getLastModifiedDate(), Opportunity_.lastModifiedDate),

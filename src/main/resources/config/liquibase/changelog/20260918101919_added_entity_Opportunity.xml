@@ -26,7 +26,7 @@
             <column name="valuerating" type="integer">
                 <constraints nullable="false" />
             </column>
-            <column name="complexity" type="integer">
+            <column name="priority" type="integer">
                 <constraints nullable="false" />
             </column>
             <column name="sort_order" type="integer">
@@ -99,7 +99,7 @@
             <column name="description" type="clob"/>
             <column name="status" type="string"/>
             <column name="valuerating" type="numeric"/>
-            <column name="complexity" type="numeric"/>
+            <column name="priority" type="numeric"/>
             <column name="sort_order" type="numeric"/>
             <column name="created_date" type="date"/>
             <column name="last_modified_date" type="date"/>

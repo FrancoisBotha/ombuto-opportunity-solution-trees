@@ -1,6 +1,5 @@
 package com.opportunity.tree.service.criteria;
 
-import com.opportunity.tree.domain.enumeration.OutcomeStatus;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
@@ -22,41 +21,12 @@ import tech.jhipster.service.filter.*;
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class OutcomeCriteria implements Serializable, Criteria {
 
-    /**
-     * Class for filtering OutcomeStatus
-     */
-    public static class OutcomeStatusFilter extends Filter<OutcomeStatus> {
-
-        public OutcomeStatusFilter() {}
-
-        public OutcomeStatusFilter(OutcomeStatusFilter filter) {
-            super(filter);
-        }
-
-        @Override
-        public OutcomeStatusFilter copy() {
-            return new OutcomeStatusFilter(this);
-        }
-    }
-
     @Serial
     private static final long serialVersionUID = 1L;
 
     private LongFilter id;
 
     private StringFilter title;
-
-    private StringFilter metric;
-
-    private StringFilter targetValue;
-
-    private StringFilter currentValue;
-
-    private OutcomeStatusFilter status;
-
-    private LocalDateFilter startDate;
-
-    private LocalDateFilter targetDate;
 
     private IntegerFilter sortOrder;
 
@@ -75,12 +45,6 @@ public class OutcomeCriteria implements Serializable, Criteria {
     public OutcomeCriteria(OutcomeCriteria other) {
         this.id = other.optionalId().map(LongFilter::copy).orElse(null);
         this.title = other.optionalTitle().map(StringFilter::copy).orElse(null);
-        this.metric = other.optionalMetric().map(StringFilter::copy).orElse(null);
-        this.targetValue = other.optionalTargetValue().map(StringFilter::copy).orElse(null);
-        this.currentValue = other.optionalCurrentValue().map(StringFilter::copy).orElse(null);
-        this.status = other.optionalStatus().map(OutcomeStatusFilter::copy).orElse(null);
-        this.startDate = other.optionalStartDate().map(LocalDateFilter::copy).orElse(null);
-        this.targetDate = other.optionalTargetDate().map(LocalDateFilter::copy).orElse(null);
         this.sortOrder = other.optionalSortOrder().map(IntegerFilter::copy).orElse(null);
         this.createdDate = other.optionalCreatedDate().map(InstantFilter::copy).orElse(null);
         this.lastModifiedDate = other.optionalLastModifiedDate().map(InstantFilter::copy).orElse(null);
@@ -130,120 +94,6 @@ public class OutcomeCriteria implements Serializable, Criteria {
 
     public void setTitle(StringFilter title) {
         this.title = title;
-    }
-
-    public StringFilter getMetric() {
-        return metric;
-    }
-
-    public Optional<StringFilter> optionalMetric() {
-        return Optional.ofNullable(metric);
-    }
-
-    public StringFilter metric() {
-        if (metric == null) {
-            setMetric(new StringFilter());
-        }
-        return metric;
-    }
-
-    public void setMetric(StringFilter metric) {
-        this.metric = metric;
-    }
-
-    public StringFilter getTargetValue() {
-        return targetValue;
-    }
-
-    public Optional<StringFilter> optionalTargetValue() {
-        return Optional.ofNullable(targetValue);
-    }
-
-    public StringFilter targetValue() {
-        if (targetValue == null) {
-            setTargetValue(new StringFilter());
-        }
-        return targetValue;
-    }
-
-    public void setTargetValue(StringFilter targetValue) {
-        this.targetValue = targetValue;
-    }
-
-    public StringFilter getCurrentValue() {
-        return currentValue;
-    }
-
-    public Optional<StringFilter> optionalCurrentValue() {
-        return Optional.ofNullable(currentValue);
-    }
-
-    public StringFilter currentValue() {
-        if (currentValue == null) {
-            setCurrentValue(new StringFilter());
-        }
-        return currentValue;
-    }
-
-    public void setCurrentValue(StringFilter currentValue) {
-        this.currentValue = currentValue;
-    }
-
-    public OutcomeStatusFilter getStatus() {
-        return status;
-    }
-
-    public Optional<OutcomeStatusFilter> optionalStatus() {
-        return Optional.ofNullable(status);
-    }
-
-    public OutcomeStatusFilter status() {
-        if (status == null) {
-            setStatus(new OutcomeStatusFilter());
-        }
-        return status;
-    }
-
-    public void setStatus(OutcomeStatusFilter status) {
-        this.status = status;
-    }
-
-    public LocalDateFilter getStartDate() {
-        return startDate;
-    }
-
-    public Optional<LocalDateFilter> optionalStartDate() {
-        return Optional.ofNullable(startDate);
-    }
-
-    public LocalDateFilter startDate() {
-        if (startDate == null) {
-            setStartDate(new LocalDateFilter());
-        }
-        return startDate;
-    }
-
-    public void setStartDate(LocalDateFilter startDate) {
-        this.startDate = startDate;
-    }
-
-    public LocalDateFilter getTargetDate() {
-        return targetDate;
-    }
-
-    public Optional<LocalDateFilter> optionalTargetDate() {
-        return Optional.ofNullable(targetDate);
-    }
-
-    public LocalDateFilter targetDate() {
-        if (targetDate == null) {
-            setTargetDate(new LocalDateFilter());
-        }
-        return targetDate;
-    }
-
-    public void setTargetDate(LocalDateFilter targetDate) {
-        this.targetDate = targetDate;
     }
 
     public IntegerFilter getSortOrder() {
@@ -372,12 +222,6 @@ public class OutcomeCriteria implements Serializable, Criteria {
         return (
             Objects.equals(id, that.id) &&
             Objects.equals(title, that.title) &&
-            Objects.equals(metric, that.metric) &&
-            Objects.equals(targetValue, that.targetValue) &&
-            Objects.equals(currentValue, that.currentValue) &&
-            Objects.equals(status, that.status) &&
-            Objects.equals(startDate, that.startDate) &&
-            Objects.equals(targetDate, that.targetDate) &&
             Objects.equals(sortOrder, that.sortOrder) &&
             Objects.equals(createdDate, that.createdDate) &&
             Objects.equals(lastModifiedDate, that.lastModifiedDate) &&
@@ -389,22 +233,7 @@ public class OutcomeCriteria implements Serializable, Criteria {
 
     @Override
     public int hashCode() {
-        return Objects.hash(
-            id,
-            title,
-            metric,
-            targetValue,
-            currentValue,
-            status,
-            startDate,
-            targetDate,
-            sortOrder,
-            createdDate,
-            lastModifiedDate,
-            productId,
-            ownerId,
-            distinct
-        );
+        return Objects.hash(id, title, sortOrder, createdDate, lastModifiedDate, productId, ownerId, distinct);
     }
 
     // prettier-ignore
@@ -413,12 +242,6 @@ public class OutcomeCriteria implements Serializable, Criteria {
         return "OutcomeCriteria{" +
             optionalId().map(f -> "id=" + f + ", ").orElse("") +
             optionalTitle().map(f -> "title=" + f + ", ").orElse("") +
-            optionalMetric().map(f -> "metric=" + f + ", ").orElse("") +
-            optionalTargetValue().map(f -> "targetValue=" + f + ", ").orElse("") +
-            optionalCurrentValue().map(f -> "currentValue=" + f + ", ").orElse("") +
-            optionalStatus().map(f -> "status=" + f + ", ").orElse("") +
-            optionalStartDate().map(f -> "startDate=" + f + ", ").orElse("") +
-            optionalTargetDate().map(f -> "targetDate=" + f + ", ").orElse("") +
             optionalSortOrder().map(f -> "sortOrder=" + f + ", ").orElse("") +
             optionalCreatedDate().map(f -> "createdDate=" + f + ", ").orElse("") +
             optionalLastModifiedDate().map(f -> "lastModifiedDate=" + f + ", ").orElse("") +

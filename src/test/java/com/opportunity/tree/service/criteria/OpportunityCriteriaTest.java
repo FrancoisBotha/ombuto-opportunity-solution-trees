@@ -79,7 +79,7 @@ class OpportunityCriteriaTest {
         opportunityCriteria.title();
         opportunityCriteria.status();
         opportunityCriteria.valuerating();
-        opportunityCriteria.complexity();
+        opportunityCriteria.priority();
         opportunityCriteria.sortOrder();
         opportunityCriteria.createdDate();
         opportunityCriteria.lastModifiedDate();
@@ -98,7 +98,7 @@ class OpportunityCriteriaTest {
                 condition.apply(criteria.getTitle()) &&
                 condition.apply(criteria.getStatus()) &&
                 condition.apply(criteria.getValuerating()) &&
-                condition.apply(criteria.getComplexity()) &&
+                condition.apply(criteria.getPriority()) &&
                 condition.apply(criteria.getSortOrder()) &&
                 condition.apply(criteria.getCreatedDate()) &&
                 condition.apply(criteria.getLastModifiedDate()) &&
@@ -119,7 +119,7 @@ class OpportunityCriteriaTest {
                 condition.apply(criteria.getTitle(), copy.getTitle()) &&
                 condition.apply(criteria.getStatus(), copy.getStatus()) &&
                 condition.apply(criteria.getValuerating(), copy.getValuerating()) &&
-                condition.apply(criteria.getComplexity(), copy.getComplexity()) &&
+                condition.apply(criteria.getPriority(), copy.getPriority()) &&
                 condition.apply(criteria.getSortOrder(), copy.getSortOrder()) &&
                 condition.apply(criteria.getCreatedDate(), copy.getCreatedDate()) &&
                 condition.apply(criteria.getLastModifiedDate(), copy.getLastModifiedDate()) &&

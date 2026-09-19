@@ -1,0 +1,13 @@
+export enum TreeNodeType {
+  PRODUCT = 'PRODUCT',
+
+  OUTCOME = 'OUTCOME',
+
+  OPPORTUNITY = 'OPPORTUNITY',
+
+  SOLUTION = 'SOLUTION',
+
+  ASSUMPTION = 'ASSUMPTION',
+
+  EVIDENCE = 'EVIDENCE',
+}

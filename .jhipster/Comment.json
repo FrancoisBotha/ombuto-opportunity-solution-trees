@@ -59,6 +59,20 @@
       "relationshipName": "solution",
       "relationshipSide": "left",
       "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "statement",
+      "otherEntityName": "assumption",
+      "relationshipName": "assumption",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "title",
+      "otherEntityName": "evidence",
+      "relationshipName": "evidence",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
     }
   ],
   "searchEngine": "no",

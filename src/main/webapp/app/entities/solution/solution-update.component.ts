@@ -90,11 +90,6 @@ export default defineComponent({
       status: {
         required: validations.required('This field is required.'),
       },
-      effort: {
-        integer: validations.integer('This field should be a number.'),
-        min: validations.minValue('This field should be at least 1.', 1),
-        max: validations.maxValue('This field cannot be more than 5.', 5),
-      },
       sortOrder: {
         required: validations.required('This field is required.'),
         integer: validations.integer('This field should be a number.'),

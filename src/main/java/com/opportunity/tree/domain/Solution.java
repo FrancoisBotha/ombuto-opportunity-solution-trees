@@ -44,11 +44,6 @@ public class Solution implements Serializable {
     @Column(name = "status", nullable = false)
     private SolutionStatus status;
 
-    @Min(value = 1)
-    @Max(value = 5)
-    @Column(name = "effort")
-    private Integer effort;
-
     @NotNull
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
@@ -130,19 +125,6 @@ public class Solution implements Serializable {
 
     public void setStatus(SolutionStatus status) {
         this.status = status;
-    }
-
-    public Integer getEffort() {
-        return this.effort;
-    }
-
-    public Solution effort(Integer effort) {
-        this.setEffort(effort);
-        return this;
-    }
-
-    public void setEffort(Integer effort) {
-        this.effort = effort;
     }
 
     public Integer getSortOrder() {
@@ -260,7 +242,6 @@ public class Solution implements Serializable {
             ", title='" + getTitle() + "'" +
             ", description='" + getDescription() + "'" +
             ", status='" + getStatus() + "'" +
-            ", effort=" + getEffort() +
             ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
             ", lastModifiedDate='" + getLastModifiedDate() + "'" +

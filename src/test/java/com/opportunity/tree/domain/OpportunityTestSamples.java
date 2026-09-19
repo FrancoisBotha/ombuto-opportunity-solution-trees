@@ -12,11 +12,11 @@ public class OpportunityTestSamples {
     private static final AtomicInteger intCount = new AtomicInteger(random.nextInt() + (2 * Short.MAX_VALUE));
 
     public static Opportunity getOpportunitySample1() {
-        return new Opportunity().id(1L).title("title1").valuerating(1).complexity(1).sortOrder(1);
+        return new Opportunity().id(1L).title("title1").valuerating(1).priority(1).sortOrder(1);
     }
 
     public static Opportunity getOpportunitySample2() {
-        return new Opportunity().id(2L).title("title2").valuerating(2).complexity(2).sortOrder(2);
+        return new Opportunity().id(2L).title("title2").valuerating(2).priority(2).sortOrder(2);
     }
 
     public static Opportunity getOpportunityRandomSampleGenerator() {
@@ -24,7 +24,7 @@ public class OpportunityTestSamples {
             .id(longCount.incrementAndGet())
             .title(UUID.randomUUID().toString())
             .valuerating(intCount.incrementAndGet())
-            .complexity(intCount.incrementAndGet())
+            .priority(intCount.incrementAndGet())
             .sortOrder(intCount.incrementAndGet());
     }
 }

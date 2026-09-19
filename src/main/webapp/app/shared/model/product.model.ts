@@ -6,6 +6,7 @@ export interface IProduct {
   description?: string | null;
   vision?: string | null;
   archived?: boolean;
+  sortOrder?: number;
   createdDate?: Date;
   team?: ITeam;
 }
@@ -17,6 +18,7 @@ export class Product implements IProduct {
     public description?: string | null,
     public vision?: string | null,
     public archived?: boolean,
+    public sortOrder?: number,
     public createdDate?: Date,
     public team?: ITeam,
   ) {

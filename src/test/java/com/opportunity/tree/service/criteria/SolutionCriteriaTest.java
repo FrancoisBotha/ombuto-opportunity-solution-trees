@@ -78,7 +78,6 @@ class SolutionCriteriaTest {
         solutionCriteria.id();
         solutionCriteria.title();
         solutionCriteria.status();
-        solutionCriteria.effort();
         solutionCriteria.sortOrder();
         solutionCriteria.createdDate();
         solutionCriteria.lastModifiedDate();
@@ -94,7 +93,6 @@ class SolutionCriteriaTest {
                 condition.apply(criteria.getId()) &&
                 condition.apply(criteria.getTitle()) &&
                 condition.apply(criteria.getStatus()) &&
-                condition.apply(criteria.getEffort()) &&
                 condition.apply(criteria.getSortOrder()) &&
                 condition.apply(criteria.getCreatedDate()) &&
                 condition.apply(criteria.getLastModifiedDate()) &&
@@ -112,7 +110,6 @@ class SolutionCriteriaTest {
                 condition.apply(criteria.getId(), copy.getId()) &&
                 condition.apply(criteria.getTitle(), copy.getTitle()) &&
                 condition.apply(criteria.getStatus(), copy.getStatus()) &&
-                condition.apply(criteria.getEffort(), copy.getEffort()) &&
                 condition.apply(criteria.getSortOrder(), copy.getSortOrder()) &&
                 condition.apply(criteria.getCreatedDate(), copy.getCreatedDate()) &&
                 condition.apply(criteria.getLastModifiedDate(), copy.getLastModifiedDate()) &&

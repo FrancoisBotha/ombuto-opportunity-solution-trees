@@ -76,7 +76,6 @@ public class SolutionQueryService extends QueryService<Solution> {
                 buildRangeSpecification(criteria.getId(), Solution_.id),
                 buildStringSpecification(criteria.getTitle(), Solution_.title),
                 buildSpecification(criteria.getStatus(), Solution_.status),
-                buildRangeSpecification(criteria.getEffort(), Solution_.effort),
                 buildRangeSpecification(criteria.getSortOrder(), Solution_.sortOrder),
                 buildRangeSpecification(criteria.getCreatedDate(), Solution_.createdDate),
                 buildRangeSpecification(criteria.getLastModifiedDate(), Solution_.lastModifiedDate),

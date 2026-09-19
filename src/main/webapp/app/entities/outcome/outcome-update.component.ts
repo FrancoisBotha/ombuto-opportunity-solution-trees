@@ -8,7 +8,6 @@ import UserService from '@/entities/user/user.service';
 import { useAlertService } from '@/shared/alert/alert.service';
 import { useDateFormat, useValidation } from '@/shared/composables';
 import useDataUtils from '@/shared/data/data-utils.service';
-import { OutcomeStatus } from '@/shared/model/enumerations/outcome-status.model';
 import { type IOutcome, Outcome } from '@/shared/model/outcome.model';
 import { type IProduct } from '@/shared/model/product.model';
 
@@ -27,7 +26,6 @@ export default defineComponent({
     const products: Ref<IProduct[]> = ref([]);
     const userService = inject('userService', () => new UserService());
     const users: Ref<Array<any>> = ref([]);
-    const outcomeStatusValues: Ref<string[]> = ref(Object.keys(OutcomeStatus));
     const isSaving = ref(false);
     const currentLanguage = inject('currentLanguage', () => computed(() => navigator.language ?? 'en'), true);
 
@@ -76,20 +74,6 @@ export default defineComponent({
         maxLength: validations.maxLength('This field cannot be longer than 200 characters.', 200),
       },
       description: {},
-      metric: {
-        maxLength: validations.maxLength('This field cannot be longer than 200 characters.', 200),
-      },
-      targetValue: {
-        maxLength: validations.maxLength('This field cannot be longer than 100 characters.', 100),
-      },
-      currentValue: {
-        maxLength: validations.maxLength('This field cannot be longer than 100 characters.', 100),
-      },
-      status: {
-        required: validations.required('This field is required.'),
-      },
-      startDate: {},
-      targetDate: {},
       sortOrder: {
         required: validations.required('This field is required.'),
         integer: validations.integer('This field should be a number.'),
@@ -111,7 +95,6 @@ export default defineComponent({
       alertService,
       outcome,
       previousState,
-      outcomeStatusValues,
       isSaving,
       currentLanguage,
       products,

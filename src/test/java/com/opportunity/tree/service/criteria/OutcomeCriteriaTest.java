@@ -77,12 +77,6 @@ class OutcomeCriteriaTest {
     private static void setAllFilters(OutcomeCriteria outcomeCriteria) {
         outcomeCriteria.id();
         outcomeCriteria.title();
-        outcomeCriteria.metric();
-        outcomeCriteria.targetValue();
-        outcomeCriteria.currentValue();
-        outcomeCriteria.status();
-        outcomeCriteria.startDate();
-        outcomeCriteria.targetDate();
         outcomeCriteria.sortOrder();
         outcomeCriteria.createdDate();
         outcomeCriteria.lastModifiedDate();
@@ -96,12 +90,6 @@ class OutcomeCriteriaTest {
             criteria ->
                 condition.apply(criteria.getId()) &&
                 condition.apply(criteria.getTitle()) &&
-                condition.apply(criteria.getMetric()) &&
-                condition.apply(criteria.getTargetValue()) &&
-                condition.apply(criteria.getCurrentValue()) &&
-                condition.apply(criteria.getStatus()) &&
-                condition.apply(criteria.getStartDate()) &&
-                condition.apply(criteria.getTargetDate()) &&
                 condition.apply(criteria.getSortOrder()) &&
                 condition.apply(criteria.getCreatedDate()) &&
                 condition.apply(criteria.getLastModifiedDate()) &&
@@ -117,12 +105,6 @@ class OutcomeCriteriaTest {
             criteria ->
                 condition.apply(criteria.getId(), copy.getId()) &&
                 condition.apply(criteria.getTitle(), copy.getTitle()) &&
-                condition.apply(criteria.getMetric(), copy.getMetric()) &&
-                condition.apply(criteria.getTargetValue(), copy.getTargetValue()) &&
-                condition.apply(criteria.getCurrentValue(), copy.getCurrentValue()) &&
-                condition.apply(criteria.getStatus(), copy.getStatus()) &&
-                condition.apply(criteria.getStartDate(), copy.getStartDate()) &&
-                condition.apply(criteria.getTargetDate(), copy.getTargetDate()) &&
                 condition.apply(criteria.getSortOrder(), copy.getSortOrder()) &&
                 condition.apply(criteria.getCreatedDate(), copy.getCreatedDate()) &&
                 condition.apply(criteria.getLastModifiedDate(), copy.getLastModifiedDate()) &&

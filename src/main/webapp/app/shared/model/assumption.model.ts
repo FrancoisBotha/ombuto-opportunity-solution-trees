@@ -1,31 +1,31 @@
-import { type AssumptionCategory } from '@/shared/model/enumerations/assumption-category.model';
-import { type IExperiment } from '@/shared/model/experiment.model';
+import { type AssumptionStatus } from '@/shared/model/enumerations/assumption-status.model';
 import { type ISolution } from '@/shared/model/solution.model';
+import { type IUser } from '@/shared/model/user.model';
 
 export interface IAssumption {
   id?: number;
   statement?: string;
-  category?: keyof typeof AssumptionCategory;
-  importance?: number;
-  evidence?: number;
-  validated?: boolean | null;
+  description?: string | null;
+  status?: keyof typeof AssumptionStatus;
+  confidence?: number;
+  sortOrder?: number;
   createdDate?: Date;
+  lastModifiedDate?: Date | null;
   solution?: ISolution;
-  experiments?: IExperiment[] | null;
+  owner?: IUser | null;
 }
 
 export class Assumption implements IAssumption {
   constructor(
     public id?: number,
     public statement?: string,
-    public category?: keyof typeof AssumptionCategory,
-    public importance?: number,
-    public evidence?: number,
-    public validated?: boolean | null,
+    public description?: string | null,
+    public status?: keyof typeof AssumptionStatus,
+    public confidence?: number,
+    public sortOrder?: number,
     public createdDate?: Date,
+    public lastModifiedDate?: Date | null,
     public solution?: ISolution,
-    public experiments?: IExperiment[] | null,
-  ) {
-    this.validated = this.validated ?? false;
-  }
+    public owner?: IUser | null,
+  ) {}
 }

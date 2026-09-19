@@ -29,16 +29,20 @@ public class OpportunityDTO implements Serializable {
     @NotNull
     private OpportunityStatus status;
 
+    @NotNull
     @Min(value = 1)
     @Max(value = 5)
     private Integer valuerating;
 
+    @NotNull
     @Min(value = 1)
-    @Max(value = 5)
-    private Integer complexity;
+    @Max(value = 100)
+    private Integer priority;
 
+    @NotNull
     private Integer sortOrder;
 
+    @NotNull
     private Instant createdDate;
 
     private Instant lastModifiedDate;
@@ -94,12 +98,12 @@ public class OpportunityDTO implements Serializable {
         this.valuerating = valuerating;
     }
 
-    public Integer getComplexity() {
-        return complexity;
+    public Integer getPriority() {
+        return priority;
     }
 
-    public void setComplexity(Integer complexity) {
-        this.complexity = complexity;
+    public void setPriority(Integer priority) {
+        this.priority = priority;
     }
 
     public Integer getSortOrder() {
@@ -196,7 +200,7 @@ public class OpportunityDTO implements Serializable {
             ", description='" + getDescription() + "'" +
             ", status='" + getStatus() + "'" +
             ", valuerating=" + getValuerating() +
-            ", complexity=" + getComplexity() +
+            ", priority=" + getPriority() +
             ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
             ", lastModifiedDate='" + getLastModifiedDate() + "'" +

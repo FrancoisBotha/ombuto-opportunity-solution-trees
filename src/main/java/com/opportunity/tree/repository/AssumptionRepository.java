@@ -14,6 +14,9 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface AssumptionRepository extends JpaRepository<Assumption, Long> {
+    @Query("select assumption from Assumption assumption where assumption.owner.login = ?#{authentication.name}")
+    List<Assumption> findByOwnerIsCurrentUser();
+
     default Optional<Assumption> findOneWithEagerRelationships(Long id) {
         return this.findOneWithToOneRelationships(id);
     }
@@ -27,14 +30,16 @@ public interface AssumptionRepository extends JpaRepository<Assumption, Long> {
     }
 
     @Query(
-        value = "select assumption from Assumption assumption left join fetch assumption.solution",
+        value = "select assumption from Assumption assumption left join fetch assumption.solution left join fetch assumption.owner",
         countQuery = "select count(assumption) from Assumption assumption"
     )
     Page<Assumption> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("select assumption from Assumption assumption left join fetch assumption.solution")
+    @Query("select assumption from Assumption assumption left join fetch assumption.solution left join fetch assumption.owner")
     List<Assumption> findAllWithToOneRelationships();
 
-    @Query("select assumption from Assumption assumption left join fetch assumption.solution where assumption.id =:id")
+    @Query(
+        "select assumption from Assumption assumption left join fetch assumption.solution left join fetch assumption.owner where assumption.id =:id"
+    )
     Optional<Assumption> findOneWithToOneRelationships(@Param("id") Long id);
 }

@@ -1,0 +1,54 @@
+{
+  "annotations": {
+    "changelogDate": "20260919105650"
+  },
+  "applications": ["opportunitySolutionTree"],
+  "documentation": "Interview snippet / test result. Exactly one parent: an Opportunity or an Assumption.",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "title",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "500",
+      "fieldValidateRulesMinlength": "2"
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "sortOrder",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "createdDate",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "lastModifiedDate",
+      "fieldType": "Instant"
+    }
+  ],
+  "name": "Evidence",
+  "relationships": [
+    {
+      "otherEntityField": "title",
+      "otherEntityName": "opportunity",
+      "relationshipName": "opportunity",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "statement",
+      "otherEntityName": "assumption",
+      "relationshipName": "assumption",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

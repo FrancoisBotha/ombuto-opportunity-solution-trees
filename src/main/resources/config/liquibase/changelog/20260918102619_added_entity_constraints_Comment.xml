@@ -44,5 +44,19 @@
                                  referencedColumnNames="id"
                                  referencedTableName="solution"
                                  />
+
+        <addForeignKeyConstraint baseColumnNames="assumption_id"
+                                 baseTableName="comment"
+                                 constraintName="fk_comment__assumption_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="assumption"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="evidence_id"
+                                 baseTableName="comment"
+                                 constraintName="fk_comment__evidence_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="evidence"
+                                 />
     </changeSet>
 </databaseChangeLog>

@@ -52,9 +52,9 @@ public class Opportunity implements Serializable {
 
     @NotNull
     @Min(value = 1)
-    @Max(value = 5)
-    @Column(name = "complexity", nullable = false)
-    private Integer complexity;
+    @Max(value = 100)
+    @Column(name = "priority", nullable = false)
+    private Integer priority;
 
     @NotNull
     @Column(name = "sort_order", nullable = false)
@@ -166,17 +166,17 @@ public class Opportunity implements Serializable {
         this.valuerating = valuerating;
     }
 
-    public Integer getComplexity() {
-        return this.complexity;
+    public Integer getPriority() {
+        return this.priority;
     }
 
-    public Opportunity complexity(Integer complexity) {
-        this.setComplexity(complexity);
+    public Opportunity priority(Integer priority) {
+        this.setPriority(priority);
         return this;
     }
 
-    public void setComplexity(Integer complexity) {
-        this.complexity = complexity;
+    public void setPriority(Integer priority) {
+        this.priority = priority;
     }
 
     public Integer getSortOrder() {
@@ -331,7 +331,7 @@ public class Opportunity implements Serializable {
             ", description='" + getDescription() + "'" +
             ", status='" + getStatus() + "'" +
             ", valuerating=" + getValuerating() +
-            ", complexity=" + getComplexity() +
+            ", priority=" + getPriority() +
             ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
             ", lastModifiedDate='" + getLastModifiedDate() + "'" +

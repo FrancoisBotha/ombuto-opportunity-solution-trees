@@ -1,12 +1,10 @@
 package com.opportunity.tree.service.dto;
 
-import com.opportunity.tree.domain.enumeration.OutcomeStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Lob;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.Objects;
 
 /**
@@ -25,24 +23,10 @@ public class OutcomeDTO implements Serializable {
     @Lob
     private String description;
 
-    @Size(max = 200)
-    private String metric;
-
-    @Size(max = 100)
-    private String targetValue;
-
-    @Size(max = 100)
-    private String currentValue;
-
     @NotNull
-    private OutcomeStatus status;
-
-    private LocalDate startDate;
-
-    private LocalDate targetDate;
-
     private Integer sortOrder;
 
+    @NotNull
     private Instant createdDate;
 
     private Instant lastModifiedDate;
@@ -74,54 +58,6 @@ public class OutcomeDTO implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public String getMetric() {
-        return metric;
-    }
-
-    public void setMetric(String metric) {
-        this.metric = metric;
-    }
-
-    public String getTargetValue() {
-        return targetValue;
-    }
-
-    public void setTargetValue(String targetValue) {
-        this.targetValue = targetValue;
-    }
-
-    public String getCurrentValue() {
-        return currentValue;
-    }
-
-    public void setCurrentValue(String currentValue) {
-        this.currentValue = currentValue;
-    }
-
-    public OutcomeStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(OutcomeStatus status) {
-        this.status = status;
-    }
-
-    public LocalDate getStartDate() {
-        return startDate;
-    }
-
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
-    }
-
-    public LocalDate getTargetDate() {
-        return targetDate;
-    }
-
-    public void setTargetDate(LocalDate targetDate) {
-        this.targetDate = targetDate;
     }
 
     public Integer getSortOrder() {
@@ -192,12 +128,6 @@ public class OutcomeDTO implements Serializable {
             "id=" + getId() +
             ", title='" + getTitle() + "'" +
             ", description='" + getDescription() + "'" +
-            ", metric='" + getMetric() + "'" +
-            ", targetValue='" + getTargetValue() + "'" +
-            ", currentValue='" + getCurrentValue() + "'" +
-            ", status='" + getStatus() + "'" +
-            ", startDate='" + getStartDate() + "'" +
-            ", targetDate='" + getTargetDate() + "'" +
             ", sortOrder=" + getSortOrder() +
             ", createdDate='" + getCreatedDate() + "'" +
             ", lastModifiedDate='" + getLastModifiedDate() + "'" +

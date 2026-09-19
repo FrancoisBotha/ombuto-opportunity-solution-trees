@@ -12,32 +12,14 @@ public class OutcomeTestSamples {
     private static final AtomicInteger intCount = new AtomicInteger(random.nextInt() + (2 * Short.MAX_VALUE));
 
     public static Outcome getOutcomeSample1() {
-        return new Outcome()
-            .id(1L)
-            .title("title1")
-            .metric("metric1")
-            .targetValue("targetValue1")
-            .currentValue("currentValue1")
-            .sortOrder(1);
+        return new Outcome().id(1L).title("title1").sortOrder(1);
     }
 
     public static Outcome getOutcomeSample2() {
-        return new Outcome()
-            .id(2L)
-            .title("title2")
-            .metric("metric2")
-            .targetValue("targetValue2")
-            .currentValue("currentValue2")
-            .sortOrder(2);
+        return new Outcome().id(2L).title("title2").sortOrder(2);
     }
 
     public static Outcome getOutcomeRandomSampleGenerator() {
-        return new Outcome()
-            .id(longCount.incrementAndGet())
-            .title(UUID.randomUUID().toString())
-            .metric(UUID.randomUUID().toString())
-            .targetValue(UUID.randomUUID().toString())
-            .currentValue(UUID.randomUUID().toString())
-            .sortOrder(intCount.incrementAndGet());
+        return new Outcome().id(longCount.incrementAndGet()).title(UUID.randomUUID().toString()).sortOrder(intCount.incrementAndGet());
     }
 }

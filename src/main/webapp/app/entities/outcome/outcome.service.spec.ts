@@ -4,7 +4,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import sinon from 'sinon';
 
-import { DATE_FORMAT, DATE_TIME_FORMAT } from '@/shared/composables/date-format';
+import { DATE_TIME_FORMAT } from '@/shared/composables/date-format';
 import { Outcome } from '@/shared/model/outcome.model';
 
 import OutcomeService from './outcome.service';
@@ -35,27 +35,12 @@ describe('Service Tests', () => {
     beforeEach(() => {
       service = new OutcomeService();
       currentDate = new Date();
-      elemDefault = new Outcome(
-        123,
-        'AAAAAAA',
-        'AAAAAAA',
-        'AAAAAAA',
-        'AAAAAAA',
-        'AAAAAAA',
-        'DRAFT',
-        currentDate,
-        currentDate,
-        0,
-        currentDate,
-        currentDate,
-      );
+      elemDefault = new Outcome(123, 'AAAAAAA', 'AAAAAAA', 0, currentDate, currentDate);
     });
 
     describe('Service methods', () => {
       it('should find an element', async () => {
         const returnedFromService = {
-          startDate: dayjs(currentDate).format(DATE_FORMAT),
-          targetDate: dayjs(currentDate).format(DATE_FORMAT),
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           ...elemDefault,
@@ -80,19 +65,11 @@ describe('Service Tests', () => {
       it('should create a Outcome', async () => {
         const returnedFromService = {
           id: 123,
-          startDate: dayjs(currentDate).format(DATE_FORMAT),
-          targetDate: dayjs(currentDate).format(DATE_FORMAT),
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           ...elemDefault,
         };
-        const expected = {
-          startDate: currentDate,
-          targetDate: currentDate,
-          createdDate: currentDate,
-          lastModifiedDate: currentDate,
-          ...returnedFromService,
-        };
+        const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
 
         axiosStub.post.resolves({ data: returnedFromService });
         return service.create({}).then(res => {
@@ -115,25 +92,13 @@ describe('Service Tests', () => {
         const returnedFromService = {
           title: 'BBBBBB',
           description: 'BBBBBB',
-          metric: 'BBBBBB',
-          targetValue: 'BBBBBB',
-          currentValue: 'BBBBBB',
-          status: 'BBBBBB',
-          startDate: dayjs(currentDate).format(DATE_FORMAT),
-          targetDate: dayjs(currentDate).format(DATE_FORMAT),
           sortOrder: 1,
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           ...elemDefault,
         };
 
-        const expected = {
-          startDate: currentDate,
-          targetDate: currentDate,
-          createdDate: currentDate,
-          lastModifiedDate: currentDate,
-          ...returnedFromService,
-        };
+        const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
         axiosStub.put.resolves({ data: returnedFromService });
 
         return service.update(expected).then(res => {
@@ -153,22 +118,10 @@ describe('Service Tests', () => {
       });
 
       it('should partial update a Outcome', async () => {
-        const patchObject = {
-          currentValue: 'BBBBBB',
-          status: 'BBBBBB',
-          startDate: dayjs(currentDate).format(DATE_FORMAT),
-          sortOrder: 1,
-          ...new Outcome(),
-        };
+        const patchObject = { lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT), ...new Outcome() };
         const returnedFromService = Object.assign(patchObject, elemDefault);
 
-        const expected = {
-          startDate: currentDate,
-          targetDate: currentDate,
-          createdDate: currentDate,
-          lastModifiedDate: currentDate,
-          ...returnedFromService,
-        };
+        const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
         axiosStub.patch.resolves({ data: returnedFromService });
 
         return service.partialUpdate(patchObject).then(res => {
@@ -191,24 +144,12 @@ describe('Service Tests', () => {
         const returnedFromService = {
           title: 'BBBBBB',
           description: 'BBBBBB',
-          metric: 'BBBBBB',
-          targetValue: 'BBBBBB',
-          currentValue: 'BBBBBB',
-          status: 'BBBBBB',
-          startDate: dayjs(currentDate).format(DATE_FORMAT),
-          targetDate: dayjs(currentDate).format(DATE_FORMAT),
           sortOrder: 1,
           createdDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           lastModifiedDate: dayjs(currentDate).format(DATE_TIME_FORMAT),
           ...elemDefault,
         };
-        const expected = {
-          startDate: currentDate,
-          targetDate: currentDate,
-          createdDate: currentDate,
-          lastModifiedDate: currentDate,
-          ...returnedFromService,
-        };
+        const expected = { createdDate: currentDate, lastModifiedDate: currentDate, ...returnedFromService };
         axiosStub.get.resolves([returnedFromService]);
         return service.retrieve().then(res => {
           expect(res).toContainEqual(expected);

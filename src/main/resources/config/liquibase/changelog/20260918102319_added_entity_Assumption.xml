@@ -17,27 +17,34 @@
             <column name="statement" type="varchar(500)">
                 <constraints nullable="false" />
             </column>
-            <column name="category" type="varchar(255)">
-                <constraints nullable="false" />
-            </column>
-            <column name="importance" type="integer">
-                <constraints nullable="false" />
-            </column>
-            <column name="evidence" type="integer">
-                <constraints nullable="false" />
-            </column>
-            <column name="validated" type="boolean">
+            <column name="description" type="${clobType}">
                 <constraints nullable="true" />
+            </column>
+            <column name="status" type="varchar(255)">
+                <constraints nullable="false" />
+            </column>
+            <column name="confidence" type="integer">
+                <constraints nullable="false" />
+            </column>
+            <column name="sort_order" type="integer">
+                <constraints nullable="false" />
             </column>
             <column name="created_date" type="${datetimeType}">
                 <constraints nullable="false" />
             </column>
+            <column name="last_modified_date" type="${datetimeType}">
+                <constraints nullable="true" />
+            </column>
             <column name="solution_id" type="bigint">
                 <constraints nullable="false" />
+            </column>
+            <column name="owner_id" type="varchar(100)">
+                <constraints nullable="true" />
             </column>
             <!-- jhipster-needle-liquibase-add-column - JHipster will add columns here -->
         </createTable>
         <dropDefaultValue tableName="assumption" columnName="created_date" columnDataType="${datetimeType}"/>
+        <dropDefaultValue tableName="assumption" columnName="last_modified_date" columnDataType="${datetimeType}"/>
     </changeSet>
 
     <!-- jhipster-needle-liquibase-add-changeset - JHipster will add changesets here -->
@@ -58,11 +65,12 @@
                   usePreparedStatements="true">
             <column name="id" type="numeric"/>
             <column name="statement" type="string"/>
-            <column name="category" type="string"/>
-            <column name="importance" type="numeric"/>
-            <column name="evidence" type="numeric"/>
-            <column name="validated" type="boolean"/>
+            <column name="description" type="clob"/>
+            <column name="status" type="string"/>
+            <column name="confidence" type="numeric"/>
+            <column name="sort_order" type="numeric"/>
             <column name="created_date" type="date"/>
+            <column name="last_modified_date" type="date"/>
             <column name="solution_id" type="numeric"/>
             <!-- jhipster-needle-liquibase-add-loadcolumn - JHipster (and/or extensions) can add load columns here -->
         </loadData>
