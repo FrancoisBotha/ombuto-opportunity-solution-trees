@@ -15,7 +15,7 @@
         @blur="commitName"
       />
       <a
-        class="ost-link__open"
+        class="ost-link__open ost-tap"
         :href="link.url"
         target="_blank"
         rel="noopener noreferrer"
@@ -28,7 +28,7 @@
       <button
         v-if="!readonly"
         type="button"
-        class="ost-link__remove"
+        class="ost-link__remove ost-tap"
         title="Remove"
         :aria-label="`Remove ${link.name}`"
         data-cy="ost-link-remove"

@@ -15,7 +15,7 @@
         <button
           type="button"
           role="checkbox"
-          class="ost-questions__box"
+          class="ost-questions__box ost-tap"
           :class="{ 'is-done': q.done }"
           :aria-checked="q.done"
           :aria-label="q.text"
@@ -29,7 +29,7 @@
         <button
           v-if="!readonly"
           type="button"
-          class="ost-questions__remove"
+          class="ost-questions__remove ost-tap"
           title="Remove"
           :aria-label="`Remove question: ${q.text}`"
           :data-cy="`ost-question-remove-${q.id}`"

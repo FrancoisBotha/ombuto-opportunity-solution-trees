@@ -48,7 +48,7 @@
           <div v-if="item.comment.mine && canEdit" class="ost-chat__own">
             <button
               type="button"
-              class="ost-chat__own-btn"
+              class="ost-chat__own-btn ost-tap"
               :aria-label="`Edit your message: ${item.comment.body.slice(0, 40)}`"
               :disabled="busy"
               :data-cy="`ost-chat-edit-${item.comment.id}`"
@@ -58,7 +58,7 @@
             </button>
             <button
               type="button"
-              class="ost-chat__own-btn"
+              class="ost-chat__own-btn ost-tap"
               :aria-label="`Delete your message: ${item.comment.body.slice(0, 40)}`"
               :disabled="busy"
               :data-cy="`ost-chat-delete-${item.comment.id}`"
@@ -72,7 +72,7 @@
       <button
         v-if="!atBottom && items.length"
         type="button"
-        class="ost-chat__jump"
+        class="ost-chat__jump ost-tap"
         title="Jump to latest"
         aria-label="Jump to the latest message"
         data-cy="ost-chat-jump"
@@ -84,7 +84,7 @@
 
     <div v-if="error" class="ost-chat__error" role="alert" data-cy="ost-chat-error">
       <span>{{ error }}</span>
-      <button type="button" class="ost-chat__error-close" aria-label="Dismiss" @click="error = null">
+      <button type="button" class="ost-chat__error-close ost-tap" aria-label="Dismiss" @click="error = null">
         <PhX :size="11" aria-hidden="true" />
       </button>
     </div>
@@ -92,7 +92,7 @@
     <footer class="ost-chat__composer">
       <div v-if="editingId !== null" class="ost-chat__editing" data-cy="ost-chat-editing">
         <span class="ost-chat__editing-pill">Editing message</span>
-        <button type="button" class="ost-chat__own-btn" data-cy="ost-chat-edit-cancel" @click="cancelEdit(true)">Cancel</button>
+        <button type="button" class="ost-chat__own-btn ost-tap" data-cy="ost-chat-edit-cancel" @click="cancelEdit(true)">Cancel</button>
       </div>
       <div class="ost-chat__row">
         <textarea

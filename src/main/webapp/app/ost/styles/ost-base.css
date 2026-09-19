@@ -280,6 +280,23 @@
   color: var(--color-neutral-300);
 }
 
+/* ---- touch targets (NFR-5) -----------------------------------------------------------------
+ * On a coarse pointer (touch) every small OST control is at least 44 x 44px. min-* beats the
+ * components' own width / height, so the fine-pointer (desktop) look is unchanged.
+ */
+@media (pointer: coarse) {
+  .ost-root .ost-tap,
+  .ost-root .ost-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .ost-root .ost-tap {
+    display: inline-grid;
+    place-items: center;
+  }
+}
+
 /* ---- visually hidden (screen-reader only) ---------------------------------------------------- */
 .ost-root .ost-sr-only {
   position: absolute;

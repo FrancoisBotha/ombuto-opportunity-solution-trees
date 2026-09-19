@@ -56,7 +56,7 @@
 
       <div v-if="shownError" class="ost-nd__error" role="alert" data-cy="ost-node-detail-error">
         <span>{{ shownError }}</span>
-        <button type="button" class="ost-nd__error-close" aria-label="Dismiss" @click="errors.report(null)">
+        <button type="button" class="ost-nd__error-close ost-tap" aria-label="Dismiss" @click="errors.report(null)">
           <PhX :size="11" aria-hidden="true" />
         </button>
       </div>
