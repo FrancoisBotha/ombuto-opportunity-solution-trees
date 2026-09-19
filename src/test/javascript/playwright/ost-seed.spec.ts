@@ -65,16 +65,18 @@ test.describe('OST dev seed', () => {
     }
   });
 
-  test('/trees lists Team Jupiter and Team Venus for user, not the admin-only teams', async () => {
+  test('the /trees team switcher offers Team Jupiter and Team Venus for user, not the admin-only teams', async () => {
     await user.page.goto('/trees');
-    const list = user.page.getByTestId('treesList');
-    await expect(list).toBeVisible();
+    await expect(user.page.getByTestId('ostShell')).toBeVisible();
+    await user.page.getByTestId('ostTeamComboButton').click();
+    const menu = user.page.getByTestId('ostTeamComboMenu');
+    await expect(menu).toBeVisible();
 
-    const cards = list.locator('[data-cy^="treeCard-"]');
-    const titles = (await list.locator('.card-title').allInnerTexts()).map(title => title.trim());
-    expect(titles.filter(title => SEEDED.includes(title)).sort()).toEqual([JUPITER, VENUS]);
-    await expect(cards.filter({ hasText: BEST })).toHaveCount(0);
-    await expect(cards.filter({ hasText: MARS })).toHaveCount(0);
+    const options = menu.locator('[data-cy^="ostTeamOption-"]');
+    const names = (await options.locator('.ost-team-combo__name').allInnerTexts()).map(name => name.trim());
+    expect(names.filter(name => SEEDED.includes(name)).sort()).toEqual([JUPITER, VENUS]);
+    await expect(options.filter({ hasText: BEST })).toHaveCount(0);
+    await expect(options.filter({ hasText: MARS })).toHaveCount(0);
   });
 
   test('admin sees the four seeded teams with the right roles', async () => {

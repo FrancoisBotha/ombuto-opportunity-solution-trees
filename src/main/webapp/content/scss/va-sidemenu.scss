@@ -257,6 +257,20 @@ $row-gutter: 0.4rem;
   min-height: calc(100vh - #{$navbar-height});
   display: flex;
   flex-direction: column;
+
+  /* Full-bleed pages (route meta.fullBleed, e.g. the OST tree builder): no card chrome, no padding,
+     exactly one viewport tall so the page manages its own scrolling. */
+  &.full-bleed {
+    padding: 0;
+    height: calc(100vh - #{$navbar-height});
+    min-height: 0;
+  }
+}
+
+.full-bleed-view {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 /* Slide transition for collapsible groups */
