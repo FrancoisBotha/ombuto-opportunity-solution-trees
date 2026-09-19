@@ -18,6 +18,8 @@ import com.opportunity.tree.service.dto.tree.CreateTreeNodeRequest;
 import com.opportunity.tree.service.dto.tree.TreeNodeDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -89,6 +91,7 @@ public class TreeNodeWriteService {
     private final TreeNodeCascadeService cascadeService;
     private final UserRepository userRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final TreeStructureLock structureLock;
 
     @PersistenceContext
     private EntityManager em;
@@ -100,7 +103,8 @@ public class TreeNodeWriteService {
         TreeNodeDtoAssembler dtoAssembler,
         TreeNodeCascadeService cascadeService,
         UserRepository userRepository,
-        TeamMemberRepository teamMemberRepository
+        TeamMemberRepository teamMemberRepository,
+        TreeStructureLock structureLock
     ) {
         this.teamAccessService = teamAccessService;
         this.historyRecorder = historyRecorder;
@@ -109,6 +113,7 @@ public class TreeNodeWriteService {
         this.cascadeService = cascadeService;
         this.userRepository = userRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.structureLock = structureLock;
     }
 
     // ---------------------------------------------------------------------
@@ -127,12 +132,15 @@ public class TreeNodeWriteService {
         }
         // Purely type-based, so checking it before access leaks nothing about existing ids.
         TreeNodeRules.requireAllowed(parentType, type);
+        // Access before field validation (as PATCH does): a viewer never learns why their body is wrong.
+        Long teamId = teamAccessService.requireEditNode(parentType, request.parentId());
         String title =
             request.title() == null || request.title().isBlank() ? TreeNodeRules.defaultTitle(type) : validTitle(type, request.title());
-
-        teamAccessService.requireEditNode(parentType, request.parentId());
         LOG.debug("Create {} under {} {}", type, parentType, request.parentId());
 
+        // sortOrder = max + 1 must be computed under the team's structure lock, or concurrent
+        // creates under one parent (a double-click) all get the same sortOrder.
+        structureLock.lockTeam(teamId);
         Instant now = Instant.now();
         Long parentId = request.parentId();
         Object entity = switch (type) {
@@ -387,7 +395,7 @@ public class TreeNodeWriteService {
 
     private void recordStatus(TreeNodeType type, Long id, Enum<?> before, Enum<?> next) {
         if (before != next) {
-            historyRecorder.record(type, id, HistoryEventType.STATUS_CHANGED, "Status set to “" + TreeNodeRules.statusLabel(next) + "”");
+            historyRecorder.record(type, id, HistoryEventType.STATUS_CHANGED, TreeNodeRules.statusChangedSummary(next));
         }
     }
 
@@ -424,18 +432,45 @@ public class TreeNodeWriteService {
         return TreeNodeRules.parseStatus(type, s);
     }
 
-    private static int integer(Object value, int min, int max, String errorKey) {
-        if (value instanceof Number n && !(value instanceof Double d && d % 1 != 0) && !(value instanceof Float f && f % 1 != 0)) {
-            long v = n.longValue();
-            if (v >= min && v <= max) {
-                return (int) v;
-            }
+    /**
+     * A whole number in {@code [min, max]}. The value is compared exactly (as a BigDecimal) so
+     * JSON numbers outside the long range — Jackson hands those over as BigInteger — are
+     * rejected instead of wrapping (e.g. 2^64 + 50 is not 50).
+     */
+    static int integer(Object value, int min, int max, String errorKey) {
+        BigDecimal exact = exactNumber(value);
+        if (
+            exact != null &&
+            exact.stripTrailingZeros().scale() <= 0 &&
+            exact.compareTo(BigDecimal.valueOf(min)) >= 0 &&
+            exact.compareTo(BigDecimal.valueOf(max)) <= 0
+        ) {
+            return exact.intValueExact();
         }
         throw new NodeWriteRuleException(
             "Value must be a whole number between " + min + " and " + max,
             TreeNodeRules.ENTITY_NAME,
             errorKey
         );
+    }
+
+    private static BigDecimal exactNumber(Object value) {
+        if (value instanceof BigDecimal b) {
+            return b;
+        }
+        if (value instanceof BigInteger b) {
+            return new BigDecimal(b);
+        }
+        if (value instanceof Double d) {
+            return d.isNaN() || d.isInfinite() ? null : BigDecimal.valueOf(d);
+        }
+        if (value instanceof Float f) {
+            return f.isNaN() || f.isInfinite() ? null : BigDecimal.valueOf(f.doubleValue());
+        }
+        if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return BigDecimal.valueOf(((Number) value).longValue());
+        }
+        return null;
     }
 
     private static Boolean bool(Object value, String errorKey) {

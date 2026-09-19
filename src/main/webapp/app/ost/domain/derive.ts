@@ -131,15 +131,26 @@ export function panelTabsFor(type: NodeType): PanelTab[] {
   return ['detail', 'links', 'chat', 'history'];
 }
 
-const sameMonth = (iso: string | null, now: Date) => {
-  if (!iso) return false;
-  const d = new Date(iso);
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+/** Start of the current calendar month in UTC — the boundary the server's TeamTreeService uses. */
+const utcMonthStart = (now: Date) => Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+
+const time = (iso: string | null | undefined) => {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(t) ? null : t;
 };
 
-/** Evidence nodes created in the current calendar month (A5 counter), derived client-side. */
+/**
+ * Evidence nodes created in the current UTC calendar month (A5 counter). Derived from the nodes'
+ * createdDate exactly as the server derives TeamTreeDTO.evidenceThisMonth (created on or after the
+ * 1st of the month, 00:00 UTC), so it follows creates, deletes and moves made in this session.
+ */
 export function evidenceThisMonth(nodes: OstNode[], now = new Date()): number {
-  return nodes.filter(n => n.type === 'evidence' && sameMonth(n.createdDate, now)).length;
+  const from = utcMonthStart(now);
+  return nodes.filter(n => {
+    if (n.type !== 'evidence') return false;
+    const created = time(n.createdDate);
+    return created !== null && created >= from;
+  }).length;
 }
 
 export interface DashboardStats {
@@ -149,26 +160,35 @@ export interface DashboardStats {
   evidenceThisMonth: number;
 }
 
-/** The four dashboard counters. Pass the server's evidenceThisMonth when known. */
-export function dashboardStats(nodes: OstNode[], opts: { evidenceThisMonth?: number | null; now?: Date } = {}): DashboardStats {
+/** The four dashboard counters, all derived from the current nodes. */
+export function dashboardStats(nodes: OstNode[], opts: { now?: Date } = {}): DashboardStats {
   const counts = countByType(nodes);
   return {
     opportunities: counts.opportunity,
     solutions: counts.solution,
     testsRunning: nodes.filter(n => n.type === 'assumption' && n.status === 'testing').length,
-    evidenceThisMonth: opts.evidenceThisMonth ?? evidenceThisMonth(nodes, opts.now),
+    evidenceThisMonth: evidenceThisMonth(nodes, opts.now),
   };
 }
 
 export interface ProductCard {
   product: OstNode;
-  outcomeTitle: string | null;
+  /** The product's outcomes (node key + title), in tree order. */
+  outcomes: { key: string; title: string }[];
   counts: { opportunities: number; solutions: number; assumptions: number; evidence: number };
+  /** Newest edit in the branch: the server's last activity or a newer local change. */
   lastActivity: string | null;
+  /** Who made that edit, when known (the product's lastActivity author). */
+  lastEditedBy: string | null;
 }
 
-/** One card per product: its first outcome, four mini counts and last activity. */
+/**
+ * One card per product: its outcomes, four mini counts and last edit. The last edit is the newest
+ * of the server's product.lastActivity (history, tree read) and the local created/modified dates
+ * of every node in the branch, so edits made in this session move it forward.
+ */
 export function productCards(nodes: OstNode[]): ProductCard[] {
+  const ordered = orderTree(nodes);
   return nodes
     .filter(n => n.type === 'product')
     .sort((a, b) => a.sortOrder - b.sortOrder || a.dbId - b.dbId)
@@ -176,17 +196,24 @@ export function productCards(nodes: OstNode[]): ProductCard[] {
       const ids = new Set(descendantIds(product.id, nodes));
       const branch = nodes.filter(n => ids.has(n.id));
       const c = countByType(branch);
-      const outcome = orderTree(nodes).find(n => n.parent === product.id && n.type === 'outcome');
-      const newest = [product, ...branch]
-        .map(n => n.lastActivity?.at ?? n.lastModifiedDate ?? n.createdDate)
-        .filter((d): d is string => !!d)
-        .sort()
-        .pop();
+      const outcomes = ordered.filter(n => n.parent === product.id && n.type === 'outcome').map(n => ({ key: n.id, title: n.title }));
+      let newestLocal: string | null = null;
+      for (const n of [product, ...branch]) {
+        for (const iso of [n.lastModifiedDate, n.createdDate, n.lastActivity?.at]) {
+          const t = time(iso);
+          if (t !== null && (newestLocal === null || t > time(newestLocal)!)) newestLocal = iso!;
+        }
+      }
+      const server = product.lastActivity;
+      const serverTime = time(server?.at);
+      const localTime = time(newestLocal);
+      const serverWins = serverTime !== null && (localTime === null || serverTime >= localTime);
       return {
         product,
-        outcomeTitle: outcome?.title ?? null,
+        outcomes,
         counts: { opportunities: c.opportunity, solutions: c.solution, assumptions: c.assumption, evidence: c.evidence },
-        lastActivity: product.lastActivity?.at ?? newest ?? null,
+        lastActivity: serverWins ? server!.at : newestLocal,
+        lastEditedBy: serverWins ? (server!.byLogin ?? null) : null,
       };
     });
 }

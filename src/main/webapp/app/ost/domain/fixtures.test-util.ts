@@ -91,3 +91,33 @@ export function treeDto(nodes: TreeNodeDTO[] = [], extra: Partial<TeamTreeDTO> =
     ...extra,
   };
 }
+
+/**
+ * A large, realistic tree for performance smoke tests: `products` products, each with one outcome,
+ * `opportunities` opportunities, 2 solutions per opportunity, 2 assumptions per solution and one
+ * evidence per assumption (1 + 1 + o * (1 + 2 * (1 + 2 * 2)) nodes per product).
+ */
+export function bigTreeDtos(products = 2, opportunities = 15): TreeNodeDTO[] {
+  const out: TreeNodeDTO[] = [];
+  let id = 1;
+  for (let p = 0; p < products; p++) {
+    const product = `product-${id++}`;
+    out.push(dto(product, null, { sortOrder: p }));
+    const outcome = `outcome-${id++}`;
+    out.push(dto(outcome, product));
+    for (let o = 0; o < opportunities; o++) {
+      const opportunity = `opportunity-${id++}`;
+      out.push(dto(opportunity, outcome, { status: 'EXPLORING', priority: 50, valueRating: 3, sortOrder: o }));
+      for (let s = 0; s < 2; s++) {
+        const solution = `solution-${id++}`;
+        out.push(dto(solution, opportunity, { status: 'CANDIDATE', sortOrder: s }));
+        for (let a = 0; a < 2; a++) {
+          const assumption = `assumption-${id++}`;
+          out.push(dto(assumption, solution, { status: 'TESTING', confidence: 40, sortOrder: a }));
+          out.push(dto(`evidence-${id++}`, assumption));
+        }
+      }
+    }
+  }
+  return out;
+}

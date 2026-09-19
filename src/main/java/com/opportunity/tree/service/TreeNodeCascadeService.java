@@ -35,12 +35,14 @@ public class TreeNodeCascadeService {
     private static final Logger LOG = LoggerFactory.getLogger(TreeNodeCascadeService.class);
 
     private final TeamAccessService teamAccessService;
+    private final TreeStructureLock structureLock;
 
     @PersistenceContext
     private EntityManager em;
 
-    public TreeNodeCascadeService(TeamAccessService teamAccessService) {
+    public TreeNodeCascadeService(TeamAccessService teamAccessService, TreeStructureLock structureLock) {
         this.teamAccessService = teamAccessService;
+        this.structureLock = structureLock;
     }
 
     public void deleteProduct(Long productId) {
@@ -110,6 +112,8 @@ public class TreeNodeCascadeService {
         if (type == null) {
             throw new TeamAccessDeniedException();
         }
+        // Queue behind concurrent moves/creates in the same team (see TreeStructureLock).
+        structureLock.lockTeam(teamAccessService.requireEditNode(type, id));
         switch (type) {
             case PRODUCT -> deleteProduct(id);
             case OUTCOME -> deleteOutcome(id);

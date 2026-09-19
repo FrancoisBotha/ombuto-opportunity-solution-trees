@@ -3,6 +3,9 @@ package com.opportunity.tree.web.rest.errors;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
 
 import com.opportunity.tree.service.NodeWriteRuleException;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.OptimisticLockException;
+import jakarta.persistence.PessimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.Arrays;
@@ -19,6 +22,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -51,6 +55,11 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
     private static final String MESSAGE_KEY = "message";
     private static final String PATH_KEY = "path";
     private static final boolean CASUAL_CHAIN_ENABLED = false;
+    static final String ERR_DATA_INTEGRITY = "error.dataintegrity";
+    static final String DATA_INTEGRITY_DETAIL =
+        "This record is still referenced by other data (for example child nodes or links) and cannot be changed or deleted.";
+
+    static final String CONCURRENCY_DETAIL = "Someone else changed this at the same time. Please reload and try again.";
 
     private static final Logger LOG = LoggerFactory.getLogger(ExceptionTranslator.class);
 
@@ -74,6 +83,41 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     public ResponseEntity<Object> handleNodeWriteRuleException(NodeWriteRuleException ex, NativeWebRequest request) {
         return handleAnyException(new BadRequestAlertException(ex.getMessage(), ex.getEntityName(), ex.getErrorKey()), request);
+    }
+
+    /**
+     * A write that breaks a database constraint — typically a generated admin DELETE of a node
+     * that still has children, links or other references — is a 409 with a generic message.
+     * The SQL / constraint text is logged server-side only, never returned to the client.
+     */
+    @ExceptionHandler
+    public ResponseEntity<Object> handleDataIntegrityViolation(DataIntegrityViolationException ex, NativeWebRequest request) {
+        LOG.warn("Data integrity violation on {}: {}", extractURI(request), ex.getMostSpecificCause().getMessage());
+        ProblemDetailWithCause problem = ProblemDetailWithCauseBuilder.instance()
+            .withStatus(HttpStatus.CONFLICT.value())
+            .withDetail(DATA_INTEGRITY_DETAIL)
+            .withProperty(MESSAGE_KEY, ERR_DATA_INTEGRITY)
+            .build();
+        return handleExceptionInternal(ex, customizeProblem(problem, ex, request), null, HttpStatus.CONFLICT, request);
+    }
+
+    /**
+     * Lock contention between concurrent writes (deadlock, lock timeout, optimistic-lock clash),
+     * whether Spring translated it ({@link ConcurrencyFailureException}, incl.
+     * {@code CannotAcquireLockException} / {@code PessimisticLockingFailureException}) or it came
+     * straight from JPA: a 409 with a generic message; the SQL text is only logged.
+     */
+    @ExceptionHandler(
+        { ConcurrencyFailureException.class, PessimisticLockException.class, LockTimeoutException.class, OptimisticLockException.class }
+    )
+    public ResponseEntity<Object> handleConcurrencyFailure(Exception ex, NativeWebRequest request) {
+        LOG.warn("Concurrent write conflict on {}: {}", extractURI(request), ex.getMessage());
+        ProblemDetailWithCause problem = ProblemDetailWithCauseBuilder.instance()
+            .withStatus(HttpStatus.CONFLICT.value())
+            .withDetail(CONCURRENCY_DETAIL)
+            .withProperty(MESSAGE_KEY, ErrorConstants.ERR_CONCURRENCY_FAILURE)
+            .build();
+        return handleExceptionInternal(ex, customizeProblem(problem, ex, request), null, HttpStatus.CONFLICT, request);
     }
 
     @SuppressWarnings("java:S2638")

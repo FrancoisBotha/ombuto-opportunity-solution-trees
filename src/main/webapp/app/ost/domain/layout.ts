@@ -2,7 +2,9 @@
  * Tidy tree layout — ported AS-IS from the design handoff:
  *   docs/References/Vue Flow Opportunity Solution Tree/design_handoff_ombuto_ost/vue-reference/src/domain/layout.ts
  *
- * Deliberate edits: none to the algorithm. Formatting follows the repo's Prettier config.
+ * Deliberate edits: none to the algorithm. Children (and roots) are looked up in maps built once
+ * per call instead of filtering the whole list per node (O(n) instead of O(n^2); same order, same
+ * result). Formatting follows the repo's Prettier config.
  */
 import { TYPE_BOX } from './rules';
 import type { OstNode } from './types';
@@ -28,7 +30,16 @@ export interface Placed {
  */
 export function layoutTree(nodes: OstNode[], opts: { roots: string[]; collapsed: Record<string, boolean> }): Record<string, Placed> {
   const pos: Record<string, Placed> = {};
-  const childrenOf = (id: string) => nodes.filter(n => n.parent === id);
+  const childMap = new Map<string, OstNode[]>();
+  const byId = new Map<string, OstNode>();
+  for (const n of nodes) {
+    if (!byId.has(n.id)) byId.set(n.id, n);
+    if (n.parent === null) continue;
+    const bucket = childMap.get(n.parent);
+    if (bucket) bucket.push(n);
+    else childMap.set(n.parent, [n]);
+  }
+  const childrenOf = (id: string) => childMap.get(id) ?? [];
   let cursor = 0;
 
   const walk = (node: OstNode, depth: number): number => {
@@ -47,7 +58,7 @@ export function layoutTree(nodes: OstNode[], opts: { roots: string[]; collapsed:
   };
 
   for (const rootId of opts.roots) {
-    const root = nodes.find(n => n.id === rootId);
+    const root = byId.get(rootId);
     if (root) {
       walk(root, 0);
       cursor += 80;

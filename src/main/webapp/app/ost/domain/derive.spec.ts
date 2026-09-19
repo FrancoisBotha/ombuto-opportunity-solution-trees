@@ -76,15 +76,59 @@ describe('OST derived values', () => {
     expect(countByType(nodes).assumption).toBe(3);
     expect(evidenceThisMonth(nodes, now)).toBe(1);
     expect(dashboardStats(nodes, { now })).toEqual({ opportunities: 2, solutions: 1, testsRunning: 1, evidenceThisMonth: 1 });
-    expect(dashboardStats(nodes, { evidenceThisMonth: 9 }).evidenceThisMonth).toBe(9);
+  });
+
+  it('counts evidence from the 1st of the month, 00:00 UTC — the server boundary', () => {
+    const now = new Date('2026-10-01T00:30:00Z');
+    const list = [
+      node('evidence-7', 'assumption-1', { createdDate: '2026-09-30T23:59:59Z' }),
+      node('evidence-8', 'assumption-1', { createdDate: '2026-10-01T00:00:00Z' }),
+      node('evidence-9', 'assumption-1', { createdDate: '2026-10-01T00:10:00.123456+00:00' }),
+      node('evidence-10', 'assumption-1', { createdDate: null }),
+      node('assumption-1', 'solution-1', { createdDate: '2026-10-01T00:10:00Z' }),
+    ];
+    expect(evidenceThisMonth(list, now)).toBe(2);
+    expect(dashboardStats(list, { now }).evidenceThisMonth).toBe(2);
   });
 
   it('builds one card per product', () => {
     const cards = productCards(nodes);
     expect(cards.map(c => c.product.id)).toEqual(['product-1', 'product-2']);
-    expect(cards[0].outcomeTitle).toBe('Title outcome-1');
+    expect(cards[0].outcomes).toEqual([{ key: 'outcome-1', title: 'Title outcome-1' }]);
     expect(cards[0].counts).toEqual({ opportunities: 2, solutions: 1, assumptions: 3, evidence: 2 });
-    expect(cards[1].outcomeTitle).toBeNull();
+    expect(cards[1].outcomes).toEqual([]);
+  });
+
+  it('lists every outcome of a product in tree order', () => {
+    const list = [
+      ...nodes,
+      node('outcome-5', 'product-1', { title: 'Second', sortOrder: 2 }),
+      node('outcome-4', 'product-1', { title: 'First', sortOrder: -1 }),
+    ];
+    expect(productCards(list)[0].outcomes.map(o => o.title)).toEqual(['First', 'Title outcome-1', 'Second']);
+  });
+
+  it('takes the newest of the server last activity and local edits in the branch', () => {
+    const server = { at: '2026-09-18T10:00:00Z', byLogin: 'admin' };
+    const base = () => [
+      node('product-1', null, { lastActivity: server, createdDate: '2026-01-01T00:00:00Z' }),
+      node('outcome-1', 'product-1', { createdDate: '2026-09-01T00:00:00Z' }),
+      node('opportunity-1', 'outcome-1', { createdDate: '2026-09-02T00:00:00Z', lastModifiedDate: '2026-09-10T00:00:00Z' }),
+    ];
+    const [card] = productCards(base());
+    expect(card.lastActivity).toBe(server.at);
+    expect(card.lastEditedBy).toBe('admin');
+
+    const edited = base();
+    edited[2].lastModifiedDate = '2026-09-19T08:00:00.5Z';
+    const [newer] = productCards(edited);
+    expect(newer.lastActivity).toBe('2026-09-19T08:00:00.5Z');
+    expect(newer.lastEditedBy).toBeNull();
+
+    const noServer = base();
+    noServer[0].lastActivity = null;
+    expect(productCards(noServer)[0]).toMatchObject({ lastActivity: '2026-09-10T00:00:00Z', lastEditedBy: null });
+    expect(productCards([node('product-3', null)])[0]).toMatchObject({ lastActivity: null, lastEditedBy: null });
   });
 
   it('lists experiment rows with their solution and product, and summarises statuses', () => {

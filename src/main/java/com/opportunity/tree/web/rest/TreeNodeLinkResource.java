@@ -1,6 +1,7 @@
 package com.opportunity.tree.web.rest;
 
 import com.opportunity.tree.service.TreeNodeLinkService;
+import com.opportunity.tree.service.TreeNodeRules;
 import com.opportunity.tree.service.dto.tree.TreeLinkDTO;
 import com.opportunity.tree.service.dto.tree.TreeLinkWriteDTO;
 import org.slf4j.Logger;
@@ -38,7 +39,9 @@ public class TreeNodeLinkResource {
         @RequestBody(required = false) TreeLinkWriteDTO request
     ) {
         LOG.debug("REST request to add a link to {} {}", type, id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(treeNodeLinkService.addLink(TreeNodeTypePath.parse(type), id, request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            treeNodeLinkService.addLink(TreeNodeRules.parseType(type, "type"), id, request)
+        );
     }
 
     @PatchMapping("/links/{id}")

@@ -50,6 +50,17 @@ accompanying code is MIT. Attribution: _Icons by [Font Awesome](https://fontawes
 Awesome Free, © Fonticons, Inc., [licence](https://fontawesome.com/license/free)._ The icon files
 also carry this attribution in embedded comments, which must not be stripped.
 
+### Inter — font under the SIL Open Font License 1.1
+
+The Inter typeface, bundled through `@fontsource/inter`, is licensed under the
+[SIL Open Font License, Version 1.1](https://openfontlicense.org/) (OFL-1.1); the Fontsource
+packaging is MIT. Copyright: _© 2016 The Inter Project Authors
+([github.com/rsms/inter](https://github.com/rsms/inter))._ The OFL allows the font to be used,
+embedded, bundled and redistributed with any software, provided that the font files are not sold
+on their own, that this copyright and licence notice accompany them, and that modified versions are
+not published under the reserved font name. The font files are shipped unmodified. The full licence
+text is in `node_modules/@fontsource/inter/LICENSE` and at the link above.
+
 ### Liquibase — source-available, not open source
 
 `org.liquibase:liquibase-core` 5.x is published under the
