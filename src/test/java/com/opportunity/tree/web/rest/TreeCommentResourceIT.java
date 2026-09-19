@@ -240,7 +240,7 @@ class TreeCommentResourceIT {
         mvc
             .perform(get(COMMENTS, "experiment", f.outcome.getId()).with(who(OWNER)))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("error.nodetypeinvalid"));
+            .andExpect(jsonPath("$.message").value("error.unknowntype"));
         mvc
             .perform(json(post(COMMENTS, "outcome", f.outcome.getId()), "{\"body\":\"   \"}", OWNER))
             .andExpect(status().isBadRequest())

@@ -57,6 +57,8 @@ public final class TreeNodeRules {
     /**
      * Parses a node type from a path or body value, case-insensitively ({@code opportunity} and
      * {@code OPPORTUNITY} both work). Missing or unknown values are a 400 ({@code error.unknowntype}).
+     * This is the single parser for every {@code {type}} path segment and type body field under
+     * {@code /api/tree}.
      */
     public static TreeNodeType parseType(String value, String what) {
         if (value == null || value.isBlank()) {
@@ -88,11 +90,6 @@ public final class TreeNodeRules {
         };
     }
 
-    /** True when the type carries a status. */
-    public static boolean hasStatus(TreeNodeType type) {
-        return type == TreeNodeType.OPPORTUNITY || type == TreeNodeType.SOLUTION || type == TreeNodeType.ASSUMPTION;
-    }
-
     /** Parses a status for the type, case-insensitively; a 400 ({@code error.invalidstatus}) when not in the vocabulary. */
     public static Enum<?> parseStatus(TreeNodeType type, String value) {
         if (value == null) {
@@ -111,10 +108,17 @@ public final class TreeNodeRules {
         }
     }
 
-    /** Status label as shown in history, e.g. {@code VALIDATED} → {@code Validated}. */
+    /**
+     * Status as the prototype writes it in history (its status vocabulary is lower case),
+     * e.g. {@code VALIDATED} → {@code validated}.
+     */
     public static String statusLabel(Enum<?> status) {
-        String s = status.name().toLowerCase(Locale.ROOT);
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+        return status.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
+    /** History summary for a status change (prototype {@code patch()}): {@code Status changed to “exploring”}. */
+    public static String statusChangedSummary(Enum<?> status) {
+        return "Status changed to “" + statusLabel(status) + "”";
     }
 
     /** Priority label (prototype {@code priLabel}). */

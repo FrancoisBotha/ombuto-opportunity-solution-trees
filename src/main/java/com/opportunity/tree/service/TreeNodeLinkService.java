@@ -54,7 +54,7 @@ public class TreeNodeLinkService {
         this.em = em;
     }
 
-    /** Adds a link at the end of the node's list. History: LINK_ADDED "Linked to {name}". */
+    /** Adds a link at the end of the node's list. History: LINK_ADDED "Link added" (prototype wording). */
     public TreeLinkDTO addLink(TreeNodeType type, Long nodeId, TreeLinkWriteDTO request) {
         teamAccessService.requireEditNode(type, nodeId);
         String name = validName(request == null ? null : request.name());
@@ -70,7 +70,7 @@ public class TreeNodeLinkService {
             case EVIDENCE -> link.setEvidence(em.getReference(Evidence.class, nodeId));
         }
         link = nodeLinkRepository.save(link);
-        historyRecorder.record(type, nodeId, HistoryEventType.LINK_ADDED, "Linked to " + name);
+        historyRecorder.record(type, nodeId, HistoryEventType.LINK_ADDED, "Link added");
         return toDto(link);
     }
 
@@ -87,13 +87,12 @@ public class TreeNodeLinkService {
         return toDto(nodeLinkRepository.save(link));
     }
 
-    /** Removes a link. History: LINK_REMOVED "Removed link “{name}”". */
+    /** Removes a link. History: LINK_REMOVED "Link removed" (prototype wording). */
     public void deleteLink(Long linkId) {
         TreeNodeRef node = teamAccessService.requireEditLink(linkId);
         NodeLink link = nodeLinkRepository.findById(linkId).orElseThrow(TeamAccessDeniedException::new);
-        String name = link.getName();
         nodeLinkRepository.delete(link);
-        historyRecorder.record(node.type(), node.id(), HistoryEventType.LINK_REMOVED, "Removed link “" + name + "”");
+        historyRecorder.record(node.type(), node.id(), HistoryEventType.LINK_REMOVED, "Link removed");
     }
 
     private int nextSortOrder(TreeNodeType type, Long nodeId) {

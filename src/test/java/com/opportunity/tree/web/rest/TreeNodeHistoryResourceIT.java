@@ -72,7 +72,7 @@ class TreeNodeHistoryResourceIT {
             TreeNodeType.OPPORTUNITY,
             oppId,
             HistoryEventType.STATUS_CHANGED,
-            "Status changed to “Exploring”",
+            "Status changed to “exploring”",
             t0.plusSeconds(3600),
             f.owner
         );
@@ -87,7 +87,7 @@ class TreeNodeHistoryResourceIT {
             .andExpect(jsonPath("$", hasSize(3)))
             .andExpect(jsonPath("$[*].eventType", contains("STATUS_CHANGED", "VALUE_CHANGED", "CREATED")))
             .andExpect(
-                jsonPath("$[*].summary", contains("Status changed to “Exploring”", "Value set to $$$", "Node created as opportunity"))
+                jsonPath("$[*].summary", contains("Status changed to “exploring”", "Value set to $$$", "Node created as opportunity"))
             )
             .andExpect(jsonPath("$[0].id").isNumber())
             .andExpect(jsonPath("$[0].authorLogin").value(OWNER))
@@ -140,7 +140,7 @@ class TreeNodeHistoryResourceIT {
             .andExpect(
                 jsonPath(
                     "$[*].summary",
-                    contains("Removed link “Epic”", "Comment deleted", "Comment added", "Open question added", "Linked to Jira Epic")
+                    contains("Link removed", "Comment deleted", "Comment added", "Open question added", "Link added")
                 )
             )
             .andExpect(jsonPath("$[*].authorLogin", contains(EDITOR, EDITOR, EDITOR, EDITOR, EDITOR)));
@@ -167,7 +167,7 @@ class TreeNodeHistoryResourceIT {
         mvc
             .perform(get(HISTORY, "interview", f.outcome.getId()).with(who(OWNER)))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("error.nodetypeinvalid"));
+            .andExpect(jsonPath("$.message").value("error.unknowntype"));
     }
 
     @Test

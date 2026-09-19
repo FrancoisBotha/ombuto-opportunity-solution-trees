@@ -96,7 +96,7 @@ class TreeNodeLinkResourceIT {
             List<NodeHistory> h = history(type, id);
             assertThat(h).hasSize(1);
             assertThat(h.get(0).getEventType()).isEqualTo(HistoryEventType.LINK_ADDED);
-            assertThat(h.get(0).getSummary()).isEqualTo("Linked to Confluence");
+            assertThat(h.get(0).getSummary()).isEqualTo("Link added");
             assertThat(h.get(0).getAuthor().getLogin()).isEqualTo(EDITOR);
         }
         String col = "select count(l) from NodeLink l where l.%s.id = ?1";
@@ -147,7 +147,7 @@ class TreeNodeLinkResourceIT {
         mvc
             .perform(json(post(url, "banana", id), "{\"name\":\"x\",\"url\":\"https://x\"}", OWNER))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value("error.nodetypeinvalid"));
+            .andExpect(jsonPath("$.message").value("error.unknowntype"));
         assertThat(f.linkCount()).isZero();
         assertThat(f.historyCount()).isZero();
     }
@@ -181,7 +181,7 @@ class TreeNodeLinkResourceIT {
         List<NodeHistory> h = history(TreeNodeType.OPPORTUNITY, f.opportunity.getId());
         assertThat(h).hasSize(1);
         assertThat(h.get(0).getEventType()).isEqualTo(HistoryEventType.LINK_REMOVED);
-        assertThat(h.get(0).getSummary()).isEqualTo("Removed link “Jira Epic”");
+        assertThat(h.get(0).getSummary()).isEqualTo("Link removed");
     }
 
     @Test

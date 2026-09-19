@@ -363,7 +363,7 @@ class TreeNodeWriteResourceIT {
             .andExpect(jsonPath("$.lastModifiedDate").isNotEmpty());
 
         assertThat(summaries(TreeNodeType.OPPORTUNITY, opportunity.getId())).containsExactly(
-            "Status set to “Validated”",
+            "Status changed to “validated”",
             "Priority set to high",
             "Value set to $$$$$"
         );
@@ -444,7 +444,7 @@ class TreeNodeWriteResourceIT {
             .andExpect(jsonPath("$.status").value("SUPPORTED"));
         assertThat(em.find(Assumption.class, assumption.getId()).getStatement()).isEqualTo("Teams will tag");
         assertThat(summaries(TreeNodeType.ASSUMPTION, assumption.getId())).containsExactly(
-            "Status set to “Supported”",
+            "Status changed to “supported”",
             "Confidence set to 75%"
         );
 
@@ -478,7 +478,7 @@ class TreeNodeWriteResourceIT {
             )
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("BUILDING"));
-        assertThat(summaries(TreeNodeType.SOLUTION, solution.getId())).containsExactly("Status set to “Building”");
+        assertThat(summaries(TreeNodeType.SOLUTION, solution.getId())).containsExactly("Status changed to “building”");
     }
 
     @Test
