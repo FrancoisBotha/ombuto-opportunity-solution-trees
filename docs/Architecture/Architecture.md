@@ -5,10 +5,10 @@
 Ombuto OST is a JHipster 9 monolith: a Spring Boot backend (Spring MVC + JPA)
 serving a Vue 3 SPA from one deployable jar, with PostgreSQL as the only
 datastore. See the PRD at `docs/Product Requirements Document/PRD.md`. It runs
-as a single application instance per organisation. The defining architectural
-property is real-time collaboration: the server is authoritative for every
-tree, persists each edit, and pushes it over WebSockets to everyone else viewing
-that tree.
+as a single application instance per organisation. The server is authoritative
+for every tree and persists each edit. The target architecture also pushes each
+edit over WebSockets to everyone else viewing that tree; that broadcast is not
+built yet (see "Built so far" in section 3).
 
 ## 2. Tech Stack
 
@@ -35,6 +35,11 @@ regenerated from `ombuto.jdl` with `reactive: false` and
 `websocket: spring-websocket` in `.yo-rc.json` to match this document.
 
 ## 3. How It's Put Together
+
+**Built so far vs. planned.** Teams and scoped access (Epic 1) and the Tree
+Builder (Epic 11, section 6) are built. The real-time broadcast, `ROLE_OVERVIEW`
+and the MCP server described below are the target design of Epics 5, 9 and 10
+and do not exist in the code yet: other people's edits appear on reload.
 
 One Spring Boot process serves everything: the built Vue SPA as static files,
 the REST API under `/api`, the STOMP endpoint under `/websocket`, and the MCP
@@ -64,11 +69,11 @@ hand-written pieces sit on top of the generated code:
   present a Keycloak bearer token.
 
 **Frontend** loads a team's whole tree (all of the team's products as top-level
-branches) in one request into a Pinia store, renders it in the tree editor with
-an optional focus on one product, and subscribes to that team's topic. An
-incoming event patches the store. The user's own edits are applied when the REST
-call returns, and their echoed event is ignored. On reconnect, the client
-reloads the tree rather than replaying missed events.
+branches) in one request into a Pinia store and renders it on the Tree Builder
+canvas, optionally scoped to one product (section 6). Planned for Epic 5: it
+subscribes to that team's topic, an incoming event patches the store, the user's
+own echoed event is ignored, and on reconnect the client reloads the tree rather
+than replaying missed events.
 
 Concurrent edits are last-write-wins per node. Edits are small (one node's
 fields, or a move), so true conflicts are rare and the losing user sees the
@@ -124,3 +129,132 @@ only. Interview notes may contain customer personal data, so they sit behind the
 same team scoping as the tree, and `ROLE_OVERVIEW` users see interview titles
 only, not notes. The database is not encrypted at the application level; disk
 encryption and TLS termination are left to the hosting environment.
+
+## 6. Tree Builder (OST)
+
+The Tree Builder (Epic 11,
+[`epic_11_OST_TREE_BUILDER.md`](../Epics/epic_11_OST_TREE_BUILDER.md)) replaced the
+first custom SVG tree editor (`app/tree`, Epics 2 and 3) and the `Experiment`,
+`OpportunityLink` and `SolutionLink` entities. The node hierarchy is Product →
+Outcome → Opportunity (nestable) → Solution → Assumption, with Evidence under an
+Opportunity or an Assumption. `NodeLink`, `OpenQuestion` and `NodeHistory` hang
+off the nodes. The model lives in `ombuto.jdl` like every other entity.
+
+**Canvas and layout.** The canvas is Vue Flow (`@vue-flow/core`) with custom
+node and edge components. Positions are never stored: `domain/layout.ts` derives
+a tidy top-down layout (O(n)) from the parent links and `sortOrder` on every
+change. The store exposes it as `placed`, and a drag only re-parents, it never
+places a node. Wheel zoom, Fit and the overview map are OST code. Vue Flow's own
+zoom-on-scroll and minimap are not used. Only nodes in view are rendered
+(`only-render-visible-elements`). A node with an open rename field or `+` menu is
+pinned so it stays mounted when it leaves the view (`pinRendered`).
+
+**Module layout** (`src/main/webapp/app/ost/`, lazy-loaded):
+
+| Folder / file                                | Contents                                                                                                                                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `domain/`                                    | Pure logic: `layout.ts` (tidy layout, edge paths), `rules.ts` (allowed children, defaults, default links), `mapping.ts` (DTO ↔ node), `derive.ts` (breadcrumbs, counts, dashboard and tracker figures) |
+| `stores/`                                    | `ost-tree.store.ts` (team, flat nodes, `placed`, all API actions), `ost-ui.store.ts` (selection, panel, filters, palette, collapse, dialogs)                                                           |
+| `ost.service.ts`, `ost.routes.ts`            | REST client for the tree APIs, and the `/trees` routes                                                                                                                                                 |
+| `shell/`, `pages/`                           | `OstShell` (team combo, view tabs, members) and the dashboard, canvas, Experiments and full-page node detail pages                                                                                     |
+| `canvas/`, `panel/`, `chat/`, `node-detail/` | Canvas (nodes, edges, toolbar, palette, `+` menu, minimap), detail panel and its tabs, the shared chat thread, detail-page parts                                                                       |
+| `overlays/`, `styles/`                       | Dialogs and toasts, scoped design tokens and base styles                                                                                                                                               |
+
+Routes: `/trees` opens the last-used (else first) team. `/trees/:teamId` is the
+shell (`meta.fullBleed`, which drops the app's card chrome in `app.vue`) with
+the children dashboard, `canvas?product=&node=`, `experiments` and
+`nodes/:nodeKey`.
+
+**Stores.** Edits are optimistic. `patchNode` applies a field change at once and
+sequences in-flight patches per node and per field: a response or rollback only
+touches a field that has no newer pending patch or newer applied response. A
+failed patch rolls back to the newest value still pending, else to the last
+confirmed one. Moves are optimistic with rollback. Creates wait for the server,
+which assigns ids, then select the new node in rename mode. When a write gets a
+403 or a `409 error.concurrencyFailure`, the store re-reads the tree. A node that
+has gone is removed locally with "This item was deleted by someone else". Collapsed
+branches and the last-used team are kept in `localStorage` per user (and team).
+
+**Scoped styling.** The design tokens (`styles/ost-tokens.css`) are declared on
+`.ost-root`, the shell's root element, not on `:root`. The OST styles, Inter and
+Vue Flow's base CSS are imported only by the lazy OST chunk and use no global
+selectors, because that CSS stays loaded after the user navigates away. Vue Flow's
+`theme-default.css` is not imported, and OST screens use no Bootstrap buttons or
+cards.
+
+**Backend: custom tree APIs beside the generated CRUD.** The tree rules live in
+hand-written classes, never in generated ones (engineering guide §4b):
+
+- Read: `TeamTreeResource` `GET /api/teams/{teamId}/tree` → `TeamTreeService`
+  returns one flat, pre-ordered `TeamTreeDTO` (members, `evidenceThisMonth`,
+  nodes with links, questions, comment counts and product last activity) in a
+  fixed number of queries (`TeamTreeRepository`).
+- Writes under `/api/tree/**`: `TreeNodeResource`/`TreeNodeWriteService`
+  (create, merge-patch, cascade delete through `TreeNodeCascadeService`),
+  `TreeNodeMoveResource`/`TreeNodeMoveService` (re-parent, product reorder,
+  cycle and cross-team checks, dense renumbering), `TreeNodeLinkResource`,
+  `TreeOpenQuestionResource`, `TreeCommentResource` and
+  `TreeNodeHistoryResource` (read). `TreeNodeRules` holds the server copy of the
+  allowed-children matrix. `DefaultNodeLinks` adds each type's default links on
+  create.
+- Access: `TeamAccessService.requireReadNode` / `requireEditNode` resolve any
+  node, link, question or comment to its team (`TreeAccessLookupRepository`).
+  Any member may read. OWNER and EDITOR may write, and that includes chat.
+  Editing or deleting a comment is limited to its author while they are still an
+  editor. A non-member, or an unknown id, gets 403 with no existence leak.
+  `ROLE_ADMIN` gives no implicit tree access.
+- The generated CRUD resources (`/api/outcomes`, `/api/evidences`,
+  `/api/node-links`, …) are admin-only via class-level
+  `@PreAuthorize(ROLE_ADMIN)`, and their Vue screens sit under the admin-only
+  "Static Data" menu. `ProductResource` is the exception: it is team-scoped, and
+  its delete cascades like a tree delete.
+
+**Team lock and 409s.** `TreeStructureLock` takes a pessimistic write lock on the
+owning `Team` row before any write that appends to or renumbers sibling lists, or
+that could race a cascade delete. That covers node create, move, patch and delete,
+product create, reorder and team change (both teams, lower id first), link and
+open-question add, and chat post, edit and delete. The wait is bounded to 5 s. After
+the wait, the service re-checks that the node and parent still exist. Conflicts
+return 409 with a generic `detail` and never any SQL:
+
+- `error.concurrencyFailure`: the lock timed out, or the request it queued behind
+  deleted the target. Clients re-read the tree.
+- `error.dataintegrity`: a foreign-key or constraint violation (SQLState class 23),
+  for example an admin CRUD delete of a node that has children.
+- `error.duplicate`: a unique-constraint violation.
+
+**History.** `NodeHistoryRecorder.record(type, id, event, summary)` writes in the
+same transaction as the change, called only from the tree services, with the
+current user as author. It records: created, status, confidence, priority (only
+when `round(priority / 10)` changes), value, a move to a new parent, link
+added/removed, open question added, and comment added/deleted. It never records
+title, notes, owner or archived edits, or comment edits. Summaries use the
+prototype's wording. Products have no history and no chat (400).
+`GET …/history` lists newest first. A cascade delete removes the history rows of
+every node it deletes (`node_history` is indexed on `(node_type, node_id)` by a
+custom changelog).
+
+**Dev seed.** `config/seed/DevDataSeeder` (`@Profile("dev")`, gated by
+`application.seed.enabled`, which is true in `application-dev.yml`) seeds the
+`admin` and `user` accounts with their Keycloak ids and four teams. Team Jupiter
+and Team Venus have `user` as OWNER and `admin` as VIEWER; Best Team and Team
+Mars have `admin` as OWNER. Team Jupiter gets the full prototype tree. Seeding
+is idempotent per team name. It retries only while the schema is not ready yet,
+and its timestamps fall inside the current month. The JHipster `faker` Liquibase
+context is no longer loaded in dev.
+
+**Existing dev databases must be wiped.** Step 1 of the Tree Builder regenerated
+the entity changelogs in place (the project is pre-production, see guide §4b). A
+dev database created before that fails Liquibase checksum validation: stop the
+app and delete `target/h2db/` (H2), or recreate the PostgreSQL container.
+
+**Error detail in dev.** In the `dev` profile, some non-database exceptions
+(Jackson parse errors, type mismatches) still echo Java class names in the
+problem `detail`. This is the generator's default. The `prod` profile masks
+them (`ExceptionTranslator.getCustomizedErrorDetails`). Database errors never
+carry SQL in any profile.
+
+**Known limits.** There is no real-time sync: other people's edits appear on
+reload (Epic 5). Only the nodes in view are in the DOM, so Tab cannot reach
+off-screen nodes. Search + Enter jumps to any match, and the panel breadcrumb
+and child list move through the tree.
