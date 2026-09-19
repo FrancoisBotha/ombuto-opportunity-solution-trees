@@ -41,21 +41,33 @@ const node = computed(() => {
 });
 const entries = computed<HistoryEntryDTO[]>(() => tree.history[props.nodeKey] ?? []);
 const loading = ref(false);
+/** The node whose history is being read (one read per node at a time; another node may start its own). */
+let loadingKey: string | null = null;
 
 const exactTime = (iso: string) => new Date(iso).toLocaleString();
 
 async function load() {
-  if (!node.value || loading.value) return;
+  const key = props.nodeKey;
+  if (!node.value || loadingKey === key) return;
+  loadingKey = key;
   loading.value = true;
   try {
-    await tree.loadHistory(props.nodeKey);
+    await tree.loadHistory(key);
   } finally {
-    loading.value = false;
+    if (loadingKey === key) {
+      loadingKey = null;
+      loading.value = false;
+    }
   }
 }
 
-// Always refresh on open (other people's changes), then whenever a write invalidates the cache.
+// Always refresh on open (other people's changes) and when the tab is reused for another node,
+// then whenever a write invalidates the cache.
 onMounted(load);
+watch(
+  () => props.nodeKey,
+  () => void load(),
+);
 watch(
   () => tree.history[props.nodeKey],
   cached => {

@@ -427,6 +427,55 @@ describe('OST tree store', () => {
       await tree.patchNode('solution-1', { note: 'typed' });
       expect(service.getTree.callCount).toBe(2);
     });
+
+    it('applies the re-read permissions: a user demoted to viewer loses edit rights', async () => {
+      service.patchNode.rejects(apiError(403));
+      service.getTree.resolves(
+        treeDto(TREE, {
+          currentUserRole: 'VIEWER',
+          canEdit: false,
+          members: [{ login: 'user', firstName: 'Kira', lastName: 'P', initials: 'KP', role: 'VIEWER' }],
+        }),
+      );
+      expect(await tree.patchNode('solution-1', { note: 'typed' })).toBe(false);
+      expect(tree.canEdit).toBe(false);
+      expect(tree.team?.currentUserRole).toBe('VIEWER');
+      expect(tree.team?.members).toHaveLength(1);
+      expect(tree.team?.name).toBe('Team Jupiter');
+      expect(tree.error).toBe('You do not have permission to change this tree.');
+    });
+
+    it('chat send, edit and delete re-read the tree like node writes', async () => {
+      const comment = {
+        id: 1,
+        body: 'hi',
+        authorLogin: 'user',
+        authorInitials: 'KP',
+        authorName: 'Kira',
+        createdDate: '',
+        editedDate: null,
+        mine: true,
+      };
+      service.listComments.resolves([comment]);
+      await tree.loadComments('opportunity-1');
+      service.getTree.resolves(treeDto(TREE));
+
+      service.addComment.rejects(apiError(409, 'error.concurrencyFailure'));
+      expect(await tree.addComment('opportunity-1', 'again')).toBeNull();
+      expect(service.getTree.callCount).toBe(2);
+
+      service.updateComment.rejects(apiError(403));
+      expect(await tree.editComment('opportunity-1', 1, 'edited')).toBe(false);
+      expect(service.getTree.callCount).toBe(3);
+      expect(tree.comments['opportunity-1'][0].body).toBe('hi');
+
+      service.getTree.resolves(treeDto(withoutSolution.filter(d => d.key !== 'opportunity-1')));
+      service.deleteComment.rejects(apiError(403));
+      expect(await tree.deleteComment('opportunity-1', 1)).toBe(false);
+      expect(service.getTree.callCount).toBe(4);
+      expect(tree.byId('opportunity-1')).toBeUndefined();
+      expect(tree.error).toBe('This item was deleted by someone else.');
+    });
   });
 
   describe('collaboration', () => {
@@ -484,6 +533,38 @@ describe('OST tree store', () => {
       await tree.deleteComment('solution-1', 1);
       expect(tree.byId('solution-1')?.commentCount).toBe(1);
       expect(await tree.loadComments('product-1')).toEqual([]);
+    });
+
+    it('a failed comment delete re-inserts the comment only if the list does not have it again', async () => {
+      const comment = {
+        id: 1,
+        body: 'hi',
+        authorLogin: 'user',
+        authorInitials: 'KP',
+        authorName: 'Kira',
+        createdDate: '',
+        editedDate: null,
+        mine: true,
+      };
+      const other = { ...comment, id: 2, body: 'second' };
+      service.listComments.resolves([comment, other]);
+      await tree.loadComments('solution-1');
+
+      // A reload lands while the delete is in flight and already shows the comment again.
+      const pending = deferred<void>();
+      service.deleteComment.returns(pending.promise);
+      const deleting = tree.deleteComment('solution-1', 1);
+      await tree.loadComments('solution-1');
+      pending.reject(apiError(500));
+      expect(await deleting).toBe(false);
+      expect(tree.comments['solution-1'].map(c => c.id)).toEqual([1, 2]);
+      expect(tree.byId('solution-1')?.commentCount).toBe(2);
+
+      // Without a reload the comment comes back where it was, once.
+      service.deleteComment.rejects(apiError(500));
+      expect(await tree.deleteComment('solution-1', 1)).toBe(false);
+      expect(tree.comments['solution-1'].map(c => c.id)).toEqual([1, 2]);
+      expect(tree.byId('solution-1')?.commentCount).toBe(2);
     });
 
     it('invalidates cached history after a write', async () => {

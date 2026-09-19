@@ -50,6 +50,7 @@
               type="button"
               class="ost-chat__own-btn"
               :aria-label="`Edit your message: ${item.comment.body.slice(0, 40)}`"
+              :disabled="busy"
               :data-cy="`ost-chat-edit-${item.comment.id}`"
               @click="startEdit(item.comment)"
             >
@@ -77,7 +78,7 @@
         data-cy="ost-chat-jump"
         @click="jumpToLatest"
       >
-        <PhCaretDown :size="14" weight="bold" aria-hidden="true" />
+        <PhCaretDown :size="14" aria-hidden="true" />
       </button>
     </div>
 
@@ -276,7 +277,8 @@ async function focusInput() {
 }
 
 function startEdit(comment: CommentDTO) {
-  if (!canEdit.value || !comment.mine) return;
+  // Not while a send / save / delete is in flight: its completion would clear the new edit's draft.
+  if (!canEdit.value || !comment.mine || busy.value) return;
   editingId.value = comment.id;
   draft.value = comment.body;
   error.value = null;
@@ -309,15 +311,21 @@ async function send() {
         return;
       }
       if (await tree.editComment(props.nodeKey, id, text)) {
-        editingId.value = null;
-        draft.value = '';
+        // Leave the composer alone if the user moved on (cancelled, or typed more) meanwhile.
+        if (editingId.value === id) {
+          editingId.value = null;
+          if (draft.value.trim() === text) draft.value = '';
+        }
       } else {
         takeError('The message could not be edited.');
       }
     } else {
       atBottom.value = true;
-      if (await tree.addComment(props.nodeKey, text)) draft.value = '';
-      else takeError('The message could not be sent.');
+      // Clear the composer only if it still holds what was sent (the user may have typed on) and
+      // has not switched to editing a message meanwhile.
+      if (await tree.addComment(props.nodeKey, text)) {
+        if (editingId.value === null && draft.value.trim() === text) draft.value = '';
+      } else takeError('The message could not be sent.');
     }
   } finally {
     busy.value = false;

@@ -23,7 +23,7 @@
           :data-cy="`ost-question-toggle-${q.id}`"
           @click="toggle(q)"
         >
-          <PhCheck v-if="q.done" :size="10" weight="bold" aria-hidden="true" />
+          <PhCheck v-if="q.done" :size="10" aria-hidden="true" />
         </button>
         <span class="ost-questions__text" :class="{ 'is-done': q.done }">{{ q.text }}</span>
         <button

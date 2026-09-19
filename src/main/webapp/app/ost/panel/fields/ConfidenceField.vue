@@ -12,7 +12,7 @@
         :class="{ 'is-on': value >= step }"
         :title="`${step}%`"
         :aria-label="`${step}%`"
-        :aria-pressed="value === step"
+        :aria-pressed="step === currentStep"
         :disabled="readonly"
         :data-cy="`ost-confidence-${step}`"
         @click="pick(step)"
@@ -27,12 +27,17 @@
 <script setup lang="ts">
 /**
  * Assumption confidence (0–100) as the prototype's five-step bar: 20 · 40 · 60 · 80 · 100.
- * Steps up to the value are filled; only the step equal to the value is announced as pressed.
+ * Steps up to the value are filled; only the current step — the highest one not above the value
+ * (40 for 50: server values need not be multiples of 20) — is announced as pressed.
  */
+import { computed } from 'vue';
+
 import { CONFIDENCE_STEPS, confidenceLabel } from '../panel-format';
 
 const props = defineProps<{ value: number; readonly?: boolean }>();
 const emit = defineEmits<{ change: [value: number] }>();
+
+const currentStep = computed(() => CONFIDENCE_STEPS.filter(step => step <= props.value).at(-1) ?? null);
 
 const labelId = `ost-conf-${Math.random().toString(36).slice(2, 9)}`;
 

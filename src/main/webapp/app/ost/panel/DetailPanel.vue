@@ -71,7 +71,7 @@
 
   <div v-else-if="node" class="ost-panel-reopen">
     <button ref="reopenButton" type="button" class="ost-panel-reopen__btn" title="Show details" data-cy="ost-panel-reopen" @click="reopen">
-      <PhCaretLeft :size="13" weight="bold" aria-hidden="true" />
+      <PhCaretLeft :size="13" aria-hidden="true" />
       Details
     </button>
   </div>

@@ -86,6 +86,22 @@ describe('DetailTab', () => {
       await flushPromises();
       expect(service.patchNode.calledOnceWith('assumption', 2, { confidence: 80 })).toBe(true);
     });
+
+    it('announces the highest step not above a value that is not a multiple of 20 as pressed', async () => {
+      const { wrapper, tree } = await mountTab('assumption-2');
+      const pressed = () =>
+        wrapper
+          .findAll('[data-cy^="ost-confidence-"]')
+          .filter(s => s.attributes('aria-pressed') === 'true')
+          .map(s => s.attributes('data-cy'));
+      expect(pressed()).toEqual(['ost-confidence-60']);
+      tree.byId('assumption-2')!.conf = 50;
+      await flushPromises();
+      expect(pressed()).toEqual(['ost-confidence-40']);
+      tree.byId('assumption-2')!.conf = 10;
+      await flushPromises();
+      expect(pressed()).toEqual([]);
+    });
   });
 
   describe('evidence strength', () => {

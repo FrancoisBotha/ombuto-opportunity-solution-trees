@@ -200,7 +200,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
    * The server answers 403 for an unknown id (no existence leak), and a 409 concurrencyFailure when
    * a concurrent delete won; both can mean "someone else deleted it". Then the tree is re-read:
    * a node that is gone is removed here (deselected, panel closed) and the message says so;
-   * otherwise the permission / conflict message stands.
+   * otherwise the permission / conflict message stands. The re-read's permissions are applied too:
+   * a user demoted to viewer meanwhile loses the edit controls at once.
    */
   async function failOnNodes(err: unknown, keys: (string | null | undefined)[], fallback?: string, type?: NodeType) {
     fail(err, fallback, type);
@@ -209,13 +210,18 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     const id = teamId.value;
     if (id === null) return;
     const seq = loadSeq.value;
-    let alive: Set<string>;
+    let fresh: TeamTreeDTO;
     try {
-      alive = new Set(((await api().getTree(id)).nodes ?? []).map(n => fromDto(n).id));
+      fresh = await api().getTree(id);
     } catch {
       return; // the team itself is out of reach (access revoked): the permission message stands
     }
     if (seq !== loadSeq.value || teamId.value !== id) return;
+    if (team.value) {
+      const meta = toTeamMeta(fresh);
+      team.value = { ...team.value, currentUserRole: meta.currentUserRole, canEdit: meta.canEdit, members: meta.members };
+    }
+    const alive = new Set((fresh.nodes ?? []).map(n => fromDto(n).id));
     const gone = keys.filter((k): k is string => !!k && !!byId(k) && !alive.has(k));
     if (!gone.length) return;
     for (const k of gone) if (byId(k)) removeSubtree(k);
@@ -642,7 +648,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       recordWrite(key);
       return dto;
     } catch (err) {
-      fail(err, 'The message could not be sent.');
+      await failOnNodes(err, [key], 'The message could not be sent.');
       return null;
     }
   }
@@ -661,7 +667,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     } catch (err) {
       const j = (comments.value[key] ?? []).findIndex(c => c.id === commentId);
       if (j >= 0) comments.value[key].splice(j, 1, snapshot);
-      fail(err, 'The message could not be edited.');
+      await failOnNodes(err, [key], 'The message could not be edited.');
       return false;
     }
   }
@@ -678,9 +684,14 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       recordWrite(key);
       return true;
     } catch (err) {
-      (comments.value[key] ?? []).splice(i, 0, removed);
-      if (node) node.commentCount += 1;
-      fail(err, 'The message could not be deleted.');
+      // Re-insert only when the list does not have it (a reload meanwhile may already show it again).
+      const current = comments.value[key];
+      if (current && !current.some(c => c.id === commentId)) {
+        current.splice(Math.min(i, current.length), 0, removed);
+        const still = byId(key);
+        if (still) still.commentCount += 1;
+      }
+      await failOnNodes(err, [key], 'The message could not be deleted.');
       return false;
     }
   }
