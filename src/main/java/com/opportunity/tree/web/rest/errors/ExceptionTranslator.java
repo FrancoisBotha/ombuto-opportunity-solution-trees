@@ -235,6 +235,8 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
 
     protected ProblemDetailWithCause customizeProblem(ProblemDetailWithCause problem, Throwable err, NativeWebRequest request) {
         if (problem.getStatus() <= 0) problem.setStatus(toStatus(err));
+        // A BadRequestAlertException carries its human message as the title, which is replaced below.
+        String ownTitle = problem.getTitle();
 
         if (problem.getType() == null || problem.getType().equals(URI.create("about:blank"))) problem.setType(getMappedType(err));
 
@@ -246,8 +248,18 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
         }
 
         if (problem.getDetail() == null) {
-            // higher precedence to cause
-            problem.setDetail(getCustomizedErrorDetails(err));
+            // An ErrorResponse (BadRequestAlertException, ResponseStatusException, ...) without a detail:
+            // its getMessage() is Java's toString of the status and body ("400 BAD_REQUEST,
+            // ProblemDetailWithCause[type=...]"), never a message for a client. Use the human message a
+            // BadRequestAlertException was built with (not a bare error key, as the team resources
+            // pass), else no detail at all.
+            if (err instanceof ErrorResponse) {
+                boolean human = err instanceof BadRequestAlertException bad && ownTitle != null && !ownTitle.equals(bad.getErrorKey());
+                problem.setDetail(human ? ownTitle : null);
+            } else {
+                // higher precedence to cause
+                problem.setDetail(getCustomizedErrorDetails(err));
+            }
         }
 
         Map<String, Object> problemProperties = problem.getProperties();

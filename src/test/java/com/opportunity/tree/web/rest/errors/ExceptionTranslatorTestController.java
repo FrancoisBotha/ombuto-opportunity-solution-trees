@@ -77,6 +77,17 @@ public class ExceptionTranslatorTestController {
         throw new java.sql.SQLException(RAW_SELECT_SQL, "42P01");
     }
 
+    /** A tree rule violation as NodeWriteRuleException becomes one (e.g. error.cycle). */
+    @GetMapping("/bad-request-alert")
+    public void badRequestAlert() {
+        throw new BadRequestAlertException("A node cannot move under its own descendant", "treeNode", "cycle");
+    }
+
+    @GetMapping("/response-status-without-reason")
+    public void responseStatusWithoutReason() {
+        throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT);
+    }
+
     @GetMapping("/cannot-acquire-lock")
     public void cannotAcquireLock() {
         throw new CannotAcquireLockException(RAW_SQL);
