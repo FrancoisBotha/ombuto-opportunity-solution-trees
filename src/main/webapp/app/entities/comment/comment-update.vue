@@ -76,19 +76,6 @@
             <small class="form-text text-danger" v-for="error of v$.author.$errors" :key="error.$uid">{{ error.$message }}</small>
           </div>
           <div class="mb-3">
-            <label class="form-control-label" for="comment">Parent</label>
-            <select class="form-control" id="comment-parent" data-cy="parent" name="parent" v-model="comment.parent">
-              <option :value="null"></option>
-              <option
-                :value="comment.parent && commentOption.id === comment.parent.id ? comment.parent : commentOption"
-                v-for="commentOption in comments"
-                :key="commentOption.id"
-              >
-                {{ commentOption.id }}
-              </option>
-            </select>
-          </div>
-          <div class="mb-3">
             <label class="form-control-label" for="comment">Outcome</label>
             <select class="form-control" id="comment-outcome" data-cy="outcome" name="outcome" v-model="comment.outcome">
               <option :value="null"></option>

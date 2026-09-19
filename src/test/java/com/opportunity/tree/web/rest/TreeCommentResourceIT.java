@@ -180,14 +180,12 @@ class TreeCommentResourceIT {
     @Test
     void authorDeletesOwnMessageWithHistory() throws Exception {
         Comment c = persistComment(f.owner, "bye", Instant.now());
-        Comment reply = new Comment().body("reply").createdDate(Instant.now()).author(f.editor).opportunity(f.opportunity).parent(c);
-        em.persist(reply);
-        em.flush();
+        Comment other = persistComment(f.editor, "still here", Instant.now());
 
         mvc.perform(delete("/api/tree/comments/{id}", c.getId()).with(who(OWNER)).with(csrf())).andExpect(status().isNoContent());
 
         assertThat(f.count("select count(c) from Comment c where c.id = ?1", c.getId())).isZero();
-        assertThat(f.count("select count(c) from Comment c where c.id = ?1", reply.getId())).isEqualTo(1);
+        assertThat(f.count("select count(c) from Comment c where c.id = ?1", other.getId())).isEqualTo(1);
         List<NodeHistory> h = history(TreeNodeType.OPPORTUNITY, f.opportunity.getId());
         assertThat(h).hasSize(1);
         assertThat(h.get(0).getEventType()).isEqualTo(HistoryEventType.COMMENT_DELETED);

@@ -252,11 +252,7 @@ public class TreeNodeCascadeService {
             .executeUpdate();
     }
 
-    /**
-     * Delete every comment that references any of the given node ids, honouring
-     * the self-referential {@code parent_id} chain by nulling parents before
-     * bulk-deleting.
-     */
+    /** Delete every comment that references any of the given node ids. */
     private void deleteCommentsFor(String column, List<Long> nodeIds) {
         if (nodeIds.isEmpty()) {
             return;
@@ -269,22 +265,7 @@ public class TreeNodeCascadeService {
             case "evidence" -> "evidence_id";
             default -> throw new IllegalArgumentException("Unsupported comment column: " + column);
         };
-        // Collect target comment ids first, then null out any comment.parent_id
-        // that points at one of them (either direct or via other comments), so
-        // we can bulk-delete without violating the self-referential FK.
-        @SuppressWarnings("unchecked")
-        List<Number> ids = em
-            .createNativeQuery("select id from comment where " + columnName + " in (:ids)")
-            .setParameter("ids", nodeIds)
-            .getResultList();
-        if (ids.isEmpty()) {
-            return;
-        }
-        List<Long> commentIds = ids.stream().map(Number::longValue).toList();
-        em
-            .createNativeQuery("update comment set parent_id = null where parent_id in (:ids)")
-            .setParameter("ids", commentIds)
-            .executeUpdate();
-        em.createNativeQuery("delete from comment where id in (:ids)").setParameter("ids", commentIds).executeUpdate();
+        // Comments are flat (no self-referential parent), so one bulk delete is enough.
+        em.createNativeQuery("delete from comment where " + columnName + " in (:ids)").setParameter("ids", nodeIds).executeUpdate();
     }
 }

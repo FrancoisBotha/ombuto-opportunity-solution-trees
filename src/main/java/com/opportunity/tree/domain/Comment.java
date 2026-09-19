@@ -10,7 +10,7 @@ import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
 /**
- * Threaded comment on any tree node. Exactly one of the node relationships is set.
+ * Flat, chat-style comment on a tree node: no replies, no threading. Exactly one of the node relationships is set.
  */
 @Entity
 @Table(name = "comment")
@@ -41,13 +41,6 @@ public class Comment implements Serializable {
     @ManyToOne(optional = false)
     @NotNull
     private User author;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JsonIgnoreProperties(
-        value = { "author", "parent", "outcome", "opportunity", "solution", "assumption", "evidence" },
-        allowSetters = true
-    )
-    private Comment parent;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "product", "owner" }, allowSetters = true)
@@ -133,19 +126,6 @@ public class Comment implements Serializable {
 
     public Comment author(User user) {
         this.setAuthor(user);
-        return this;
-    }
-
-    public Comment getParent() {
-        return this.parent;
-    }
-
-    public void setParent(Comment comment) {
-        this.parent = comment;
-    }
-
-    public Comment parent(Comment comment) {
-        this.setParent(comment);
         return this;
     }
 

@@ -40,8 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
  * concurrent cascade delete collected the node's comments would otherwise break that delete with a
  * foreign-key violation, and an edit could land on a row deleted meanwhile. A node or comment
  * deleted by the previous lock holder is a 409 {@code error.concurrencyFailure}.
- * Threading ({@code Comment.parent}) is not used: every comment on the node is
- * returned as one flat thread, oldest first.
+ *
+ * <p>Chat is flat by design: there is no threading in the model, so every comment on the node is
+ * returned as one thread, oldest first.
  */
 @Service
 @Transactional
@@ -138,12 +139,6 @@ public class TreeCommentService {
         TreeNodeRef node = teamAccessService.requireEditComment(commentId);
         lockNodeOfComment(node, commentId);
         Comment comment = requireOwnComment(commentId);
-        // Replies (unused by the tree builder, but possible via the raw CRUD API) must not block the delete.
-        em
-            .createQuery("select c from Comment c where c.parent.id = :id", Comment.class)
-            .setParameter("id", commentId)
-            .getResultList()
-            .forEach(reply -> reply.setParent(null));
         commentRepository.delete(comment);
         historyRecorder.record(node.type(), node.id(), HistoryEventType.COMMENT_DELETED, "Comment deleted");
     }
