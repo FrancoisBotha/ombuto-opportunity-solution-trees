@@ -25,7 +25,9 @@ import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.security.AuthoritiesConstants;
+import com.opportunity.tree.domain.Team;
 import jakarta.persistence.EntityManager;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -33,6 +35,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -372,6 +376,107 @@ class DevDataSeederIT {
 
         assertThat(seeder(true).seed()).isFalse();
         assertThat(tableCounts()).isEqualTo(afterFirst);
+    }
+
+    @Test
+    void existingTeamsAreSkippedPerTeamAndTheTreeNeedsANewJupiter() {
+        Team existingJupiter = new Team();
+        existingJupiter.setName(DevDataSeeder.TEAM_JUPITER);
+        existingJupiter.setCreatedDate(Instant.now());
+        teamRepository.saveAndFlush(existingJupiter);
+        Team existingMars = new Team();
+        existingMars.setName(DevDataSeeder.TEAM_MARS);
+        existingMars.setCreatedDate(Instant.now());
+        teamRepository.saveAndFlush(existingMars);
+
+        // Venus and Best Team are still missing, so the run writes something...
+        assertThat(seeder(true).seed()).isTrue();
+
+        for (String name : List.of(DevDataSeeder.TEAM_JUPITER, DevDataSeeder.TEAM_VENUS, DevDataSeeder.BEST_TEAM, DevDataSeeder.TEAM_MARS)) {
+            assertThat(teamsNamed(name)).as(name).isEqualTo(1);
+        }
+        // ...but the pre-existing teams are left alone: no members added, and no tree in the old Jupiter.
+        assertThat(teamMemberRepository.findAll().stream().filter(m -> m.getTeam().getId().equals(existingJupiter.getId()))).isEmpty();
+        assertThat(teamMemberRepository.findAll().stream().filter(m -> m.getTeam().getId().equals(existingMars.getId()))).isEmpty();
+        assertThat(nodeCount("Product")).isZero();
+        assertThat(rolesOf(DevDataSeeder.USER_LOGIN)).isEqualTo(Map.of(DevDataSeeder.TEAM_VENUS, TeamRole.OWNER));
+
+        // Everything exists now: a further run is a no-op.
+        Map<String, Long> afterFirst = tableCounts();
+        assertThat(seeder(true).seed()).isFalse();
+        assertThat(tableCounts()).isEqualTo(afterFirst);
+    }
+
+    @Test
+    void seededEvidenceCountsAsThisMonth() {
+        seeder(true).seed();
+
+        Instant now = Instant.now();
+        Instant monthStart = now.atZone(ZoneOffset.UTC).toLocalDate().withDayOfMonth(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        long evidenceThisMonth = em
+            .createQuery(
+                "select count(e) from Evidence e where e.opportunity.outcome.product.team.name = :team and e.createdDate >= :start",
+                Long.class
+            )
+            .setParameter("team", DevDataSeeder.TEAM_JUPITER)
+            .setParameter("start", monthStart)
+            .getSingleResult();
+        assertThat(evidenceThisMonth).isEqualTo(3);
+        // Every seeded history row sits inside the current month and not in the future.
+        List<Instant> seededHistory = em
+            .createQuery(
+                "select h.createdDate from NodeHistory h where h.nodeType = :type and h.nodeId in " +
+                "(select o.id from Opportunity o where o.outcome.product.team.name = :team)",
+                Instant.class
+            )
+            .setParameter("type", TreeNodeType.OPPORTUNITY)
+            .setParameter("team", DevDataSeeder.TEAM_JUPITER)
+            .getResultList();
+        assertThat(seededHistory).isNotEmpty().allSatisfy(t -> assertThat(t).isBetween(monthStart, now));
+    }
+
+    @Test
+    void seedAnchorKeepsThePrototypeWeekWhenItIsInTheCurrentMonth() {
+        // Saturday 19 Sep 2026: the reference Monday (14 Sep) is this month, so it is used as is.
+        assertThat(DevDataSeeder.seedAnchor(Instant.parse("2026-09-19T12:00:00Z"))).isEqualTo(Instant.parse("2026-09-14T00:00:00Z"));
+    }
+
+    @Test
+    void seedAnchorMovesIntoTheCurrentMonthWhenTheReferenceWeekStartedLastMonth() {
+        // Saturday 3 Oct 2026 18:00: the reference Monday is 28 Sep, so "Mon" becomes Fri 2 Oct and "Tue" Sat 3 Oct.
+        Instant sat = Instant.parse("2026-10-03T18:00:00Z");
+        assertThat(DevDataSeeder.seedAnchor(sat)).isEqualTo(Instant.parse("2026-10-02T00:00:00Z"));
+        assertThat(DevDataSeeder.at(DevDataSeeder.seedAnchor(sat), "Tue", "16:18", sat)).isEqualTo(Instant.parse("2026-10-03T16:18:00Z"));
+
+        // Friday 2 Oct 2026 10:00: not two full days into the month yet, so the 1st is the anchor and
+        // anything that would land after "now" is clamped to now.
+        Instant fri = Instant.parse("2026-10-02T10:00:00Z");
+        Instant anchor = DevDataSeeder.seedAnchor(fri);
+        assertThat(anchor).isEqualTo(Instant.parse("2026-10-01T00:00:00Z"));
+        assertThat(DevDataSeeder.at(anchor, "Mon", "08:31", fri)).isEqualTo(Instant.parse("2026-10-01T08:31:00Z"));
+        assertThat(DevDataSeeder.at(anchor, "Tue", "11:43", fri)).isEqualTo(fri);
+
+        // Just after midnight on the 1st: everything collapses to now, which is still this month.
+        Instant first = Instant.parse("2026-10-01T00:30:00Z");
+        assertThat(DevDataSeeder.at(DevDataSeeder.seedAnchor(first), "Mon", "08:10", first)).isEqualTo(first);
+    }
+
+    @Test
+    void onlySchemaNotReadyErrorsAreRetried() {
+        assertThat(DevDataSeeder.isSchemaNotReady(new BadSqlGrammarException("seed", "select 1", new SQLException("no table", "42P01"))))
+            .isTrue();
+        assertThat(DevDataSeeder.isSchemaNotReady(new RuntimeException("wrapped", new SQLException("no column", "42703")))).isTrue();
+        assertThat(DevDataSeeder.isSchemaNotReady(new DataIntegrityViolationException("dup", new SQLException("dup", "23505")))).isFalse();
+        assertThat(DevDataSeeder.isSchemaNotReady(new IllegalStateException("Missing authority ROLE_X"))).isFalse();
+        assertThat(DevDataSeeder.isSchemaNotReady(new RuntimeException("no state", new SQLException("no state")))).isFalse();
+    }
+
+    private long teamsNamed(String name) {
+        return teamRepository
+            .findAll()
+            .stream()
+            .filter(team -> name.equals(team.getName()))
+            .count();
     }
 
     @Test
