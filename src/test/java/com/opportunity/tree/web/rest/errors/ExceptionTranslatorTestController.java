@@ -1,8 +1,11 @@
 package com.opportunity.tree.web.rest.errors;
 
+import jakarta.persistence.PessimisticLockException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -15,6 +18,24 @@ public class ExceptionTranslatorTestController {
     @GetMapping("/concurrency-failure")
     public void concurrencyFailure() {
         throw new ConcurrencyFailureException("test concurrency failure");
+    }
+
+    static final String RAW_SQL =
+        "could not execute statement [ERROR: update or delete on table \"opportunity\" violates foreign key constraint] [delete from opportunity where id=?]";
+
+    @GetMapping("/data-integrity")
+    public void dataIntegrity() {
+        throw new DataIntegrityViolationException(RAW_SQL, new java.sql.SQLException(RAW_SQL, "23503"));
+    }
+
+    @GetMapping("/cannot-acquire-lock")
+    public void cannotAcquireLock() {
+        throw new CannotAcquireLockException(RAW_SQL);
+    }
+
+    @GetMapping("/jpa-pessimistic-lock")
+    public void jpaPessimisticLock() {
+        throw new PessimisticLockException(RAW_SQL);
     }
 
     @PostMapping("/method-argument")

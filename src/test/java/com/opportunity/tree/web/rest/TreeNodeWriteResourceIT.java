@@ -322,6 +322,98 @@ class TreeNodeWriteResourceIT {
     }
 
     @Test
+    void viewerAndNonMemberGet403OnCreateUnderEveryParentType() throws Exception {
+        Map<String, Long> before = new HashMap<>();
+        for (String entity : List.of("Outcome", "Opportunity", "Solution", "Assumption", "Evidence")) {
+            before.put(entity, count(entity));
+        }
+        for (TreeNodeType parentType : TreeNodeType.values()) {
+            for (TreeNodeType childType : ALLOWED.get(parentType)) {
+                for (String login : List.of(VIEWER, OUTSIDER)) {
+                    mvc
+                        .perform(json(post("/api/tree/nodes"), create(childType, parentType, idOf(parentType), null)).with(user(login)))
+                        .andExpect(status().isForbidden());
+                }
+            }
+        }
+        before.forEach((entity, n) -> assertThat(count(entity)).as(entity).isEqualTo(n));
+    }
+
+    @Test
+    void viewerWithAnInvalidTitleGets403Not400() throws Exception {
+        // Access is checked before the body is validated, as on PATCH.
+        mvc
+            .perform(
+                json(post("/api/tree/nodes"), create(TreeNodeType.SOLUTION, TreeNodeType.OPPORTUNITY, opportunity.getId(), "x")).with(
+                    user(VIEWER)
+                )
+            )
+            .andExpect(status().isForbidden());
+        mvc
+            .perform(
+                json(post("/api/tree/nodes"), create(TreeNodeType.SOLUTION, TreeNodeType.OPPORTUNITY, opportunity.getId(), "x")).with(
+                    user(OUTSIDER)
+                )
+            )
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aWholeBranchCanBeBuiltThroughTheApiMoreThanThreeLevelsDeep() throws Exception {
+        JsonNode newOutcome = createOk(TreeNodeType.OUTCOME, TreeNodeType.PRODUCT, product.getId(), "Deep outcome");
+        JsonNode opp = createOk(TreeNodeType.OPPORTUNITY, TreeNodeType.OUTCOME, newOutcome.get("id").asLong(), "Level 2");
+        JsonNode nested = createOk(TreeNodeType.OPPORTUNITY, TreeNodeType.OPPORTUNITY, opp.get("id").asLong(), "Level 3");
+        JsonNode nested2 = createOk(TreeNodeType.OPPORTUNITY, TreeNodeType.OPPORTUNITY, nested.get("id").asLong(), "Level 4");
+        JsonNode sol = createOk(TreeNodeType.SOLUTION, TreeNodeType.OPPORTUNITY, nested2.get("id").asLong(), "Level 5");
+        JsonNode ass = createOk(TreeNodeType.ASSUMPTION, TreeNodeType.SOLUTION, sol.get("id").asLong(), "Level 6");
+        JsonNode ev = createOk(TreeNodeType.EVIDENCE, TreeNodeType.ASSUMPTION, ass.get("id").asLong(), "Level 7");
+
+        assertThat(newOutcome.get("parentKey").asText()).isEqualTo(key(TreeNodeType.PRODUCT, product.getId()));
+        assertThat(opp.get("parentKey").asText()).isEqualTo(newOutcome.get("key").asText());
+        assertThat(nested.get("parentKey").asText()).isEqualTo(opp.get("key").asText());
+        assertThat(nested2.get("parentKey").asText()).isEqualTo(nested.get("key").asText());
+        assertThat(sol.get("parentKey").asText()).isEqualTo(nested2.get("key").asText());
+        assertThat(ass.get("parentKey").asText()).isEqualTo(sol.get("key").asText());
+        assertThat(ev.get("parentKey").asText()).isEqualTo(ass.get("key").asText());
+        // Nested opportunities share the top-level opportunity's outcome.
+        assertThat(em.find(Opportunity.class, nested2.get("id").asLong()).getOutcome().getId()).isEqualTo(newOutcome.get("id").asLong());
+    }
+
+    @Test
+    void productDeleteThroughTheProductApiCascadesItsLinksAndTree() throws Exception {
+        // A ROLE_ADMIN user who owns the team (the generated admin screen's DELETE /api/products/{id}).
+        User admin = em.createQuery("select u from User u where u.login = :l", User.class).setParameter("l", ADMIN).getSingleResult();
+        data.member(em.find(Team.class, teamA.getId()), admin, TeamRole.OWNER);
+        Product doomed = data.product(em.find(Team.class, teamA.getId()), "Doomed", 1);
+        em.flush();
+        JsonNode doomedOutcome = createOk(TreeNodeType.OUTCOME, TreeNodeType.PRODUCT, doomed.getId(), "Doomed outcome");
+        mvc
+            .perform(
+                json(
+                    post("/api/tree/nodes/product/{id}/links", doomed.getId()),
+                    Map.of("name", "Space", "url", "https://x.example.com")
+                ).with(user(OWNER))
+            )
+            .andExpect(status().isCreated());
+
+        mvc.perform(delete("/api/products/{id}", doomed.getId()).with(user(VIEWER)).with(csrf())).andExpect(status().isForbidden());
+        mvc
+            .perform(delete("/api/products/{id}", doomed.getId()).with(user(ADMIN).roles("ADMIN", "USER")).with(csrf()))
+            .andExpect(status().isNoContent());
+        em.clear();
+        assertThat(em.find(Product.class, doomed.getId())).isNull();
+        assertThat(em.find(Outcome.class, doomedOutcome.get("id").asLong())).isNull();
+        assertThat(
+            em
+                .createQuery("select count(l) from NodeLink l where l.product.id = :id", Long.class)
+                .setParameter("id", doomed.getId())
+                .getSingleResult()
+        ).isZero();
+        // The rest of team A's tree is untouched.
+        assertThat(em.find(Product.class, product.getId())).isNotNull();
+    }
+
+    @Test
     void productCreatedThroughProductApiGetsItsDefaultLink() throws Exception {
         Map<String, Object> body = Map.of("name", "Brand new product", "archived", false, "team", Map.of("id", teamA.getId()));
         String json = mvc
@@ -542,6 +634,72 @@ class TreeNodeWriteResourceIT {
             .perform(mergePatch("opportunity", opportunity.getId(), clearNotes).with(user(OWNER)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.notes").value(nullValue()));
+    }
+
+    @Test
+    void numbersOutsideTheLongRangeAreRejectedNotWrapped() throws Exception {
+        // 2^64 + 50 would wrap to 50 with Number.longValue().
+        for (String body : List.of(
+            "{\"priority\": 18446744073709551666}",
+            "{\"priority\": -18446744073709551566}",
+            "{\"valueRating\": 18446744073709551619}",
+            "{\"priority\": 50.5}",
+            "{\"priority\": 1e300}"
+        )) {
+            mvc
+                .perform(
+                    patch("/api/tree/nodes/{type}/{id}", "opportunity", opportunity.getId())
+                        .with(csrf())
+                        .with(user(OWNER))
+                        .contentType("application/merge-patch+json")
+                        .content(body)
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(
+                    jsonPath("$.message").value(body.contains("valueRating") ? "error.invalidvaluerating" : "error.invalidpriority")
+                );
+        }
+        // Integral values written as decimals are still fine.
+        mvc
+            .perform(
+                patch("/api/tree/nodes/{type}/{id}", "opportunity", opportunity.getId())
+                    .with(csrf())
+                    .with(user(OWNER))
+                    .contentType("application/merge-patch+json")
+                    .content("{\"priority\": 60.0}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.priority").value(60));
+    }
+
+    @Test
+    void patchAdvancesLastModifiedDateAndKeepsCreatedDate() throws Exception {
+        java.time.Instant old = java.time.Instant.parse("2020-01-02T03:04:05Z");
+        for (String entity : List.of("Outcome", "Opportunity", "Solution", "Assumption", "Evidence")) {
+            em
+                .createQuery("update " + entity + " x set x.createdDate = :d, x.lastModifiedDate = :d")
+                .setParameter("d", old)
+                .executeUpdate();
+        }
+        em.clear();
+        java.time.Instant beforePatch = java.time.Instant.now().minusSeconds(1);
+        for (TreeNodeType type : List.of(
+            TreeNodeType.OUTCOME,
+            TreeNodeType.OPPORTUNITY,
+            TreeNodeType.SOLUTION,
+            TreeNodeType.ASSUMPTION,
+            TreeNodeType.EVIDENCE
+        )) {
+            String json = mvc
+                .perform(mergePatch(type.name().toLowerCase(Locale.ROOT), idOf(type), Map.of("notes", "touched")).with(user(EDITOR)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+            JsonNode node = om.readTree(json);
+            assertThat(java.time.Instant.parse(node.get("createdDate").asText())).as(type + " createdDate").isEqualTo(old);
+            assertThat(java.time.Instant.parse(node.get("lastModifiedDate").asText())).as(type + " lastModifiedDate").isAfter(beforePatch);
+        }
     }
 
     @Test

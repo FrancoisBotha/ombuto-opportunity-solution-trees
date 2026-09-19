@@ -91,6 +91,7 @@ public class TreeNodeWriteService {
     private final TreeNodeCascadeService cascadeService;
     private final UserRepository userRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final TreeStructureLock structureLock;
 
     @PersistenceContext
     private EntityManager em;
@@ -102,7 +103,8 @@ public class TreeNodeWriteService {
         TreeNodeDtoAssembler dtoAssembler,
         TreeNodeCascadeService cascadeService,
         UserRepository userRepository,
-        TeamMemberRepository teamMemberRepository
+        TeamMemberRepository teamMemberRepository,
+        TreeStructureLock structureLock
     ) {
         this.teamAccessService = teamAccessService;
         this.historyRecorder = historyRecorder;
@@ -111,6 +113,7 @@ public class TreeNodeWriteService {
         this.cascadeService = cascadeService;
         this.userRepository = userRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.structureLock = structureLock;
     }
 
     // ---------------------------------------------------------------------
@@ -130,11 +133,14 @@ public class TreeNodeWriteService {
         // Purely type-based, so checking it before access leaks nothing about existing ids.
         TreeNodeRules.requireAllowed(parentType, type);
         // Access before field validation (as PATCH does): a viewer never learns why their body is wrong.
-        teamAccessService.requireEditNode(parentType, request.parentId());
+        Long teamId = teamAccessService.requireEditNode(parentType, request.parentId());
         String title =
             request.title() == null || request.title().isBlank() ? TreeNodeRules.defaultTitle(type) : validTitle(type, request.title());
         LOG.debug("Create {} under {} {}", type, parentType, request.parentId());
 
+        // sortOrder = max + 1 must be computed under the team's structure lock, or concurrent
+        // creates under one parent (a double-click) all get the same sortOrder.
+        structureLock.lockTeam(teamId);
         Instant now = Instant.now();
         Long parentId = request.parentId();
         Object entity = switch (type) {

@@ -104,6 +104,39 @@ class TreeNodeLinkResourceIT {
         assertThat(f.count(col.formatted("evidence"), f.evidence.getId())).isEqualTo(1);
     }
 
+    /** Edit + delete by link id on every node type: exercises the link → node column mapping in TeamAccessService. */
+    @Test
+    void editAndDeleteByIdWorkOnEveryNodeType() throws Exception {
+        for (TreeNodeType type : TreeNodeType.values()) {
+            NodeLink link = new NodeLink().name("On " + type).url("https://example.com/" + type).sortOrder(0).createdDate(Instant.now());
+            switch (type) {
+                case PRODUCT -> link.product(f.product);
+                case OUTCOME -> link.outcome(f.outcome);
+                case OPPORTUNITY -> link.opportunity(f.opportunity);
+                case SOLUTION -> link.solution(f.solution);
+                case ASSUMPTION -> link.assumption(f.assumption);
+                case EVIDENCE -> link.evidence(f.evidence);
+            }
+            em.persist(link);
+            em.flush();
+
+            mvc
+                .perform(json(patch("/api/tree/links/{id}", link.getId()), "{\"name\":\"Hacked\"}", VIEWER))
+                .andExpect(status().isForbidden());
+            mvc
+                .perform(json(patch("/api/tree/links/{id}", link.getId()), "{\"name\":\"Renamed\"}", EDITOR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Renamed"));
+            mvc.perform(delete("/api/tree/links/{id}", link.getId()).with(who(OUTSIDER)).with(csrf())).andExpect(status().isForbidden());
+            mvc.perform(delete("/api/tree/links/{id}", link.getId()).with(who(EDITOR)).with(csrf())).andExpect(status().isNoContent());
+
+            assertThat(f.count("select count(l) from NodeLink l where l.id = ?1", link.getId())).as(type.name()).isZero();
+            List<NodeHistory> h = history(type, f.idOf(type));
+            assertThat(h).as(type.name()).extracting(NodeHistory::getSummary).containsExactly("Link removed");
+            assertThat(h.get(0).getEventType()).isEqualTo(HistoryEventType.LINK_REMOVED);
+        }
+    }
+
     @Test
     void sortOrderIsMaxPlusOneAndTypeIsCaseInsensitive() throws Exception {
         persistLink("a", 0);

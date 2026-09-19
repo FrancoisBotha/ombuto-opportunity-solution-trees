@@ -146,6 +146,37 @@ class TreeCommentResourceIT {
         assertThat(history(TreeNodeType.OPPORTUNITY, f.opportunity.getId())).isEmpty();
     }
 
+    /** Edit + delete by comment id on every chat node type: exercises the comment → node column mapping in TeamAccessService. */
+    @Test
+    void editAndDeleteByIdWorkOnEveryChatNodeType() throws Exception {
+        for (TreeNodeType type : TreeCollaborationFixture.chatTypes()) {
+            Comment c = new Comment().body("on " + type).createdDate(Instant.now()).author(f.editor);
+            switch (type) {
+                case OUTCOME -> c.outcome(f.outcome);
+                case OPPORTUNITY -> c.opportunity(f.opportunity);
+                case SOLUTION -> c.solution(f.solution);
+                case ASSUMPTION -> c.assumption(f.assumption);
+                case EVIDENCE -> c.evidence(f.evidence);
+                default -> throw new IllegalStateException(type.name());
+            }
+            em.persist(c);
+            em.flush();
+
+            mvc
+                .perform(json(patch("/api/tree/comments/{id}", c.getId()), "{\"body\":\"not yours\"}", OWNER))
+                .andExpect(status().isForbidden());
+            mvc
+                .perform(json(patch("/api/tree/comments/{id}", c.getId()), "{\"body\":\"edited\"}", EDITOR))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.body").value("edited"));
+            mvc.perform(delete("/api/tree/comments/{id}", c.getId()).with(who(OUTSIDER)).with(csrf())).andExpect(status().isForbidden());
+            mvc.perform(delete("/api/tree/comments/{id}", c.getId()).with(who(EDITOR)).with(csrf())).andExpect(status().isNoContent());
+
+            assertThat(f.count("select count(c) from Comment c where c.id = ?1", c.getId())).as(type.name()).isZero();
+            assertThat(history(type, f.idOf(type))).as(type.name()).extracting(NodeHistory::getSummary).containsExactly("Comment deleted");
+        }
+    }
+
     @Test
     void authorDeletesOwnMessageWithHistory() throws Exception {
         Comment c = persistComment(f.owner, "bye", Instant.now());

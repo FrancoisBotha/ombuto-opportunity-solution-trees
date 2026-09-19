@@ -70,6 +70,7 @@ public class TreeNodeMoveService {
     private final SolutionRepository solutionRepository;
     private final AssumptionRepository assumptionRepository;
     private final EvidenceRepository evidenceRepository;
+    private final TreeStructureLock structureLock;
 
     @PersistenceContext
     private EntityManager em;
@@ -83,7 +84,8 @@ public class TreeNodeMoveService {
         OpportunityRepository opportunityRepository,
         SolutionRepository solutionRepository,
         AssumptionRepository assumptionRepository,
-        EvidenceRepository evidenceRepository
+        EvidenceRepository evidenceRepository,
+        TreeStructureLock structureLock
     ) {
         this.teamAccessService = teamAccessService;
         this.historyRecorder = historyRecorder;
@@ -94,6 +96,7 @@ public class TreeNodeMoveService {
         this.solutionRepository = solutionRepository;
         this.assumptionRepository = assumptionRepository;
         this.evidenceRepository = evidenceRepository;
+        this.structureLock = structureLock;
     }
 
     public MoveTreeNodeResponse move(MoveTreeNodeRequest request) {
@@ -127,6 +130,9 @@ public class TreeNodeMoveService {
         if (!nodeTeamId.equals(parentTeamId)) {
             throw new NodeWriteRuleException("A node can only move within its own team", TreeNodeRules.ENTITY_NAME, "crossteam");
         }
+        // Serialise with other structural writes in this team before reading any parent/sibling state
+        // (concurrent moves between the same parents would otherwise deadlock on the renumbering).
+        structureLock.lockTeam(nodeTeamId);
         if (nodeType == TreeNodeType.OPPORTUNITY && parentType == TreeNodeType.OPPORTUNITY && wouldFormCycle(nodeId, newParent.id())) {
             throw new NodeWriteRuleException(
                 "Cannot move an opportunity under itself or one of its descendants",
@@ -166,6 +172,7 @@ public class TreeNodeMoveService {
             );
         }
         Long teamId = teamAccessService.requireEditNode(TreeNodeType.PRODUCT, productId);
+        structureLock.lockTeam(teamId);
         List<SiblingOrderDTO> siblings = renumber(TreeNodeType.PRODUCT, new TreeNodeRef(null, teamId), productId, position);
         em.flush();
         return new MoveTreeNodeResponse(dtoAssembler.toDto(TreeNodeType.PRODUCT, productId), siblings);

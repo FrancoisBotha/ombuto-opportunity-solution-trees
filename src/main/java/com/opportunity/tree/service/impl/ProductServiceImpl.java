@@ -8,6 +8,7 @@ import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.ProductService;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
+import com.opportunity.tree.service.TreeNodeCascadeService;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.mapper.ProductMapper;
@@ -50,16 +51,20 @@ public class ProductServiceImpl implements ProductService {
 
     private final DefaultNodeLinks defaultNodeLinks;
 
+    private final TreeNodeCascadeService treeNodeCascadeService;
+
     public ProductServiceImpl(
         ProductRepository productRepository,
         ProductMapper productMapper,
         TeamAccessService teamAccessService,
-        DefaultNodeLinks defaultNodeLinks
+        DefaultNodeLinks defaultNodeLinks,
+        TreeNodeCascadeService treeNodeCascadeService
     ) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.teamAccessService = teamAccessService;
         this.defaultNodeLinks = defaultNodeLinks;
+        this.treeNodeCascadeService = treeNodeCascadeService;
     }
 
     @Override
@@ -183,9 +188,10 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public void delete(Long id) {
         LOG.debug("Request to delete Product : {}", id);
-        Product existing = productRepository.findById(id).orElseThrow(TeamAccessDeniedException::new);
-        teamAccessService.requireEditNode(TreeNodeType.PRODUCT, existing.getId());
-        productRepository.deleteById(id);
+        // OST: every product has default links (and usually a subtree), so a plain deleteById
+        // fails on foreign keys. The cascade service authorises (OWNER/EDITOR of the product's
+        // team; 403 for anyone else or an unknown id) and removes the whole subtree.
+        treeNodeCascadeService.deleteNode(TreeNodeType.PRODUCT, id);
     }
 
     private static Long teamIdOf(ProductDTO dto) {
