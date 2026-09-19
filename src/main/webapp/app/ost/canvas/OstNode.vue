@@ -305,6 +305,11 @@ const priorityDots = computed(() =>
 }
 
 /* ---- states ---------------------------------------------------------------------------------- */
+/* The browser's own focus outline is replaced by the ring below. This rule comes BEFORE the state
+   rules on purpose: a focused node keeps its selected / target / drop outline and match halo. */
+.ost-node:focus-visible {
+  outline: none;
+}
 .ost-node.is-match {
   border-style: solid;
   border-color: var(--color-accent);
@@ -325,16 +330,18 @@ const priorityDots = computed(() =>
   outline-offset: 4px;
   background: var(--color-accent-800);
 }
-/* Keyboard focus: a ring outside the selection outline, so both stay readable. */
-.ost-node:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 5px var(--color-bg),
-    0 0 0 7px var(--color-accent-300);
-}
-.ost-node.is-selected:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+/*
+ * Keyboard focus: a ring on its own layer (::after), 7–9px outside the border — beyond every state
+ * outline (selected 2–4px, target 3–4px, drop 4–6px) and the match halo (0–3px), so it never hides
+ * or replaces them. The pseudo-element is positioned from the padding box (1px border).
+ */
+.ost-node:focus-visible::after {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border: 2px solid var(--color-accent-300);
+  border-radius: calc(var(--radius-md) + 8px);
+  pointer-events: none;
 }
 .ost-node.is-dimmed {
   opacity: 0.24;

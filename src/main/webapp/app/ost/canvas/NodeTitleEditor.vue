@@ -27,6 +27,11 @@
  * `editing`). Enter commits, Escape cancels, blur commits — a blur with an invalid title cancels
  * instead (there is nowhere left to show the message). Invalid titles on Enter stay in the field
  * with inline feedback. Emits once: commit(title) or cancel.
+ *
+ * Unmounted while still open (its node left the canvas: scope switch, collapse, page change, ...),
+ * it settles like a blur — a valid draft commits, anything else cancels — so the canvas never keeps
+ * a stale editingId that re-grabs focus when the node comes back. (The canvas also keeps the node
+ * being edited rendered while it scrolls or zooms out of view: see TreeCanvas.)
  */
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -95,7 +100,10 @@ function focusSoon(tries = 12) {
 }
 
 onMounted(() => focusSoon());
-onBeforeUnmount(() => cancelAnimationFrame(frame));
+onBeforeUnmount(() => {
+  cancelAnimationFrame(frame);
+  onBlur();
+});
 
 defineExpose({ finish });
 </script>

@@ -30,6 +30,8 @@
  * The node `+` menu: exactly the node's valid child types (prototype: `addOptions`, "Add child").
  * Keyboard: focus lands on the first item, ↑/↓/Home/End move, Enter/Space choose, Escape or Tab
  * closes (focus goes back to the `+`). A pointer press anywhere outside the menu and its `+` closes it.
+ * Unmounted while open (its node left the canvas), it reports close so no stale addMenuId remains;
+ * the canvas ignores a close from a menu that is no longer the open one.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -77,7 +79,10 @@ onMounted(async () => {
   await nextTick();
   items()[0]?.focus({ preventScroll: true });
 });
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointerDown, true));
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointerDown, true);
+  emit('close', false);
+});
 </script>
 
 <style scoped>
