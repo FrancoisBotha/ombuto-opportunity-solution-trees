@@ -13,10 +13,16 @@ public class ApplicationProperties {
 
     private final Liquibase liquibase = new Liquibase();
 
+    private final Seed seed = new Seed();
+
     // jhipster-needle-application-properties-property
 
     public Liquibase getLiquibase() {
         return liquibase;
+    }
+
+    public Seed getSeed() {
+        return seed;
     }
 
     // jhipster-needle-application-properties-property-getter
@@ -31,6 +37,23 @@ public class ApplicationProperties {
 
         public void setAsyncStart(Boolean asyncStart) {
             this.asyncStart = asyncStart;
+        }
+    }
+
+    /**
+     * Dev seed data ({@code DevDataSeeder}). Off unless {@code application.seed.enabled} is true
+     * (set in {@code application-dev.yml}).
+     */
+    public static class Seed {
+
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
         }
     }
 
