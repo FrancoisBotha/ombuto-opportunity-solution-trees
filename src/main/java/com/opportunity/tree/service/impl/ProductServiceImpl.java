@@ -1,7 +1,9 @@
 package com.opportunity.tree.service.impl;
 
 import com.opportunity.tree.domain.Product;
+import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.ProductRepository;
+import com.opportunity.tree.service.DefaultNodeLinks;
 import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.ProductService;
 import com.opportunity.tree.service.TeamAccessDeniedException;
@@ -46,10 +48,18 @@ public class ProductServiceImpl implements ProductService {
 
     private final TeamAccessService teamAccessService;
 
-    public ProductServiceImpl(ProductRepository productRepository, ProductMapper productMapper, TeamAccessService teamAccessService) {
+    private final DefaultNodeLinks defaultNodeLinks;
+
+    public ProductServiceImpl(
+        ProductRepository productRepository,
+        ProductMapper productMapper,
+        TeamAccessService teamAccessService,
+        DefaultNodeLinks defaultNodeLinks
+    ) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.teamAccessService = teamAccessService;
+        this.defaultNodeLinks = defaultNodeLinks;
     }
 
     @Override
@@ -69,6 +79,8 @@ public class ProductServiceImpl implements ProductService {
         // sortOrder is server-set: append after the team's existing products.
         product.setSortOrder(productRepository.findMaxSortOrderByTeamId(targetTeamId) + 1);
         product = productRepository.save(product);
+        // OST: every new product gets its default "Product space" link.
+        defaultNodeLinks.addDefaults(product);
         return productMapper.toDto(product);
     }
 
@@ -77,7 +89,7 @@ public class ProductServiceImpl implements ProductService {
         LOG.debug("Request to update Product : {}", productDTO);
         Product existing = productRepository.findById(productDTO.getId()).orElseThrow(TeamAccessDeniedException::new);
         Long existingTeamId = existing.getTeam() != null ? existing.getTeam().getId() : null;
-        teamAccessService.requireEditProduct(existing.getId());
+        teamAccessService.requireEditNode(TreeNodeType.PRODUCT, existing.getId());
 
         Long targetTeamId = teamIdOf(productDTO);
         if (!Objects.equals(existingTeamId, targetTeamId)) {
@@ -98,7 +110,7 @@ public class ProductServiceImpl implements ProductService {
     public Optional<ProductDTO> partialUpdate(ProductDTO productDTO) {
         LOG.debug("Request to partially update Product : {}", productDTO);
         Product existing = productRepository.findById(productDTO.getId()).orElseThrow(TeamAccessDeniedException::new);
-        teamAccessService.requireEditProduct(existing.getId());
+        teamAccessService.requireEditNode(TreeNodeType.PRODUCT, existing.getId());
 
         Long targetTeamId = teamIdOf(productDTO);
         Long existingTeamId = existing.getTeam() != null ? existing.getTeam().getId() : null;
@@ -160,7 +172,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Optional<ProductDTO> findOne(Long id) {
         LOG.debug("Request to get Product : {}", id);
-        if (id == null || !teamAccessService.canReadProduct(id)) {
+        if (id == null || !teamAccessService.canReadNode(TreeNodeType.PRODUCT, id)) {
             // Non-member and non-existing map to the same empty Optional so the
             // controller returns 404 either way and existence is not revealed.
             return Optional.empty();
@@ -172,7 +184,7 @@ public class ProductServiceImpl implements ProductService {
     public void delete(Long id) {
         LOG.debug("Request to delete Product : {}", id);
         Product existing = productRepository.findById(id).orElseThrow(TeamAccessDeniedException::new);
-        teamAccessService.requireEditProduct(existing.getId());
+        teamAccessService.requireEditNode(TreeNodeType.PRODUCT, existing.getId());
         productRepository.deleteById(id);
     }
 

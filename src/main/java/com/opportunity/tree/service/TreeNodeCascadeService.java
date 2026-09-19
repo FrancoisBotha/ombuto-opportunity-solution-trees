@@ -45,7 +45,7 @@ public class TreeNodeCascadeService {
 
     public void deleteProduct(Long productId) {
         LOG.debug("Cascade delete Product {}", productId);
-        teamAccessService.requireEditProduct(productId);
+        teamAccessService.requireEditNode(TreeNodeType.PRODUCT, productId);
         List<Long> outcomeIds = em
             .createQuery("select o.id from Outcome o where o.product.id = :pid", Long.class)
             .setParameter("pid", productId)
@@ -68,21 +68,21 @@ public class TreeNodeCascadeService {
 
     public void deleteOutcome(Long outcomeId) {
         LOG.debug("Cascade delete Outcome {}", outcomeId);
-        teamAccessService.requireEditOutcome(outcomeId);
+        teamAccessService.requireEditNode(TreeNodeType.OUTCOME, outcomeId);
         deleteOutcomesInternal(List.of(outcomeId));
         em.flush();
     }
 
     public void deleteOpportunity(Long opportunityId) {
         LOG.debug("Cascade delete Opportunity {}", opportunityId);
-        teamAccessService.requireEditOpportunity(opportunityId);
+        teamAccessService.requireEditNode(TreeNodeType.OPPORTUNITY, opportunityId);
         deleteOpportunitiesInternal(List.of(opportunityId));
         em.flush();
     }
 
     public void deleteSolution(Long solutionId) {
         LOG.debug("Cascade delete Solution {}", solutionId);
-        teamAccessService.requireEditSolution(solutionId);
+        teamAccessService.requireEditNode(TreeNodeType.SOLUTION, solutionId);
         deleteSolutionsInternal(List.of(solutionId));
         em.flush();
     }

@@ -48,7 +48,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration tests for {@link TreeNodeCascadeResource} covering the TREE-003
+ * Integration tests for the cascade delete endpoint {@code DELETE /api/tree/nodes/{type}/{id}}
+ * ({@link TreeNodeResource} → {@code TreeNodeCascadeService}) covering the TREE-003
  * acceptance criteria: cascade delete of each node type, transactional atomicity,
  * team-scoped authorisation, and isolation from sibling / other-team nodes.
  */
@@ -190,7 +191,7 @@ class TreeNodeCascadeResourceIT {
     void ownerDeletesProductCascadesEntireSubtree() throws Exception {
         Fixture f = seedFullFixture();
         mvc
-            .perform(delete("/api/tree/products/{id}", f.productA1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/product/{id}", f.productA1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(productRepository.existsById(f.productA1.getId())).isFalse();
@@ -221,7 +222,7 @@ class TreeNodeCascadeResourceIT {
     void editorDeletesOutcomeCascadesOpportunitiesAndSolutions() throws Exception {
         Fixture f = seedFullFixture();
         mvc
-            .perform(delete("/api/tree/outcomes/{id}", f.outcome1.getId()).with(user(EDITOR_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/outcome/{id}", f.outcome1.getId()).with(user(EDITOR_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(outcomeRepository.existsById(f.outcome1.getId())).isFalse();
@@ -251,7 +252,7 @@ class TreeNodeCascadeResourceIT {
         Fixture f = seedFullFixture();
         // Delete opp1: opp2, opp3, sol1, sol2, sol3 must go; siblingOpp stays.
         mvc
-            .perform(delete("/api/tree/opportunities/{id}", f.opp1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/opportunity/{id}", f.opp1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(opportunityRepository.existsById(f.opp1.getId())).isFalse();
@@ -273,7 +274,7 @@ class TreeNodeCascadeResourceIT {
     void deleteSolutionRemovesOnlyThatSolution() throws Exception {
         Fixture f = seedFullFixture();
         mvc
-            .perform(delete("/api/tree/solutions/{id}", f.sol1.getId()).with(user(EDITOR_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/solution/{id}", f.sol1.getId()).with(user(EDITOR_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(solutionRepository.existsById(f.sol1.getId())).isFalse();
@@ -296,7 +297,7 @@ class TreeNodeCascadeResourceIT {
     void viewerCannotDeleteProductAndNothingIsRemoved() throws Exception {
         Fixture f = seedFullFixture();
         mvc
-            .perform(delete("/api/tree/products/{id}", f.productA1.getId()).with(user(VIEWER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/product/{id}", f.productA1.getId()).with(user(VIEWER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
 
         assertThat(productRepository.existsById(f.productA1.getId())).isTrue();
@@ -310,13 +311,13 @@ class TreeNodeCascadeResourceIT {
     void viewerCannotDeleteOutcomeOpportunityOrSolution() throws Exception {
         Fixture f = seedFullFixture();
         mvc
-            .perform(delete("/api/tree/outcomes/{id}", f.outcome1.getId()).with(user(VIEWER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/outcome/{id}", f.outcome1.getId()).with(user(VIEWER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
         mvc
-            .perform(delete("/api/tree/opportunities/{id}", f.opp1.getId()).with(user(VIEWER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/opportunity/{id}", f.opp1.getId()).with(user(VIEWER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
         mvc
-            .perform(delete("/api/tree/solutions/{id}", f.sol1.getId()).with(user(VIEWER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/solution/{id}", f.sol1.getId()).with(user(VIEWER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
 
         assertThat(outcomeRepository.existsById(f.outcome1.getId())).isTrue();
@@ -329,16 +330,16 @@ class TreeNodeCascadeResourceIT {
     void nonMemberCannotDeleteAnyNodeAndNothingIsRemoved() throws Exception {
         Fixture f = seedFullFixture();
         mvc
-            .perform(delete("/api/tree/products/{id}", f.productA1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/product/{id}", f.productA1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
         mvc
-            .perform(delete("/api/tree/outcomes/{id}", f.outcome1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/outcome/{id}", f.outcome1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
         mvc
-            .perform(delete("/api/tree/opportunities/{id}", f.opp1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/opportunity/{id}", f.opp1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
         mvc
-            .perform(delete("/api/tree/solutions/{id}", f.sol1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/solution/{id}", f.sol1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
 
         assertThat(productRepository.existsById(f.productA1.getId())).isTrue();
@@ -359,7 +360,7 @@ class TreeNodeCascadeResourceIT {
         // Make outsider an owner of team B — still not a member of team A.
         persistMembership(teamB, outsiderUser, TeamRole.OWNER);
         mvc
-            .perform(delete("/api/tree/products/{id}", f.productA1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/product/{id}", f.productA1.getId()).with(user(OUTSIDER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
         assertThat(productRepository.existsById(f.productA1.getId())).isTrue();
     }
@@ -383,7 +384,7 @@ class TreeNodeCascadeResourceIT {
         em.clear();
 
         mvc
-            .perform(delete("/api/tree/products/{id}", f.productA1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/product/{id}", f.productA1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(productRepository.existsById(f.productA1.getId())).isFalse();
@@ -428,7 +429,7 @@ class TreeNodeCascadeResourceIT {
         em.clear();
 
         mvc
-            .perform(delete("/api/tree/solutions/{id}", f.sol1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/solution/{id}", f.sol1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(solutionRepository.existsById(f.sol1.getId())).isFalse();
@@ -457,7 +458,7 @@ class TreeNodeCascadeResourceIT {
         em.clear();
 
         mvc
-            .perform(delete("/api/tree/opportunities/{id}", f.opp1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/opportunity/{id}", f.opp1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(opportunityRepository.existsById(f.opp1.getId())).isFalse();
@@ -528,7 +529,7 @@ class TreeNodeCascadeResourceIT {
         em.clear();
 
         mvc
-            .perform(delete("/api/tree/assumptions/{id}", assumption.getId()).with(user(EDITOR_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/assumption/{id}", assumption.getId()).with(user(EDITOR_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(countById("Assumption", assumption.getId())).isZero();
@@ -569,7 +570,7 @@ class TreeNodeCascadeResourceIT {
         em.clear();
 
         mvc
-            .perform(delete("/api/tree/evidence/{id}", evidence.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/evidence/{id}", evidence.getId()).with(user(OWNER_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(countById("Evidence", evidence.getId())).isZero();
@@ -594,15 +595,15 @@ class TreeNodeCascadeResourceIT {
 
         for (String login : List.of(VIEWER_LOGIN, OUTSIDER_LOGIN)) {
             mvc
-                .perform(delete("/api/tree/assumptions/{id}", assumption.getId()).with(user(login)).with(csrf()))
+                .perform(delete("/api/tree/nodes/assumption/{id}", assumption.getId()).with(user(login)).with(csrf()))
                 .andExpect(status().isForbidden());
             mvc
-                .perform(delete("/api/tree/evidence/{id}", evidence.getId()).with(user(login)).with(csrf()))
+                .perform(delete("/api/tree/nodes/evidence/{id}", evidence.getId()).with(user(login)).with(csrf()))
                 .andExpect(status().isForbidden());
         }
         // Unknown ids are indistinguishable from foreign ones.
         mvc
-            .perform(delete("/api/tree/evidence/{id}", Long.MAX_VALUE).with(user(OWNER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/evidence/{id}", Long.MAX_VALUE).with(user(OWNER_LOGIN)).with(csrf()))
             .andExpect(status().isForbidden());
 
         assertThat(countById("Assumption", assumption.getId())).isEqualTo(1);
@@ -631,7 +632,7 @@ class TreeNodeCascadeResourceIT {
         em.clear();
 
         mvc
-            .perform(delete("/api/tree/products/{id}", f.productA1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .perform(delete("/api/tree/nodes/product/{id}", f.productA1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
             .andExpect(status().isNoContent());
 
         assertThat(historyCount(TreeNodeType.PRODUCT, f.productA1.getId())).isZero();
