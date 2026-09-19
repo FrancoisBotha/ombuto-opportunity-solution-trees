@@ -190,6 +190,30 @@
   resize: vertical;
 }
 
+/* ---- panel fields (label row, hint) ------------------------------------------------------------ */
+.ost-root .ost-field__label {
+  display: block;
+  margin-bottom: 7px;
+  font-family: var(--font-heading);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.ost-root .ost-field__label--split {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ost-root .ost-field__hint {
+  margin-top: 6px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--color-neutral-400);
+}
+
 /* ---- state messages (loading / empty / forbidden / not found) -------------------------------- */
 .ost-root .ost-state {
   max-width: 460px;

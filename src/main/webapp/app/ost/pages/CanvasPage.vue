@@ -4,7 +4,7 @@
     <div class="ost-canvas-page__body">
       <!-- step 9 adds the node palette on the left -->
       <TreeCanvas ref="canvas" @select="selectFromCanvas" @add="ui.openAddMenu" @zoom="zoom = $event" />
-      <DetailPanel v-if="ui.selectedId && ui.rightOpen" />
+      <DetailPanel v-if="ui.selectedId" />
     </div>
   </section>
 </template>
@@ -56,6 +56,12 @@ watch(
   key => {
     if ((key ?? null) !== queryKey(route.query.node)) replaceQuery({ node: key ?? undefined });
   },
+);
+
+// The panel (breadcrumb, child list, quick-add) asks for a node to be centred.
+watch(
+  () => ui.centreRequest,
+  req => req && canvas.value?.centreOn(req.key),
 );
 
 onMounted(() => {
