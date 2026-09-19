@@ -2,7 +2,7 @@
   <div v-if="!ui.leftOpen" class="ost-palette-rail" data-cy="ost-palette" data-state="closed">
     <button
       type="button"
-      class="ost-palette-rail__open"
+      class="ost-palette-rail__open ost-hit"
       title="Show node palette"
       aria-label="Show node palette"
       :aria-expanded="false"
@@ -19,7 +19,7 @@
       <span class="ost-palette__title">Place a node</span>
       <button
         type="button"
-        class="ost-palette__hide"
+        class="ost-palette__hide ost-hit"
         title="Hide palette"
         aria-label="Hide palette"
         :aria-expanded="true"
@@ -210,6 +210,14 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 10px 0;
   gap: 10px;
+}
+
+/* Touch: the rail is as wide as the show button's 48px hit area (.ost-hit), so the hit area never
+   reaches past the rail's left edge (under the app sidebar). */
+@media (pointer: coarse) {
+  .ost-palette-rail {
+    width: 48px;
+  }
 }
 
 .ost-palette-rail__open {

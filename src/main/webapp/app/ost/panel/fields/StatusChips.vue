@@ -38,6 +38,14 @@ function pick(option: string) {
   gap: 4px;
 }
 
+/* Touch: a wrapped second row sits far enough below that the chips' 48px hit areas (.ost-hit)
+   never overlap — a ~27px chip needs 21px+ between rows. */
+@media (pointer: coarse) {
+  .ost-chips {
+    row-gap: 22px;
+  }
+}
+
 .ost-chip {
   font: inherit;
   font-family: var(--font-heading);

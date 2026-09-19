@@ -420,6 +420,84 @@ test.describe('OST tree canvas — render & navigate', () => {
     await expect(page.getByTestId(`ost-minimap-node-${k.op2}`)).toHaveClass(/\bis-selected\b/);
   });
 
+  test('a node the opening panel would clip is eased fully into view (click with nothing selected; reopening via Details)', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    await expect(page.getByTestId('ost-panel')).toHaveCount(0);
+    const target = node(page, k.op3);
+
+    /** Drags the empty pane (above the nodes) so `target` ends 30px inside the canvas's right edge. */
+    async function toRightEdge() {
+      const canvas = await box(page.getByTestId('ost-canvas'));
+      const b = await box(target);
+      const dx = canvas.x + canvas.width - 30 - (b.x + b.width);
+      const start = { x: canvas.x + canvas.width / 2, y: canvas.y + 12 };
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(start.x + dx, start.y, { steps: 8 });
+      await page.mouse.up();
+      await settle(page);
+      const at = await box(target);
+      expect(Math.abs(at.x + at.width - (canvas.x + canvas.width - 30)), 'node parked at the right edge').toBeLessThan(3);
+    }
+
+    /** Records the pane transform on every frame for 600ms (an eased pan shows several in-between values). */
+    const recordFrames = () =>
+      page.evaluate(() => {
+        const w = window as unknown as { __frames: string[] };
+        w.__frames = [];
+        const pane = document.querySelector<HTMLElement>('.vue-flow__transformationpane')!;
+        const until = performance.now() + 600;
+        const tick = () => {
+          w.__frames.push(getComputedStyle(pane).transform);
+          if (performance.now() < until) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    const frames = () => page.evaluate(() => (window as unknown as { __frames: string[] }).__frames);
+
+    async function expectFullyVisible(label: string) {
+      await settle(page);
+      const canvas = await box(page.getByTestId('ost-canvas'));
+      const b = await box(target);
+      expect(b.x, `${label}: left`).toBeGreaterThanOrEqual(canvas.x);
+      expect(b.x + b.width, `${label}: right edge inside the (narrowed) canvas`).toBeLessThanOrEqual(canvas.x + canvas.width - 20);
+      expect(b.y, `${label}: top`).toBeGreaterThanOrEqual(canvas.y);
+    }
+
+    // Not the fitted zoom (zooming out keeps every node rendered for the drag below).
+    await page.getByTestId('ost-zoom-out').click();
+    await settle(page);
+    const zoom = await zoomPercent(page);
+    await toRightEdge();
+    await recordFrames();
+    await target.locator('.ost-node__kicker').click();
+    await expect(page.getByTestId('ost-panel')).toBeVisible();
+    await expectFullyVisible('panel opened by the click');
+    expect(new Set(await frames()).size, 'the view eases (several in-between frames)').toBeGreaterThan(3);
+    expect(await zoomPercent(page), 'zoom unchanged').toBe(zoom);
+
+    // Hide the panel, park the node at the edge again, reopen from the Details tab.
+    await page.getByTestId('ost-panel-hide').click();
+    await expect(page.getByTestId('ost-panel')).toHaveCount(0);
+    await toRightEdge();
+    await page.getByTestId('ost-panel-reopen').click();
+    await expect(page.getByTestId('ost-panel')).toBeVisible();
+    await expectFullyVisible('panel reopened via Details');
+    expect(await zoomPercent(page), 'zoom unchanged').toBe(zoom);
+
+    // A node that stays fully visible does not move when the panel opens.
+    await page.getByTestId('ost-panel-hide').click();
+    await page.getByTestId('ost-fit').click();
+    await settle(page);
+    const before = await box(node(page, k.o1));
+    await node(page, k.o1).locator('.ost-node__kicker').click();
+    await expect(page.getByTestId('ost-panel')).toBeVisible();
+    await settle(page);
+    const after = await box(node(page, k.o1));
+    expect(Math.abs(after.x - before.x) + Math.abs(after.y - before.y), 'a visible node stays put').toBeLessThan(1);
+  });
+
   test('a ?node= deep link selects the node and centres it (expanding collapsed ancestors)', async () => {
     const page = user.page;
     // Collapse the assumption's grandparent first, then deep-link past it.

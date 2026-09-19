@@ -3,7 +3,7 @@
     <button
       ref="trigger"
       type="button"
-      class="ost-product-combo__button"
+      class="ost-product-combo__button ost-hit"
       :class="{ 'is-open': open }"
       aria-haspopup="listbox"
       :aria-expanded="open"

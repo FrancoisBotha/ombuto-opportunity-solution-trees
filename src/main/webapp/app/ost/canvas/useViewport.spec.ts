@@ -8,7 +8,6 @@ import {
   childCounts,
   edgeKind,
   evidenceBySolution,
-  evidenceScores,
   isDimmed,
   isDraggable,
   laidOutNodes,
@@ -21,12 +20,14 @@ import {
 import {
   FIT_FLOOR,
   FIT_MAX,
+  REVEAL_MARGIN,
   WHEEL_IN,
   ZOOM_MAX,
   ZOOM_MIN,
   centreOn,
   clampZoom,
   fitViewport,
+  revealDelta,
   stepZoom,
   wheelZoom,
   zoomAt,
@@ -86,6 +87,34 @@ describe('useViewport maths', () => {
     expect(c1.x).toBeCloseTo(c0.x, 6);
     expect(c1.y).toBeCloseTo(c0.y, 6);
     expect(stepZoom({ x: 0, y: 0, zoom: 0.36 }, size, -1).zoom).toBe(ZOOM_MIN);
+  });
+
+  describe('revealDelta (a node the opening panel would clip)', () => {
+    const box = { x: 900, y: 100, w: 206, h: 80, depth: 3 };
+    const size = { width: 800, height: 600 };
+
+    it('does not move a node that is fully visible', () => {
+      expect(revealDelta(box, { x: -400, y: 0, zoom: 1 }, size)).toEqual({ x: 0, y: 0 });
+    });
+
+    it('pans just far enough to leave the margin at the edge it crossed, respecting the zoom', () => {
+      // At zoom 1 the node spans 797..1003 on screen: 1003 - (800 - 24) = 227 to the left.
+      expect(revealDelta(box, { x: 0, y: 0, zoom: 1 }, size)).toEqual({ x: 800 - REVEAL_MARGIN - 1003, y: 0 });
+      // At zoom 0.5 it spans 398.5..501.5 + x; with x = 350 its right edge is 851.5.
+      const d = revealDelta(box, { x: 350, y: 0, zoom: 0.5 }, size);
+      expect(d.x).toBeCloseTo(800 - REVEAL_MARGIN - 851.5, 6);
+      // Above the top and left of the left edge.
+      expect(revealDelta(box, { x: -850, y: -120, zoom: 1 }, size)).toEqual({
+        x: REVEAL_MARGIN - (797 - 850),
+        y: REVEAL_MARGIN - (100 - 120),
+      });
+      // Below the bottom.
+      expect(revealDelta(box, { x: -400, y: 500, zoom: 1 }, size).y).toBe(600 - REVEAL_MARGIN - 680);
+    });
+
+    it('a node wider than the canvas keeps its left edge in view', () => {
+      expect(revealDelta(box, { x: 0, y: 0, zoom: 1 }, { width: 200, height: 600 }).x).toBe(REVEAL_MARGIN - 797);
+    });
   });
 
   describe('fitViewport', () => {
@@ -181,7 +210,6 @@ describe('canvas-model', () => {
     const rule = evidenceStrength('solution-1', nodes);
     expect(strength.get('solution-1')).toEqual({ tests: rule.tests, score: rule.score });
     expect(strength.has('opportunity-1')).toBe(false);
-    expect(evidenceScores(nodes).get('solution-1')).toBe(rule.score);
   });
 
   it('search matches title + notes case-insensitively; empty query dims nothing', () => {

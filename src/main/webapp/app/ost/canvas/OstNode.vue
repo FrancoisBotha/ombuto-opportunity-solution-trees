@@ -69,9 +69,10 @@
         node.status
       }}</span>
       <span v-if="node.type === 'assumption'" class="ost-node__metric" data-cy="ost-node-metric">{{ node.conf }}% confidence</span>
-      <span v-else-if="node.type === 'solution' && evidenceScore !== null" class="ost-node__metric" data-cy="ost-node-metric">
-        {{ evidenceScore }}% evidence
-      </span>
+      <span v-else-if="node.type === 'solution' && evidenceScore !== null" class="ost-node__metric" data-cy="ost-node-metric"
+        ><span class="ost-node__metric-part">{{ evidenceTests }} test{{ evidenceTests === 1 ? '' : 's' }} ·</span>{{ ' '
+        }}<span class="ost-node__metric-part">{{ evidenceScore }}% evidence</span></span
+      >
       <span v-else-if="isOpportunity" class="ost-node__money" title="Opportunity value" data-cy="ost-node-value"
         ><span class="ost-node__money-on">{{ '$'.repeat(value) }}</span
         ><span class="ost-node__money-off">{{ '$'.repeat(5 - value) }}</span></span
@@ -123,8 +124,8 @@
  * computes every flag from the stores and handles the emitted events.
  *
  * Adapted from design_handoff_ombuto_ost/vue-reference/src/components/OstNode.vue: styles moved to
- * classes, Phosphor chat icon, the `+` only for editors on types that can have children, and an
- * evidence metric on solutions (the prototype computes it; one metric per type).
+ * classes, Phosphor chat icon, the `+` only for editors on types that can have children, and the
+ * prototype's evidence metric on tested solutions ("1 test · 40% evidence"; one metric per type).
  *
  * Editing (step 9): the `+` opens AddChildMenu, a double-click on the title (or F2) swaps in
  * NodeTitleEditor, and legal drop targets carry `is-target` / `data-drop-target` (the one under the
@@ -167,6 +168,8 @@ const props = withDefaults(
     editError?: string | null;
     /** solutions: derived evidence strength (null when untested) */
     evidenceScore?: number | null;
+    /** solutions: how many assumptions (tests) the strength is rolled up from */
+    evidenceTests?: number;
   }>(),
   {
     selected: false,
@@ -183,6 +186,7 @@ const props = withDefaults(
     editDraft: null,
     editError: null,
     evidenceScore: null,
+    evidenceTests: 0,
   },
 );
 
@@ -421,6 +425,10 @@ const priorityDots = computed(() =>
   letter-spacing: 0.08em;
   opacity: 0.7;
   min-width: 0; /* wraps like the prototype ("20% / confidence") so the thread chip never overflows */
+}
+/* "1 test ·" / "40% evidence": the solution metric wraps between its two parts, at most two lines. */
+.ost-node__metric-part {
+  white-space: nowrap;
 }
 
 .ost-node__money {

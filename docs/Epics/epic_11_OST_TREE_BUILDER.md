@@ -80,7 +80,7 @@ Tests: [`test-strategy.md`](../Test%20Strategy/test-strategy.md) section 9a.
 | NFR-2 optimistic edits                       | Per-node, per-field sequenced patches with rollback; confirmation only for delete                                                                                                                         | `ost-tree.store.spec.ts`                                                    |
 | NFR-3 keyboard                               | Focusable nodes (Enter / Space select, F2 rename, Delete), focus ring, tab arrow keys, dialog focus trap, search + Enter jump                                                                             | `OstNode.spec.ts`, `CanvasToolbar.spec.ts`, `ost-canvas-edit`               |
 | NFR-4 append-friendly                        | Comments and history are append-only rows; edits are field patches                                                                                                                                        | backend ITs                                                                 |
-| NFR-5 accessibility                          | 44px targets on coarse pointers (`.ost-tap` sizes small buttons; `.ost-hit` adds an invisible 48px hit area to compact chips, tabs and node controls); dialogs trap focus and close on backdrop or Escape | `touch-targets.spec.ts`, journey (touch check)                              |
+| NFR-5 accessibility                          | 44px targets on coarse pointers (`.ost-tap` sizes small buttons; `.ost-hit` gives every compact control a 48px hit area; wrapped rows are kept apart); dialogs trap focus and close on backdrop or Escape | `touch-targets.spec.ts`, journey (touch check)                              |
 
 ## 4. Deliberate deviations from the prototype
 
@@ -115,6 +115,15 @@ Tests: [`test-strategy.md`](../Test%20Strategy/test-strategy.md) section 9a.
 - **Deep links**: `?product=` and `?node=` live in the canvas URL. A node outside
   the chosen product switches the scope to that node's product.
 - **Automatic fit** keeps re-fitting on resize until the user moves the view.
+- **Solution metric on the node**: a tested solution shows the prototype's
+  `evidenceLabel` text exactly, "1 test · 40% evidence" ("2 tests · …" for more;
+  nothing when it has no assumptions). The prototype computes that label but its
+  node template never renders it; we show it, as the one metric per type. The
+  full-page detail tag keeps the prototype's "40% evidence" (`rollupPct`).
+- **Panel opening keeps the node in view**: when the 346px detail panel opens
+  (a node click with nothing selected, or the "Details" edge tab) and would clip
+  the selected node, the canvas eases (220ms, at the current zoom) just far
+  enough to show it whole. A node that stays visible does not move.
 
 ## 5. Data model changes (`ombuto.jdl`)
 
@@ -155,8 +164,6 @@ Tests: [`test-strategy.md`](../Test%20Strategy/test-strategy.md) section 9a.
   admin-only Static Data screens, or join the team.
 - In the `dev` profile, some non-database errors still show Java class names in
   the problem `detail` (the generator default, masked in `prod`).
-- `@vue-flow/minimap` is still a dependency, used only for its CSS import
-  (carry-over C13).
 
 ## 7. Performance (C21, `ost-perf.spec.ts`)
 

@@ -51,7 +51,8 @@
           :editing="tree.canEdit && ui.editingId === id"
           :edit-draft="retry?.key === id ? retry.draft : null"
           :edit-error="retry?.key === id ? retry.error : null"
-          :evidence-score="scores.get(id) ?? null"
+          :evidence-score="evidence.get(id)?.score ?? null"
+          :evidence-tests="evidence.get(id)?.tests ?? 0"
           @add="toggleAddMenu(id)"
           @add-choose="createChild(id, $event)"
           @add-close="closeAddMenu(id)"
@@ -139,7 +140,7 @@ import OstEdge from './OstEdge.vue';
 import OstNode from './OstNode.vue';
 import {
   childCounts,
-  evidenceScores,
+  evidenceBySolution,
   isDimmed,
   isDraggable,
   laidOutNodes,
@@ -175,10 +176,10 @@ const keepRendered = computed<ReadonlySet<string>>(() => {
 });
 const flowNodes = computed(() => toFlowNodes(visible.value, tree.placed, n => isDraggable(n, tree.canEdit) && ui.editingId !== n.id));
 const flowEdges = computed(() => toFlowEdges(visible.value, tree.placed));
-// One pass each over the nodes, shared by every node body (no per-node scans). Scores are
-// primitives, so a confidence change only re-renders the solution whose score moved.
+// One pass each over the nodes, shared by every node body (no per-node scans). Each node gets the
+// score and test count as primitives, so a confidence change only re-renders the solution it moved.
 const kidCounts = computed(() => childCounts(tree.nodes));
-const scores = computed(() => evidenceScores(tree.nodes));
+const evidence = computed(() => evidenceBySolution(tree.nodes));
 
 watch(zoom, z => emit('zoom', z), { immediate: true });
 
@@ -571,6 +572,23 @@ watch(
   async () => {
     await nextTick();
     fit();
+  },
+  { flush: 'post' },
+);
+
+/**
+ * The detail panel opening (a click with nothing selected, the "Details" edge tab) narrows the
+ * canvas by 346px from the right: when that clips the selected node, ease the view just far enough
+ * to show it whole. Runs after the panel has mounted (flush post), so the canvas is measured at its
+ * new width. A deep link centres the node itself (pendingCentre).
+ */
+watch(
+  () => !!(ui.rightOpen && ui.selectedId),
+  open => {
+    const key = ui.selectedId;
+    const p = key ? tree.placed[key] : undefined;
+    if (!open || !key || !p || !ready.value || pendingCentre) return;
+    view.reveal({ ...p, h: Math.max(p.h, renderedHeight(key) ?? 0) });
   },
   { flush: 'post' },
 );
