@@ -73,8 +73,10 @@ test.describe('OST dev seed', () => {
     await expect(menu).toBeVisible();
 
     const options = menu.locator('[data-cy^="ostTeamOption-"]');
-    const names = (await options.locator('.ost-team-combo__name').allInnerTexts()).map(name => name.trim());
-    expect(names.filter(name => SEEDED.includes(name)).sort()).toEqual([JUPITER, VENUS]);
+    // Web-first: the options may still be rendering when the menu turns visible.
+    const named = (team: string) => options.locator('.ost-team-combo__name').filter({ hasText: new RegExp(String.raw`^\s*${team}\s*$`) });
+    await expect(named(JUPITER)).toHaveCount(1);
+    await expect(named(VENUS)).toHaveCount(1);
     await expect(options.filter({ hasText: BEST })).toHaveCount(0);
     await expect(options.filter({ hasText: MARS })).toHaveCount(0);
   });
