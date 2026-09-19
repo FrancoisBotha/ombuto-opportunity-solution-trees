@@ -18,6 +18,8 @@ export default defineConfig(
   { ignores: ['target/classes/static/', 'target/'] },
   // Ombuto Code tooling, not application source; its bundled dist makes `eslint .` hang.
   { ignores: ['.ombutocode/'] },
+  // Reference material (e.g. the OST design handoff prototype), not application source.
+  { ignores: ['docs/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended.map(config =>
     config.name === 'typescript-eslint/base' ? config : { ...config, files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'] },
