@@ -38,3 +38,53 @@ describe('TreeService.deleteNode', () => {
     expect(mockedDelete).toHaveBeenCalledWith('api/tree/solutions/99');
   });
 });
+
+describe('TreeService.moveNode', () => {
+  const mockedPost = vi.mocked(axios.post);
+  beforeEach(() => {
+    mockedPost.mockReset();
+    mockedPost.mockResolvedValue({
+      data: {
+        nodeType: 'OPPORTUNITY',
+        nodeId: 5,
+        parentType: 'OUTCOME',
+        parentId: 7,
+        outcomeId: 7,
+        sortOrder: 0,
+        oldSiblings: [{ nodeType: 'OPPORTUNITY', id: 6, sortOrder: 0 }],
+        newSiblings: [{ nodeType: 'OPPORTUNITY', id: 5, sortOrder: 0 }],
+        outcomeUpdates: [{ opportunityId: 5, outcomeId: 7 }],
+      },
+    } as any);
+  });
+  it('POSTs the move request to api/tree/nodes/move with uppercase enum wire values', async () => {
+    const svc = new TreeService();
+    const res = await svc.moveNode({ nodeType: 'opportunity', nodeId: 5, parentType: 'outcome', parentId: 7, position: 0 });
+    expect(mockedPost).toHaveBeenCalledWith('api/tree/nodes/move', {
+      nodeType: 'OPPORTUNITY',
+      nodeId: 5,
+      parentType: 'OUTCOME',
+      parentId: 7,
+      position: 0,
+    });
+    expect(res.nodeId).toBe(5);
+    // Response comes back lowercase for the consumer.
+    expect(res.nodeType).toBe('opportunity');
+    expect(res.parentType).toBe('outcome');
+    expect(res.newSiblings[0].nodeType).toBe('opportunity');
+    expect(res.oldSiblings[0].nodeType).toBe('opportunity');
+    expect(res.outcomeUpdates[0]).toEqual({ opportunityId: 5, outcomeId: 7 });
+  });
+
+  it('sends null parentType/parentId for a product moving on the top row', async () => {
+    const svc = new TreeService();
+    await svc.moveNode({ nodeType: 'product', nodeId: 42, parentType: null, parentId: null, position: 2 });
+    expect(mockedPost).toHaveBeenCalledWith('api/tree/nodes/move', {
+      nodeType: 'PRODUCT',
+      nodeId: 42,
+      parentType: null,
+      parentId: null,
+      position: 2,
+    });
+  });
+});

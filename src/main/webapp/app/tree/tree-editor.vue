@@ -78,9 +78,15 @@
 
         <div class="tree-editor-workspace">
           <section
+            ref="canvasEl"
             class="tree-canvas"
             data-cy="treeEditorCanvas"
-            :class="{ 'tree-canvas--dragging': isDragging }"
+            :class="{
+              'tree-canvas--dragging': isDragging,
+              'tree-canvas--node-dragging': dragActive,
+              'tree-canvas--no-drop': dragActive && !dragTarget,
+              'tree-canvas--valid-drop': dragActive && !!dragTarget,
+            }"
             @mousedown="onCanvasMouseDown"
             @mousemove="onCanvasMouseMove"
             @mouseup="onCanvasMouseUp"
@@ -116,7 +122,12 @@
                   />
                 </g>
               </svg>
-              <div class="tree-canvas__nodes" :style="{ transform: `translate(${canvasPadding}px, ${canvasPadding}px)` }">
+              <div
+                class="tree-canvas__nodes"
+                :style="{ transform: `translate(${canvasPadding}px, ${canvasPadding}px)` }"
+                @mousedown="onNodeMouseDown"
+                @click.capture="onNodesClickCapture"
+              >
                 <TreeNodeCard
                   v-for="n in nodes"
                   :key="n.key"
@@ -124,20 +135,53 @@
                   :node="n.data"
                   :selected="isSelected(n.type, n.id)"
                   :can-edit="canEdit"
+                  :can-move-up="canMoveUpOf(n.type, n.id)"
+                  :can-move-down="canMoveDownOf(n.type, n.id)"
+                  :can-move-to="canMoveToOf(n.type, n.id)"
                   :x="n.x"
                   :y="n.y"
                   :width="n.width"
                   :height="n.height"
+                  :class="{
+                    'tree-node-card--drop-target': isDragValidReparentTarget(n.type, n.id),
+                    'tree-node-card--dragging-source': dragActive && dragMovingType === n.type && dragMovingId === n.id,
+                  }"
                   @select="onNodeSelect(n.type, n.id)"
                   @add-child="openAddChildModal($event.parentType, $event.parentId, $event.childType)"
                   @delete="openDeleteModal($event.type, $event.id)"
+                  @move-to="openMoveModal($event.type, $event.id)"
+                  @move-up="reorderPrev($event.type, $event.id)"
+                  @move-down="reorderNext($event.type, $event.id)"
                 />
+                <div
+                  v-if="dragActive && dragTarget && dragTarget.kind === 'insert'"
+                  class="tree-canvas__insert-marker"
+                  data-cy="treeEditorInsertMarker"
+                  :style="{
+                    left: dragTarget.markerX + 'px',
+                    top: dragTarget.markerY + 'px',
+                    height: dragTarget.markerHeight + 'px',
+                  }"
+                ></div>
               </div>
             </div>
           </section>
           <TreeDetailPanel @delete="openDeleteModal($event.type, $event.id)" />
         </div>
       </template>
+    </div>
+
+    <!-- Drag ghost — follows the cursor in client (screen) coordinates while a
+         node drag is active. Kept outside the pan/zoom viewport so it appears
+         crisp regardless of zoom level. -->
+    <div
+      v-if="dragActive"
+      class="tree-editor-drag-ghost"
+      data-cy="treeEditorDragGhost"
+      :class="{ 'tree-editor-drag-ghost--no-drop': dragActive && !dragTarget }"
+      :style="{ left: dragGhostX + 'px', top: dragGhostY + 'px' }"
+    >
+      {{ dragGhostLabel }}
     </div>
 
     <!-- Add product modal -->
@@ -234,6 +278,70 @@
       </div>
     </div>
 
+    <!-- Move to… modal -->
+    <div
+      v-if="moveContext"
+      class="tree-editor-modal"
+      data-cy="treeEditorMoveModal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tem-move-title"
+      tabindex="-1"
+      @keydown.esc.prevent="closeMoveModal"
+      @click.self="closeMoveModal"
+    >
+      <div class="tree-editor-modal__dialog">
+        <form @submit.prevent="confirmMove">
+          <header class="tree-editor-modal__header">
+            <h5 id="tem-move-title" class="mb-0">Move {{ moveContext.label }} to…</h5>
+          </header>
+          <div class="tree-editor-modal__body">
+            <div v-if="moveErrorMessage" class="alert alert-danger" data-cy="moveErrorMessage" role="alert">
+              {{ moveErrorMessage }}
+            </div>
+            <p v-if="moveTargets.length === 0" class="text-muted" data-cy="moveNoTargets">No valid destinations available.</p>
+            <div v-else class="tree-editor-move-targets" role="listbox" aria-label="Valid destinations">
+              <div v-for="group in groupedMoveTargets" :key="group.productId" class="tree-editor-move-group">
+                <div class="tree-editor-move-group__label small text-muted">{{ group.productName }}</div>
+                <button
+                  v-for="target in group.targets"
+                  :key="`${target.parentType}:${target.parentId}`"
+                  type="button"
+                  role="option"
+                  :aria-selected="
+                    selectedMoveTarget &&
+                    selectedMoveTarget.parentType === target.parentType &&
+                    selectedMoveTarget.parentId === target.parentId
+                      ? 'true'
+                      : 'false'
+                  "
+                  :data-cy="`moveTarget-${target.parentType}-${target.parentId}`"
+                  class="btn btn-sm btn-outline-secondary tree-editor-move-target"
+                  :class="{
+                    active:
+                      selectedMoveTarget &&
+                      selectedMoveTarget.parentType === target.parentType &&
+                      selectedMoveTarget.parentId === target.parentId,
+                  }"
+                  :style="{ paddingLeft: 0.5 + target.depth * 0.75 + 'rem' }"
+                  @click="selectMoveTarget(target)"
+                >
+                  <span class="badge bg-light text-dark me-2">{{ target.parentType }}</span
+                  >{{ target.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <footer class="tree-editor-modal__footer">
+            <button type="button" class="btn btn-outline-secondary" data-cy="moveCancel" @click="closeMoveModal">Cancel</button>
+            <button type="submit" class="btn btn-primary" data-cy="moveConfirm" :disabled="!selectedMoveTarget || isMovingNode">
+              {{ isMovingNode ? 'Moving…' : 'Move' }}
+            </button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
     <!-- Delete confirmation modal -->
     <div v-if="deleteContext" class="tree-editor-modal" data-cy="treeEditorDeleteModal" @click.self="closeDeleteModal">
       <div class="tree-editor-modal__dialog">
@@ -288,6 +396,53 @@
   &--dragging {
     cursor: grabbing;
   }
+
+  &--node-dragging {
+    cursor: not-allowed;
+  }
+
+  &--no-drop,
+  &--no-drop :deep(.tree-node-card) {
+    cursor: not-allowed !important;
+  }
+
+  &--valid-drop,
+  &--valid-drop :deep(.tree-node-card) {
+    cursor: grabbing !important;
+  }
+}
+
+.tree-canvas__insert-marker {
+  position: absolute;
+  width: 4px;
+  background: #e83e8c;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.tree-editor-drag-ghost {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #593196;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #212529;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 2000;
+  transform: translate(-50%, -50%);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &--no-drop {
+    border-color: #dc3545;
+    cursor: not-allowed;
+  }
 }
 
 .tree-canvas__viewport {
@@ -334,6 +489,12 @@
   }
   &--selected {
     box-shadow: 0 0 0 3px #e83e8c;
+  }
+  &--drop-target {
+    box-shadow: 0 0 0 3px #20c997;
+  }
+  &--dragging-source {
+    opacity: 0.45;
   }
 }
 

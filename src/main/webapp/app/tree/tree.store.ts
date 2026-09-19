@@ -4,6 +4,7 @@ import type { IOpportunityTreeNode, IOutcomeTreeNode, IProductTreeNode, ITeamTre
 import TreeService, {
   type CreateChildInput,
   type CreateProductInput,
+  type MoveNodeResponse,
   type UpdateOpportunityInput,
   type UpdateOutcomeInput,
   type UpdateProductInput,
@@ -11,6 +12,10 @@ import TreeService, {
 } from './tree.service';
 
 export type UpdateNodePatch = UpdateProductInput | UpdateOutcomeInput | UpdateOpportunityInput | UpdateSolutionInput;
+
+export interface MoveToast {
+  showError: (message: string) => void;
+}
 
 export type TreeLoadError = 'forbidden' | 'not-found' | 'unknown';
 
@@ -406,6 +411,291 @@ export const useTreeStore = defineStore('tree', {
         this.recordWriteError(err);
         return null;
       }
+    },
+    /**
+     * Move a node to a new parent (re-parent). Applies the move optimistically,
+     * calls the server, and rolls back the tree on failure. On error, sets writeError
+     * and (if provided) surfaces the server's message via the toast callback.
+     */
+    async moveNode(
+      type: TreeNodeType,
+      id: number,
+      newParentType: TreeNodeType,
+      newParentId: number,
+      options: { service?: TreeService; toast?: MoveToast } = {},
+    ): Promise<boolean> {
+      if (!this.tree) return false;
+      const svc = options.service ?? new TreeService();
+      this.clearWriteError();
+      const snapshot: ITeamTree = JSON.parse(JSON.stringify(this.tree));
+      const entry = buildIndex(this.tree).get(key(type, id));
+      if (!entry || !entry.parent) return false;
+      const targetEntry = buildIndex(this.tree).get(key(newParentType, newParentId));
+      if (!targetEntry) return false;
+      // Detach from current parent
+      const fromArr = childrenArrayFor(entry.parent, type);
+      if (!fromArr) return false;
+      const idx = fromArr.findIndex(n => (n as { id: number }).id === id);
+      if (idx < 0) return false;
+      const [moved] = fromArr.splice(idx, 1);
+      // Attach to new parent
+      const toArr = childrenArrayFor(targetEntry.node, type);
+      if (!toArr) {
+        // Restore before returning false
+        fromArr.splice(idx, 0, moved);
+        return false;
+      }
+      // Update parentId / outcome reference bookkeeping for opportunities.
+      if (type === 'opportunity') {
+        if (newParentType === 'outcome') {
+          (moved as IOpportunityTreeNode).parentId = null;
+        } else if (newParentType === 'opportunity') {
+          (moved as IOpportunityTreeNode).parentId = newParentId;
+        }
+      }
+      const appendPosition = toArr.length;
+      (moved as { sortOrder?: number | null }).sortOrder = appendPosition;
+      toArr.push(moved);
+      // Renumber siblings in the destination.
+      toArr.forEach((n, i) => {
+        (n as { sortOrder?: number | null }).sortOrder = i;
+      });
+      // Renumber siblings in the source (only if different parent).
+      fromArr.forEach((n, i) => {
+        (n as { sortOrder?: number | null }).sortOrder = i;
+      });
+      try {
+        const response = await svc.moveNode({
+          nodeType: type,
+          nodeId: id,
+          parentType: newParentType,
+          parentId: newParentId,
+          position: appendPosition,
+        });
+        this._applyMoveResponse(response);
+        return true;
+      } catch (err: any) {
+        // Roll back to the snapshot.
+        this.tree = snapshot;
+        const status = err?.response?.status;
+        const body = err?.response?.data;
+        const serverMessage =
+          (body && (body.detail || body.title || body.message)) ||
+          (status === 403 ? 'You do not have permission to modify this tree.' : 'The move was rejected by the server.');
+        if (status === 403) this.writeError = 'forbidden';
+        else if (status === 400) this.writeError = 'validation';
+        else this.writeError = 'unknown';
+        this.writeErrorMessage = String(serverMessage);
+        if (options.toast) options.toast.showError(String(serverMessage));
+        return false;
+      }
+    },
+    /**
+     * Place a node at a specific position under a parent (or, for products, at a
+     * top-row position with parentType/parentId both null). Supports arbitrary
+     * reparent-plus-position drops from drag-and-drop; on API failure the tree
+     * is rolled back and, if a toast is provided, the server's message is shown.
+     *
+     * `position` is interpreted as the target index in the destination array
+     * AFTER the moved node has been removed from its current position.
+     */
+    async moveNodeToPosition(
+      type: TreeNodeType,
+      id: number,
+      newParentType: TreeNodeType | null,
+      newParentId: number | null,
+      position: number,
+      options: { service?: TreeService; toast?: MoveToast } = {},
+    ): Promise<boolean> {
+      if (!this.tree) return false;
+      const svc = options.service ?? new TreeService();
+      this.clearWriteError();
+      const snapshot: ITeamTree = JSON.parse(JSON.stringify(this.tree));
+      const entry = buildIndex(this.tree).get(key(type, id));
+      if (!entry || !entry.parent) return false;
+      const fromArr = childrenArrayFor(entry.parent, type);
+      if (!fromArr) return false;
+      const idx = fromArr.findIndex(n => (n as { id: number }).id === id);
+      if (idx < 0) return false;
+      // Resolve destination array.
+      let toArr: TreeNode[] | null;
+      if (newParentType === null) {
+        // Top-row product reorder.
+        if (type !== 'product') return false;
+        toArr = childrenArrayFor(this.tree, 'product');
+      } else {
+        const targetEntry = buildIndex(this.tree).get(key(newParentType, newParentId as number));
+        if (!targetEntry) return false;
+        toArr = childrenArrayFor(targetEntry.node, type);
+      }
+      if (!toArr) return false;
+      const [moved] = fromArr.splice(idx, 1);
+      // Bookkeeping for opportunity's outcome/parent references.
+      if (type === 'opportunity') {
+        if (newParentType === 'outcome') (moved as IOpportunityTreeNode).parentId = null;
+        else if (newParentType === 'opportunity') (moved as IOpportunityTreeNode).parentId = newParentId;
+      }
+      const clamped = Math.max(0, Math.min(position, toArr.length));
+      toArr.splice(clamped, 0, moved);
+      // Renumber both source and destination sortOrders locally.
+      toArr.forEach((n, i) => {
+        (n as { sortOrder?: number | null }).sortOrder = i;
+      });
+      if (fromArr !== toArr) {
+        fromArr.forEach((n, i) => {
+          (n as { sortOrder?: number | null }).sortOrder = i;
+        });
+      }
+      try {
+        const response = await svc.moveNode({
+          nodeType: type,
+          nodeId: id,
+          parentType: newParentType,
+          parentId: newParentId,
+          position: clamped,
+        });
+        this._applyMoveResponse(response);
+        return true;
+      } catch (err: any) {
+        this.tree = snapshot;
+        const status = err?.response?.status;
+        const body = err?.response?.data;
+        const serverMessage =
+          (body && (body.detail || body.title || body.message)) ||
+          (status === 403 ? 'You do not have permission to modify this tree.' : 'The move was rejected by the server.');
+        if (status === 403) this.writeError = 'forbidden';
+        else if (status === 400) this.writeError = 'validation';
+        else this.writeError = 'unknown';
+        this.writeErrorMessage = String(serverMessage);
+        if (options.toast) options.toast.showError(String(serverMessage));
+        return false;
+      }
+    },
+    /**
+     * Move a node up or down among its siblings (products move left/right along the top row).
+     * Persists the new order via the same move endpoint. No-op at the ends.
+     */
+    async reorderSibling(
+      type: TreeNodeType,
+      id: number,
+      direction: -1 | 1,
+      options: { service?: TreeService; toast?: MoveToast } = {},
+    ): Promise<boolean> {
+      if (!this.tree) return false;
+      const svc = options.service ?? new TreeService();
+      this.clearWriteError();
+      const snapshot: ITeamTree = JSON.parse(JSON.stringify(this.tree));
+      const entry = buildIndex(this.tree).get(key(type, id));
+      if (!entry || !entry.parent) return false;
+      const arr = childrenArrayFor(entry.parent, type);
+      if (!arr) return false;
+      const idx = arr.findIndex(n => (n as { id: number }).id === id);
+      if (idx < 0) return false;
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= arr.length) return false;
+      const [node] = arr.splice(idx, 1);
+      arr.splice(newIdx, 0, node);
+      arr.forEach((n, i) => {
+        (n as { sortOrder?: number | null }).sortOrder = i;
+      });
+      // Determine the parent identity to send. Products moving on the top row
+      // have NO parent — the backend rejects a parent for products.
+      let parentType: TreeNodeType | null = null;
+      let parentId: number | null = null;
+      const parent = entry.parent;
+      if (type === 'product') {
+        parentType = null;
+        parentId = null;
+      } else if ((parent as IProductTreeNode).outcomes && !(parent as any).opportunities) {
+        parentType = 'product';
+        parentId = (parent as IProductTreeNode).id;
+      } else if ((parent as IOutcomeTreeNode).opportunities && !(parent as any).children) {
+        parentType = 'outcome';
+        parentId = (parent as IOutcomeTreeNode).id;
+      } else if ((parent as IOpportunityTreeNode).children || (parent as IOpportunityTreeNode).solutions) {
+        parentType = 'opportunity';
+        parentId = (parent as IOpportunityTreeNode).id;
+      }
+      try {
+        const response = await svc.moveNode({ nodeType: type, nodeId: id, parentType, parentId, position: newIdx });
+        this._applyMoveResponse(response);
+        return true;
+      } catch (err: any) {
+        this.tree = snapshot;
+        const status = err?.response?.status;
+        const body = err?.response?.data;
+        const serverMessage =
+          (body && (body.detail || body.title || body.message)) ||
+          (status === 403 ? 'You do not have permission to modify this tree.' : 'The move was rejected by the server.');
+        if (status === 403) this.writeError = 'forbidden';
+        else if (status === 400) this.writeError = 'validation';
+        else this.writeError = 'unknown';
+        this.writeErrorMessage = String(serverMessage);
+        if (options.toast) options.toast.showError(String(serverMessage));
+        return false;
+      }
+    },
+    /** True if the node has a previous sibling (or previous product on the top row). */
+    canMoveUp(type: TreeNodeType, id: number): boolean {
+      return this._siblingIndex(type, id).idx > 0;
+    },
+    /** True if the node has a next sibling (or next product on the top row). */
+    canMoveDown(type: TreeNodeType, id: number): boolean {
+      const info = this._siblingIndex(type, id);
+      return info.idx >= 0 && info.idx < info.length - 1;
+    },
+    /**
+     * Reconcile the in-memory tree with the server's authoritative response —
+     * apply the new sortOrder to every sibling under both the old and the new
+     * parent, and rewrite each nested opportunity's outcomeId that the server
+     * carried across as part of the move. Never refetches the whole tree.
+     */
+    _applyMoveResponse(response: MoveNodeResponse) {
+      if (!this.tree) return;
+      const applySibs = (sibs: { nodeType: TreeNodeType; id: number; sortOrder: number }[]) => {
+        if (!sibs || sibs.length === 0) return;
+        const idx = buildIndex(this.tree);
+        for (const s of sibs) {
+          const target = idx.get(key(s.nodeType, s.id));
+          if (target) (target.node as { sortOrder?: number | null }).sortOrder = s.sortOrder;
+        }
+      };
+      applySibs(response.oldSiblings ?? []);
+      applySibs(response.newSiblings ?? []);
+      for (const upd of response.outcomeUpdates ?? []) {
+        const entry = buildIndex(this.tree).get(key('opportunity', upd.opportunityId));
+        if (entry) (entry.node as any).outcomeId = upd.outcomeId;
+      }
+      if (response.sortOrder != null) {
+        const moved = buildIndex(this.tree).get(key(response.nodeType, response.nodeId));
+        if (moved) (moved.node as { sortOrder?: number | null }).sortOrder = response.sortOrder;
+      }
+    },
+    _siblingIndex(type: TreeNodeType, id: number): { idx: number; length: number } {
+      if (!this.tree) return { idx: -1, length: 0 };
+      const entry = buildIndex(this.tree).get(key(type, id));
+      if (!entry || !entry.parent) return { idx: -1, length: 0 };
+      const arr = childrenArrayFor(entry.parent, type);
+      if (!arr) return { idx: -1, length: 0 };
+      const idx = arr.findIndex(n => (n as { id: number }).id === id);
+      return { idx, length: arr.length };
+    },
+    parentOf(type: TreeNodeType, id: number): { type: TreeNodeType | 'team'; id: number | null } | null {
+      if (!this.tree) return null;
+      const entry = buildIndex(this.tree).get(key(type, id));
+      if (!entry || !entry.parent) return null;
+      const parent = entry.parent;
+      // Team root
+      if ((parent as ITeamTree).products && !(parent as any).outcomes) {
+        return { type: 'team', id: null };
+      }
+      if ((parent as IProductTreeNode).outcomes && !(parent as any).opportunities) {
+        return { type: 'product', id: (parent as IProductTreeNode).id };
+      }
+      if ((parent as IOutcomeTreeNode).opportunities && !(parent as any).children) {
+        return { type: 'outcome', id: (parent as IOutcomeTreeNode).id };
+      }
+      return { type: 'opportunity', id: (parent as IOpportunityTreeNode).id };
     },
     enclosingOutcomeId(opportunityId: number): number | null {
       if (!this.tree) return null;

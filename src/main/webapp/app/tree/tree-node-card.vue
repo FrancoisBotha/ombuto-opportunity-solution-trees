@@ -8,8 +8,8 @@
     role="button"
     tabindex="0"
     @click="onClick"
-    @keydown.enter.prevent="onClick($event)"
-    @keydown.space.prevent="onClick($event)"
+    @keydown.enter.self.prevent="onClick($event)"
+    @keydown.space.self.prevent="onClick($event)"
   >
     <div class="tree-node-card__type" data-cy="treeNodeType">{{ typeLabel }}</div>
     <div class="tree-node-card__title" data-cy="treeNodeTitle">{{ title }}</div>
@@ -27,6 +27,39 @@
         @click="onAddChild(ct, $event)"
       >
         + {{ childTypeLabel(ct) }}
+      </button>
+      <button
+        v-if="showMoveTo"
+        type="button"
+        class="btn btn-sm btn-outline-secondary tree-node-card__move-to"
+        :data-cy="`treeNodeMoveTo-${type}-${nodeId}`"
+        title="Move to…"
+        @click="onMoveTo($event)"
+        @keydown.enter.stop
+      >
+        Move to…
+      </button>
+      <button
+        v-if="showReorder"
+        type="button"
+        class="btn btn-sm btn-outline-secondary tree-node-card__move-up"
+        :data-cy="`treeNodeMoveUp-${type}-${nodeId}`"
+        :disabled="!canMoveUp"
+        :title="reorderPrevLabel"
+        @click="onMoveUp($event)"
+      >
+        {{ reorderPrevLabel }}
+      </button>
+      <button
+        v-if="showReorder"
+        type="button"
+        class="btn btn-sm btn-outline-secondary tree-node-card__move-down"
+        :data-cy="`treeNodeMoveDown-${type}-${nodeId}`"
+        :disabled="!canMoveDown"
+        :title="reorderNextLabel"
+        @click="onMoveDown($event)"
+      >
+        {{ reorderNextLabel }}
       </button>
       <button
         type="button"
