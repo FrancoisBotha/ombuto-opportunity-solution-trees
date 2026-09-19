@@ -18,13 +18,15 @@ const MESSAGES: Record<string, string> = {
   invalidposition: 'That position is not valid.',
   cycle: 'A node cannot move under its own descendant.',
   crossteam: 'Nodes cannot move between teams.',
-  nodetypeinvalid: 'That node type is not recognised.',
   linknameinvalid: 'Link names need 1 to 100 characters.',
   linkurlinvalid: 'Links must start with http:// or https://.',
   questiontextinvalid: 'Questions need 1 to 500 characters.',
   commentbodyinvalid: 'Messages cannot be empty.',
   chatnotsupported: 'Products have no chat.',
   historynotsupported: 'Products have no history.',
+  // 409s (see ExceptionTranslator)
+  dataintegrity: 'Something else still refers to this, so the change could not be made.',
+  concurrencyFailure: 'Someone else changed this tree at the same moment — please try again.',
 };
 
 export type LoadFailure = 'forbidden' | 'notFound' | 'error';
@@ -38,7 +40,6 @@ export function describeError(err: any, fallback = 'Something went wrong. Your c
   if (key && MESSAGES[key]) return MESSAGES[key];
   if (status === 403) return 'You do not have permission to change this tree.';
   if (status === 404) return 'That item no longer exists.';
-  if (status === 0 || status == null) return fallback;
   return fallback;
 }
 
