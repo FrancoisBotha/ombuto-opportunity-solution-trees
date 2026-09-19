@@ -106,10 +106,11 @@ async function addChild(
   await expect(page.getByTestId('treeEditorAddChildModal')).toHaveCount(0);
   await expect(page.getByTestId('treeEditorAddProductModal')).toHaveCount(0);
 
-  // Reveal the hover-only add-child affordance by selecting the parent card first.
+  // Reveal the hover-only add-child affordance. Hover rather than click: the
+  // revealed action buttons cover the card's centre, so a click would hit one.
   const parent = page.getByTestId(`treeNode-${parentType}-${parentId}`);
   await parent.scrollIntoViewIfNeeded();
-  await parent.click();
+  await parent.hover();
 
   const addBtn = page.getByTestId(`treeNodeAddChild-${parentType}-${parentId}-${childType}`);
   await addBtn.waitFor({ state: 'visible' });
@@ -172,7 +173,8 @@ test.describe('TREE-008 — build-a-tree end to end', () => {
 
     // 3. Edit a node's title and status through the detail panel; the card must
     //    reflect both changes.
-    await page.getByTestId(`treeNode-opportunity-${opp1Id}`).click();
+    // Select with the keyboard: a mouse click would land on a hover-revealed action button.
+    await page.getByTestId(`treeNode-opportunity-${opp1Id}`).press('Enter');
     const detail = page.getByTestId('treeDetailPanel');
     await expect(detail).toBeVisible();
     await detail.getByTestId('detailTitle').fill(editedOpportunityTitle);
@@ -191,7 +193,7 @@ test.describe('TREE-008 — build-a-tree end to end', () => {
     const throwawayOppId = await nodeIdOf(nodeCard(page, 'opportunity', throwawayOppTitle));
     await addChild(page, 'opportunity', throwawayOppId, 'solution', throwawaySolutionTitle);
 
-    await page.getByTestId(`treeNode-outcome-${throwawayOutcomeId}`).click();
+    await page.getByTestId(`treeNode-outcome-${throwawayOutcomeId}`).hover();
     await page.getByTestId(`treeNodeDelete-outcome-${throwawayOutcomeId}`).click();
     await expect(page.getByTestId('treeEditorDeleteModal')).toBeVisible();
     await expect(page.getByTestId('deleteConfirmCount')).toHaveText('2');
@@ -225,5 +227,22 @@ test.describe('TREE-008 — build-a-tree end to end', () => {
     const persistedEditedCard = page.getByTestId(`treeNode-opportunity-${opp1Id}`);
     await expect(persistedEditedCard.getByTestId('treeNodeTitle')).toHaveText(editedOpportunityTitle);
     await expect(persistedEditedCard.getByTestId('treeNodeStatus')).toContainText(editedOpportunityStatus);
+
+    // Visibility alone does not prove nesting: check the persisted parent-child chain.
+    const treeResp = await owner.api('get', `/api/teams/${teamId}/tree`);
+    expect(treeResp.ok(), `load tree -> HTTP ${treeResp.status()}`).toBe(true);
+    const tree = await treeResp.json();
+    expect(tree.products.map((p: { name: string }) => p.name).sort()).toEqual([productA, productB].sort());
+    const persistedProductA = tree.products.find((p: { name: string }) => p.name === productA);
+    expect(persistedProductA.outcomes).toHaveLength(1);
+    const persistedOutcome = persistedProductA.outcomes[0];
+    expect(persistedOutcome.title).toBe(outcomeTitle);
+    const level1 = persistedOutcome.opportunities[0];
+    expect(level1).toMatchObject({ title: editedOpportunityTitle, status: editedOpportunityStatus });
+    const level2 = level1.children[0];
+    expect(level2.title).toBe(opp2Title);
+    const level3 = level2.children[0];
+    expect(level3.title).toBe(opp3Title);
+    expect(level3.solutions[0].title).toBe(solutionTitle);
   });
 });
