@@ -1,28 +1,76 @@
 <template>
   <div
+    ref="root"
     class="ost-node"
     :class="[
       `ost-node--${node.type}`,
-      { 'is-selected': selected, 'is-match': match, 'is-dimmed': dimmed, 'is-target': dropTarget, 'has-priority': isOpportunity },
+      {
+        'is-selected': selected,
+        'is-match': match,
+        'is-dimmed': dimmed,
+        'is-target': legalTarget,
+        'is-drop': dropTarget,
+        'is-editing': editing,
+        'has-priority': isOpportunity,
+      },
     ]"
     :style="{ width: `${box.w}px`, minHeight: `${box.h}px` }"
     :data-cy="`ost-node-${node.id}`"
     :data-node-key="node.id"
     :data-node-type="node.type"
-    :aria-label="`${box.label}: ${node.title}`"
+    :data-drop-target="legalTarget ? 'true' : undefined"
+    :data-drop-hover="dropTarget ? 'true' : undefined"
+    tabindex="0"
+    role="group"
+    aria-roledescription="node"
+    :aria-label="accessibleName"
+    @keydown="onKeydown"
   >
     <Handle type="target" :position="Position.Top" class="ost-node__handle" :connectable="false" />
 
     <div class="ost-node__kicker">{{ box.label }}</div>
-    <div class="ost-node__title" data-cy="ost-node-title">{{ node.title }}</div>
+    <!-- The + comes first in tab order (it is absolutely positioned top-right). -->
+    <AddChildMenu
+      v-if="canAdd && addMenuOpen"
+      :parent-type="node.type"
+      :parent-title="node.title"
+      :trigger="addButton"
+      @choose="emit('addChoose', $event)"
+      @close="onMenuClose"
+    />
+    <button
+      v-if="canAdd"
+      ref="addButton"
+      type="button"
+      class="ost-node__add nodrag nopan"
+      :class="{ 'is-open': addMenuOpen }"
+      title="Add child"
+      :aria-label="`Add a child under ${node.title}`"
+      aria-haspopup="menu"
+      :aria-expanded="addMenuOpen"
+      :data-cy="`ost-node-add-${node.id}`"
+      @click.stop="emit('add')"
+    >
+      +
+    </button>
+    <NodeTitleEditor
+      v-if="editing"
+      :type="node.type"
+      :label="box.label.toLowerCase()"
+      :value="editDraft ?? node.title"
+      :error="editError"
+      @commit="emit('renameCommit', $event)"
+      @cancel="emit('renameCancel')"
+    />
+    <div v-else class="ost-node__title" data-cy="ost-node-title" @dblclick.stop="onTitleDblclick">{{ node.title }}</div>
 
     <div v-if="node.type !== 'product'" class="ost-node__meta">
       <span v-if="node.status" class="ost-node__badge" :class="`ost-node__badge--${tone}`" :data-tone="tone" data-cy="ost-node-status">{{
         node.status
       }}</span>
       <span v-if="node.type === 'assumption'" class="ost-node__metric" data-cy="ost-node-metric">{{ node.conf }}% confidence</span>
-      <span v-else-if="node.type === 'solution' && evidence && evidence.score !== null" class="ost-node__metric" data-cy="ost-node-metric">
-        {{ evidence.score }}% evidence
+      <span v-else-if="node.type === 'solution' && evidenceScore !== null" class="ost-node__metric" data-cy="ost-node-metric">
+        {{ evidenceScore }}% evidence
       </span>
       <span v-else-if="isOpportunity" class="ost-node__money" title="Opportunity value" data-cy="ost-node-value"
         ><span class="ost-node__money-on">{{ '$'.repeat(value) }}</span
@@ -30,7 +78,7 @@
       >
       <button
         type="button"
-        class="ost-node__chat nopan"
+        class="ost-node__chat nodrag nopan"
         :class="{ 'is-empty': !node.commentCount }"
         title="Open thread"
         :aria-label="`Open thread (${node.commentCount} message${node.commentCount === 1 ? '' : 's'})`"
@@ -51,22 +99,12 @@
     </div>
 
     <button
-      v-if="canAdd"
-      type="button"
-      class="ost-node__add nopan"
-      title="Add child"
-      :aria-label="`Add a child under ${node.title}`"
-      :data-cy="`ost-node-add-${node.id}`"
-      @click.stop="emit('add')"
-    >
-      +
-    </button>
-    <button
       v-if="childCount > 0"
       type="button"
-      class="ost-node__toggle nopan"
+      class="ost-node__toggle nodrag nopan"
       :class="{ 'is-collapsed': collapsed }"
       :title="collapsed ? `Expand (${childCount} hidden)` : 'Collapse'"
+      :aria-label="collapsed ? `Expand, ${childCount} hidden` : 'Collapse'"
       :aria-expanded="!collapsed"
       :data-cy="`ost-collapse-${node.id}`"
       @click.stop="emit('toggle')"
@@ -87,15 +125,23 @@
  * Adapted from design_handoff_ombuto_ost/vue-reference/src/components/OstNode.vue: styles moved to
  * classes, Phosphor chat icon, the `+` only for editors on types that can have children, and an
  * evidence metric on solutions (the prototype computes it; one metric per type).
+ *
+ * Editing (step 9): the `+` opens AddChildMenu, a double-click on the title (or F2) swaps in
+ * NodeTitleEditor, and legal drop targets carry `is-target` / `data-drop-target` (the one under the
+ * pointer also `is-drop`). The node itself is focusable: Enter/Space activates (select, or attach
+ * the armed palette type), F2 renames, Delete asks to delete — the canvas decides what is allowed.
  */
 import { PhChat } from '@phosphor-icons/vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { Handle, Position } from '@vue-flow/core';
 
 import { statusTone } from '../domain/derive';
 import { TYPE_BOX, priorityColor, priorityLabel } from '../domain/rules';
-import type { OstNode } from '../domain/types';
+import type { NodeType, OstNode } from '../domain/types';
+
+import AddChildMenu from './AddChildMenu.vue';
+import NodeTitleEditor from './NodeTitleEditor.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -103,24 +149,92 @@ const props = withDefaults(
     selected?: boolean;
     dimmed?: boolean;
     match?: boolean;
+    /** a legal target for the node / palette type being dragged or armed */
+    legalTarget?: boolean;
+    /** the legal target currently under the pointer */
     dropTarget?: boolean;
     /** direct children (shown as +n when collapsed) */
     childCount?: number;
     collapsed?: boolean;
     /** editors only, and only for types that permit children */
     canAdd?: boolean;
-    /** solutions: derived evidence strength */
-    evidence?: { tests: number; score: number | null } | null;
+    addMenuOpen?: boolean;
+    /** editors only: double-click / F2 renames */
+    canRename?: boolean;
+    editing?: boolean;
+    /** rename field start value and message (after a refused save); defaults to the title */
+    editDraft?: string | null;
+    editError?: string | null;
+    /** solutions: derived evidence strength (null when untested) */
+    evidenceScore?: number | null;
   }>(),
-  { selected: false, dimmed: false, match: false, dropTarget: false, childCount: 0, collapsed: false, canAdd: false, evidence: null },
+  {
+    selected: false,
+    dimmed: false,
+    match: false,
+    legalTarget: false,
+    dropTarget: false,
+    childCount: 0,
+    collapsed: false,
+    canAdd: false,
+    addMenuOpen: false,
+    canRename: false,
+    editing: false,
+    editDraft: null,
+    editError: null,
+    evidenceScore: null,
+  },
 );
 
-const emit = defineEmits<{ add: []; toggle: []; chat: [] }>();
+const emit = defineEmits<{
+  add: [];
+  addChoose: [type: NodeType];
+  addClose: [];
+  toggle: [];
+  chat: [];
+  activate: [];
+  rename: [];
+  renameCommit: [title: string];
+  renameCancel: [];
+  delete: [];
+}>();
+
+const root = ref<HTMLElement | null>(null);
+const addButton = ref<HTMLButtonElement | null>(null);
 
 const box = computed(() => TYPE_BOX[props.node.type]);
 const isOpportunity = computed(() => props.node.type === 'opportunity');
 const tone = computed(() => statusTone(props.node.status));
 const value = computed(() => Math.min(5, Math.max(0, Math.round(props.node.value || 0))));
+
+/** "Opportunity: Faster onboarding, exploring, selected" — type + title + status (+ state). */
+const accessibleName = computed(() =>
+  [`${box.value.label}: ${props.node.title}`, props.node.status, props.selected ? 'selected' : '', props.collapsed ? 'collapsed' : '']
+    .filter(Boolean)
+    .join(', '),
+);
+
+function onTitleDblclick() {
+  if (props.canRename) emit('rename');
+}
+
+/** Keys on the node itself (not on its buttons or the rename field, which handle their own). */
+function onKeydown(event: KeyboardEvent) {
+  if (event.target !== root.value) return;
+  if (event.key === 'Enter' || event.key === ' ') emit('activate');
+  else if (event.key === 'F2' && props.canRename) emit('rename');
+  else if (event.key === 'Delete') emit('delete');
+  else return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function onMenuClose(refocus: boolean) {
+  emit('addClose');
+  if (refocus) addButton.value?.focus({ preventScroll: true });
+}
+
+defineExpose({ focus: () => root.value?.focus({ preventScroll: true }) });
 
 /** Five dots, top = highest band; each fills over its 20-point band and grows 4.5 → 7px. */
 const priorityDots = computed(() =>
@@ -199,8 +313,26 @@ const priorityDots = computed(() =>
 .ost-node.is-target {
   outline: 1px dashed var(--color-accent-400);
   outline-offset: 3px;
+  cursor: copy;
 }
 .ost-node.is-selected {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+/* The legal target under the pointer (prototype: dropId). */
+.ost-node.is-drop {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 4px;
+  background: var(--color-accent-800);
+}
+/* Keyboard focus: a ring outside the selection outline, so both stay readable. */
+.ost-node:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 5px var(--color-bg),
+    0 0 0 7px var(--color-accent-300);
+}
+.ost-node.is-selected:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
@@ -340,7 +472,8 @@ const priorityDots = computed(() =>
   color: var(--color-accent-300);
   cursor: pointer;
 }
-.ost-node__add:hover {
+.ost-node__add:hover,
+.ost-node__add.is-open {
   background: var(--color-accent-800);
   border-color: var(--color-accent-600);
   color: var(--color-accent-200);

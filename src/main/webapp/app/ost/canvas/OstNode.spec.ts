@@ -95,16 +95,8 @@ describe('OstNode', () => {
 
     it('solutions show their derived evidence strength when tested', () => {
       const solution = node('solution-1', 'opportunity-1', { status: 'building' });
-      expect(
-        mountNode(solution, { evidence: { tests: 2, score: 55 } })
-          .get('[data-cy="ost-node-metric"]')
-          .text(),
-      ).toBe('55% evidence');
-      expect(
-        mountNode(solution, { evidence: { tests: 0, score: null } })
-          .find('[data-cy="ost-node-metric"]')
-          .exists(),
-      ).toBe(false);
+      expect(mountNode(solution, { evidenceScore: 55 }).get('[data-cy="ost-node-metric"]').text()).toBe('55% evidence');
+      expect(mountNode(solution, { evidenceScore: null }).find('[data-cy="ost-node-metric"]').exists()).toBe(false);
     });
 
     it('outcomes and evidence show no metric', () => {
@@ -226,12 +218,112 @@ describe('OstNode', () => {
   });
 
   describe('states', () => {
-    it('maps selected / match / dimmed / drop target to classes', () => {
-      const wrapper = mountNode(node('solution-1', 'opportunity-1'), { selected: true, match: true, dimmed: true, dropTarget: true });
-      expect(wrapper.get('.ost-node').classes()).toEqual(expect.arrayContaining(['is-selected', 'is-match', 'is-dimmed', 'is-target']));
+    it('maps selected / match / dimmed / legal + hovered drop target to classes', () => {
+      const wrapper = mountNode(node('solution-1', 'opportunity-1'), {
+        selected: true,
+        match: true,
+        dimmed: true,
+        legalTarget: true,
+        dropTarget: true,
+      });
+      const root = wrapper.get('.ost-node');
+      expect(root.classes()).toEqual(expect.arrayContaining(['is-selected', 'is-match', 'is-dimmed', 'is-target', 'is-drop']));
+      expect(root.attributes('data-drop-target')).toBe('true');
+      expect(root.attributes('data-drop-hover')).toBe('true');
       const plain = mountNode(node('solution-1', 'opportunity-1'));
       expect(plain.get('.ost-node').classes()).not.toEqual(expect.arrayContaining(['is-selected']));
       expect(plain.get('.ost-node').classes()).not.toContain('is-dimmed');
+    });
+  });
+
+  describe('collapse chip names', () => {
+    it('says what it does, not "–" / "+n"', () => {
+      const open = mountNode(node('outcome-1', 'product-1'), { childCount: 3 }).get('[data-cy="ost-collapse-outcome-1"]');
+      expect(open.attributes('aria-label')).toBe('Collapse');
+      const shut = mountNode(node('outcome-1', 'product-1'), { childCount: 3, collapsed: true }).get('[data-cy="ost-collapse-outcome-1"]');
+      expect(shut.attributes('aria-label')).toBe('Expand, 3 hidden');
+    });
+  });
+
+  describe('keyboard + accessible name', () => {
+    it('is focusable with a name from type, title and status', () => {
+      const root = mountNode(node('opportunity-3', 'outcome-1', { title: 'Faster onboarding', status: 'exploring' }), {
+        selected: true,
+      }).get('.ost-node');
+      expect(root.attributes('tabindex')).toBe('0');
+      expect(root.attributes('role')).toBe('group');
+      expect(root.attributes('aria-label')).toBe('Opportunity: Faster onboarding, exploring, selected');
+    });
+
+    it('Enter and Space activate, F2 renames (editors only), Delete asks to delete', async () => {
+      const editor = mountNode(node('solution-1', 'opportunity-1'), { canRename: true });
+      const root = editor.get('.ost-node');
+      await root.trigger('keydown', { key: 'Enter' });
+      await root.trigger('keydown', { key: ' ' });
+      await root.trigger('keydown', { key: 'F2' });
+      await root.trigger('keydown', { key: 'Delete' });
+      expect(editor.emitted('activate')).toHaveLength(2);
+      expect(editor.emitted('rename')).toHaveLength(1);
+      expect(editor.emitted('delete')).toHaveLength(1);
+
+      const viewer = mountNode(node('solution-1', 'opportunity-1'));
+      await viewer.get('.ost-node').trigger('keydown', { key: 'F2' });
+      expect(viewer.emitted('rename')).toBeUndefined();
+    });
+
+    it('ignores keys that come from its own buttons', async () => {
+      const wrapper = mountNode(node('outcome-1', 'product-1'), { canAdd: true });
+      await wrapper.get('[data-cy="ost-node-add-outcome-1"]').trigger('keydown', { key: 'Enter' });
+      expect(wrapper.emitted('activate')).toBeUndefined();
+    });
+  });
+
+  describe('rename', () => {
+    it('a double-click on the title asks to rename, for editors only', async () => {
+      const editor = mountNode(node('outcome-1', 'product-1'), { canRename: true });
+      await editor.get('[data-cy="ost-node-title"]').trigger('dblclick');
+      expect(editor.emitted('rename')).toHaveLength(1);
+      const viewer = mountNode(node('outcome-1', 'product-1'));
+      await viewer.get('[data-cy="ost-node-title"]').trigger('dblclick');
+      expect(viewer.emitted('rename')).toBeUndefined();
+    });
+
+    it('editing swaps the title for the rename field and relays commit / cancel', async () => {
+      const wrapper = mountNode(node('outcome-1', 'product-1', { title: 'Old' }), { canRename: true, editing: true });
+      expect(wrapper.find('[data-cy="ost-node-title"]').exists()).toBe(false);
+      const input = wrapper.get('[data-cy="ost-rename-input"]');
+      expect((input.element as HTMLInputElement).value).toBe('Old');
+      await input.setValue('New');
+      await input.trigger('keydown', { key: 'Enter' });
+      expect(wrapper.emitted('renameCommit')).toEqual([['New']]);
+    });
+
+    it('reopens with a refused draft and its message', () => {
+      const wrapper = mountNode(node('outcome-1', 'product-1', { title: 'Old' }), {
+        canRename: true,
+        editing: true,
+        editDraft: 'Refused',
+        editError: 'Nope.',
+      });
+      expect((wrapper.get('[data-cy="ost-rename-input"]').element as HTMLInputElement).value).toBe('Refused');
+      expect(wrapper.get('[data-cy="ost-rename-error"]').text()).toBe('Nope.');
+    });
+  });
+
+  describe('+ menu', () => {
+    it('opens under the + with the valid child types and relays the choice', async () => {
+      const wrapper = mountNode(node('assumption-1', 'solution-1'), { canAdd: true, addMenuOpen: true });
+      expect(wrapper.get('[data-cy="ost-node-add-assumption-1"]').attributes('aria-expanded')).toBe('true');
+      const menu = wrapper.get('[data-cy="ost-add-menu"]');
+      expect(menu.findAll('[role="menuitem"]').map(i => i.text())).toEqual(['Evidence']);
+      await menu.get('[data-cy="ost-add-menu-evidence"]').trigger('click');
+      expect(wrapper.emitted('addChoose')).toEqual([['evidence']]);
+      expect(wrapper.emitted('activate')).toBeUndefined();
+    });
+
+    it('no menu without canAdd (viewers)', () => {
+      const wrapper = mountNode(node('assumption-1', 'solution-1'), { addMenuOpen: true });
+      expect(wrapper.find('[data-cy="ost-add-menu"]').exists()).toBe(false);
     });
   });
 });
