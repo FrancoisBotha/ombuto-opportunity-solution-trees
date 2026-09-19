@@ -1,5 +1,13 @@
 <template>
-  <div ref="wrap" class="ost-canvas" data-cy="ost-canvas" :data-zoom="zoom.toFixed(3)" tabindex="-1" @focusin="onFocusIn">
+  <div
+    ref="wrap"
+    class="ost-canvas"
+    data-cy="ost-canvas"
+    :data-zoom="zoom.toFixed(3)"
+    :style="{ '--ost-zoom': zoom.toFixed(3) }"
+    tabindex="-1"
+    @focusin="onFocusIn"
+  >
     <VueFlow
       :id="FLOW_ID"
       class="ost-canvas__flow"
@@ -19,7 +27,7 @@
       :pan-on-scroll="false"
       :zoom-on-double-click="false"
       :pan-on-drag="true"
-      :only-render-visible-elements="!keepAllRendered"
+      :only-render-visible-elements="true"
       @node-click="onNodeClick"
       @node-drag-start="onDragStart"
       @node-drag="onDrag"
@@ -110,9 +118,10 @@
  *   node is selected, centred when off-screen and in rename mode;
  * - double-click (or F2) renames inline; Delete asks for confirmation (ConfirmDeleteDialog).
  *
- * While a node is being renamed or has its + menu open, visibility culling is off: panning or
- * wheel-zooming that node out of view must not unmount its rename field (losing the draft) or its
- * menu. Vue Flow has no per-node exemption, so every laid-out node renders until the edit ends.
+ * While a node is being renamed or has its + menu open, that node stays rendered: panning or
+ * wheel-zooming it out of view must not unmount its rename field (losing the draft) or its menu.
+ * Culling stays on for every other node (pinRendered in canvas-model.ts; turning culling off for the
+ * whole tree cost ~250ms per rename / + menu at 300 nodes — step 13b perf smoke).
  */
 import { computed, markRaw, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue';
 
@@ -128,7 +137,17 @@ import CanvasLegend from './CanvasLegend.vue';
 import CanvasMinimap from './CanvasMinimap.vue';
 import OstEdge from './OstEdge.vue';
 import OstNode from './OstNode.vue';
-import { childCounts, evidenceScores, isDimmed, isDraggable, laidOutNodes, matchesQuery, toFlowEdges, toFlowNodes } from './canvas-model';
+import {
+  childCounts,
+  evidenceScores,
+  isDimmed,
+  isDraggable,
+  laidOutNodes,
+  matchesQuery,
+  pinRendered,
+  toFlowEdges,
+  toFlowNodes,
+} from './canvas-model';
 import { attachTargets, canAttach, clientToFlow, dropTargetAt, insideRect, legalParents } from './edit-rules';
 import { focusIsLost, restoreFocusAfterRename, typingElsewhere } from './rename-focus';
 import { ZOOM_MAX, ZOOM_MIN, type Point, useViewport, wheelZoom } from './useViewport';
@@ -148,8 +167,12 @@ const view = useViewport(flow, wrap);
 const zoom = view.zoom;
 
 const visible = computed(() => laidOutNodes(tree.nodes, tree.placed));
-/** A rename field or + menu is open: keep every node rendered (see the header). */
-const keepAllRendered = computed(() => tree.canEdit && !!(ui.editingId || ui.addMenuId));
+/** Nodes with a rename field or + menu open: kept rendered however far out of view (see the header). */
+const keepRendered = computed<ReadonlySet<string>>(() => {
+  if (!tree.canEdit) return NONE;
+  const keys = [ui.editingId, ui.addMenuId].filter((key): key is string => !!key);
+  return keys.length ? new Set(keys) : NONE;
+});
 const flowNodes = computed(() => toFlowNodes(visible.value, tree.placed, n => isDraggable(n, tree.canEdit) && ui.editingId !== n.id));
 const flowEdges = computed(() => toFlowEdges(visible.value, tree.placed));
 // One pass each over the nodes, shared by every node body (no per-node scans). Scores are
@@ -200,7 +223,7 @@ function flowPoint(client: Point): Point | null {
 function snapToLayout(all = true) {
   for (const n of flowNodes.value) {
     const live = flow.findNode(n.id);
-    if (!live || (!all && live.dragging)) continue;
+    if (!live || (!all && live.dragging && !keepRendered.value.has(n.id))) continue;
     const { x, y } = n.position;
     const cp = live.computedPosition;
     if (live.position.x !== x || live.position.y !== y || cp.x !== x || cp.y !== y) {
@@ -209,11 +232,29 @@ function snapToLayout(all = true) {
   }
 }
 
-// Layout changes (collapse, create, move, remote edits) move culled nodes too.
-watch(flowNodes, () => nextTick(() => snapToLayout(false)), { flush: 'post' });
-
 // ---- legal targets (node drag, palette drag, armed tool) ------------------------------------------
 const dragKey = ref<string | null>(null);
+
+/** The nodes currently flagged by pinRendered (see keepRendered). */
+let pinned: ReadonlySet<string> = NONE;
+function applyPins() {
+  const now = keepRendered.value;
+  pinRendered(id => flow.findNode(id), pinned, now, dragKey.value);
+  pinned = now;
+}
+watch(keepRendered, applyPins, { flush: 'post' });
+
+// Layout changes (collapse, create, move, remote edits) move culled nodes too; a node created with
+// its rename field open reaches Vue Flow only now, so it is pinned here.
+watch(
+  flowNodes,
+  () =>
+    nextTick(() => {
+      snapToLayout(false);
+      applyPins();
+    }),
+  { flush: 'post' },
+);
 const legal = computed<ReadonlySet<string>>(() => {
   if (!tree.canEdit) return NONE;
   if (dragKey.value) return legalParents(dragKey.value, tree.nodes);
@@ -330,20 +371,30 @@ function startRename(key: string) {
   ui.startEditing(key);
 }
 
-/** Closes the rename field; focus goes back to the node only if nothing else took it (rename-focus.ts). */
-async function endRename(key: string) {
+/** Closes the rename field. */
+function closeRename(key: string) {
   if (ui.editingId === key) ui.stopEditing();
   if (retry.value?.key === key) retry.value = null;
+}
+
+/** Closes the rename field; focus goes back to the node only if nothing else took it (rename-focus.ts). */
+async function endRename(key: string) {
+  closeRename(key);
   await restoreFocusAfterRename(() => focusNode(key));
 }
 
 async function commitRename(key: string, title: string) {
   const node = tree.byId(key);
   if (ui.editingId !== key) return; // a stale editor (e.g. unmounted while another node took over)
-  await endRename(key);
-  if (!node || title === node.title) return;
-  const ok = await tree.patchNode(key, { title });
-  if (!ok && tree.byId(key) && !ui.editingId && !typingElsewhere(wrap.value)) {
+  closeRename(key);
+  // The optimistic title lands in the same tick the field closes (no frame showing the old title);
+  // focus is restored once it has settled.
+  const saving = node && title !== node.title ? tree.patchNode(key, { title }) : null;
+  await restoreFocusAfterRename(() => focusNode(key));
+  if (!saving) return;
+  const ok = await saving;
+  // No retry once the user may no longer edit (demoted meanwhile): the toast says why.
+  if (!ok && tree.canEdit && tree.byId(key) && !ui.editingId && !typingElsewhere(wrap.value)) {
     retry.value = { key, draft: title, error: tree.error ?? 'The title could not be saved.' };
     tree.clearError();
     ui.startEditing(key);
@@ -531,6 +582,8 @@ watch(
  */
 onUnmounted(() => {
   listenNodeDrag(false);
+  pinRendered(id => flow.findNode(id), pinned, NONE, null);
+  pinned = NONE;
   if (ui.editingId) ui.stopEditing();
   if (ui.addMenuId) ui.openAddMenu(null);
   if (ui.dropTargetId) ui.setDropTarget(null);

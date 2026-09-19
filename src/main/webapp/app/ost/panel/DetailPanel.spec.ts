@@ -116,6 +116,39 @@ describe('DetailPanel', () => {
       expect(service.patchNode.called).toBe(false);
     });
 
+    it('a focused but untouched title field follows a rename made elsewhere; a typed edit is kept', async () => {
+      const { wrapper, service, tree } = await mountPanel('outcome-1');
+      const input = wrapper.get('[data-cy="ost-panel-title"]');
+      const field = input.element as HTMLInputElement;
+      // Focus lands in the field before the canvas rename's title reaches the store.
+      field.focus();
+      await input.trigger('focus');
+      tree.byId('outcome-1')!.title = 'Renamed on the canvas';
+      await flushPromises();
+      expect(field.value).toBe('Renamed on the canvas');
+      // Typing from there edits the NEW title, and Enter saves exactly that.
+      service.patchNode.resolves(dto('outcome-1', 'product-1', { title: 'Renamed on the canvas yz' }));
+      await input.setValue('Renamed on the canvas yz');
+      tree.byId('outcome-1')!.title = 'Someone else';
+      await flushPromises();
+      expect(field.value).toBe('Renamed on the canvas yz'); // the user's own typing is never overwritten
+      await input.trigger('blur');
+      await flushPromises();
+      expect(service.patchNode.lastCall.args).toEqual(['outcome', 1, { title: 'Renamed on the canvas yz' }]);
+      // Afterwards the field follows the store again.
+      tree.byId('outcome-1')!.title = 'Later remote title';
+      await flushPromises();
+      expect(field.value).toBe('Later remote title');
+    });
+
+    it('focusing the field picks up a title changed while it was not being edited', async () => {
+      const { wrapper, tree } = await mountPanel('outcome-1');
+      const input = wrapper.get('[data-cy="ost-panel-title"]');
+      tree.byId('outcome-1')!.title = 'Changed meanwhile';
+      await input.trigger('focus');
+      expect((input.element as HTMLInputElement).value).toBe('Changed meanwhile');
+    });
+
     it('shows a refused title inline and rolls it back', async () => {
       const { wrapper, service, tree } = await mountPanel('outcome-1');
       service.patchNode.rejects(apiError(400, 'error.invalidtitle'));

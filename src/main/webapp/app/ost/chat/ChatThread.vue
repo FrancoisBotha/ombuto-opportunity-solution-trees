@@ -112,7 +112,7 @@
         ></textarea>
         <button
           type="button"
-          class="ost-chat__send"
+          class="ost-chat__send ost-hit"
           :class="{ 'is-ready': ready }"
           :disabled="!ready"
           :title="editingId !== null ? 'Save' : 'Send'"

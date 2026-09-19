@@ -45,6 +45,9 @@ export function messageKey(err: any): string | undefined {
 /** A write about a node another session has deleted (the store re-reads the tree to tell). */
 export const DELETED_ELSEWHERE = 'This item was deleted by someone else.';
 
+/** A write refused because the user was demoted to viewer meanwhile (the re-read shows it). */
+export const DEMOTED_TO_VIEWER = 'Your role changed to viewer — changes are no longer possible.';
+
 /**
  * `type` (the node the failed write was about) makes the title rule specific: products 100,
  * assumptions and evidence 500, the other types 200 characters.

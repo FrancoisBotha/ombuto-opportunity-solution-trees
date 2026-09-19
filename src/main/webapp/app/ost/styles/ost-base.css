@@ -283,8 +283,36 @@
 /* ---- touch targets (NFR-5) -----------------------------------------------------------------
  * On a coarse pointer (touch) every small OST control is at least 44 x 44px. min-* beats the
  * components' own width / height, so the fine-pointer (desktop) look is unchanged.
+ * `.ost-hit` controls keep their visual size (node +, collapse and chat chips, filter and status
+ * chips, panel tabs, chat send): an invisible ::before centred on them widens the HIT AREA to at
+ * least 44 x 44px. :where() keeps the position: relative weaker than a component's own absolute
+ * positioning. The widened area may overlap a few px of a neighbour's edge; the control wins there.
  */
 @media (pointer: coarse) {
+  :where(.ost-root) .ost-hit {
+    position: relative;
+  }
+
+  .ost-root .ost-hit::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    /* 48, not 44: centred on the padding box, so a border (e.g. a tab's 2px underline) shifts it */
+    width: max(100%, 48px);
+    height: max(100%, 48px);
+    transform: translate(-50%, -50%);
+    z-index: 1; /* above a positioned neighbour it overlaps (e.g. the panel body under the tabs) */
+  }
+
+  /* On the canvas the controls scale with the zoom (--ost-zoom, set by TreeCanvas): the hit area is
+   * 48 SCREEN px down to ~75% zoom, then stops growing at 64 canvas px so a node's controls never
+   * swallow its neighbours (the tidy layout leaves 26px between siblings). Zoom in to work by touch. */
+  .ost-root .ost-canvas .ost-hit::before {
+    width: max(100%, clamp(48px, calc(48px / var(--ost-zoom, 1)), 64px));
+    height: max(100%, clamp(48px, calc(48px / var(--ost-zoom, 1)), 64px));
+  }
+
   .ost-root .ost-tap,
   .ost-root .ost-btn {
     min-width: 44px;
