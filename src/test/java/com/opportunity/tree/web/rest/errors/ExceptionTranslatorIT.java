@@ -1,5 +1,7 @@
 package com.opportunity.tree.web.rest.errors;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,6 +35,30 @@ class ExceptionTranslatorIT {
             .andExpect(status().isConflict())
             .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.message").value(ErrorConstants.ERR_CONCURRENCY_FAILURE));
+    }
+
+    @Test
+    void dataIntegrityViolationIsAConflictWithoutSql() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/data-integrity").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.message").value("error.dataintegrity"))
+            .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DATA_INTEGRITY_DETAIL))
+            .andExpect(content().string(not(containsString("delete from"))))
+            .andExpect(content().string(not(containsString("foreign key"))));
+    }
+
+    @Test
+    void lockFailuresAreAConflictWithoutSql() throws Exception {
+        for (String path : new String[] { "cannot-acquire-lock", "jpa-pessimistic-lock" }) {
+            mockMvc
+                .perform(get("/api/exception-translator-test/" + path).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(ErrorConstants.ERR_CONCURRENCY_FAILURE))
+                .andExpect(jsonPath("$.detail").value(ExceptionTranslator.CONCURRENCY_DETAIL))
+                .andExpect(content().string(not(containsString("delete from"))));
+        }
     }
 
     @Test

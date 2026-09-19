@@ -16,6 +16,7 @@ import com.opportunity.tree.service.DefaultNodeLinks;
 import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
+import com.opportunity.tree.service.TreeNodeCascadeService;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.mapper.ProductMapper;
@@ -54,7 +55,13 @@ class ProductServiceImplTest {
     @BeforeEach
     void setUp() {
         productMapper = mock(ProductMapper.class);
-        service = new ProductServiceImpl(productRepository, productMapper, teamAccessService, mock(DefaultNodeLinks.class));
+        service = new ProductServiceImpl(
+            productRepository,
+            productMapper,
+            teamAccessService,
+            mock(DefaultNodeLinks.class),
+            mock(TreeNodeCascadeService.class)
+        );
 
         team = new Team();
         team.setId(TEAM_ID);

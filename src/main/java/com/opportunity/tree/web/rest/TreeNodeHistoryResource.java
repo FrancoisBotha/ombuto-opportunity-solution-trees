@@ -1,6 +1,7 @@
 package com.opportunity.tree.web.rest;
 
 import com.opportunity.tree.service.TreeNodeHistoryService;
+import com.opportunity.tree.service.TreeNodeRules;
 import com.opportunity.tree.service.dto.tree.TreeHistoryEntryDTO;
 import java.util.List;
 import org.slf4j.Logger;
@@ -26,6 +27,6 @@ public class TreeNodeHistoryResource {
     @GetMapping("/nodes/{type}/{id}/history")
     public List<TreeHistoryEntryDTO> getHistory(@PathVariable("type") String type, @PathVariable("id") Long id) {
         LOG.debug("REST request to get the history of {} {}", type, id);
-        return treeNodeHistoryService.getHistory(TreeNodeTypePath.parse(type), id);
+        return treeNodeHistoryService.getHistory(TreeNodeRules.parseType(type, "type"), id);
     }
 }

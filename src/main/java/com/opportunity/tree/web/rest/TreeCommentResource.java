@@ -1,6 +1,7 @@
 package com.opportunity.tree.web.rest;
 
 import com.opportunity.tree.service.TreeCommentService;
+import com.opportunity.tree.service.TreeNodeRules;
 import com.opportunity.tree.service.dto.tree.TreeCommentDTO;
 import com.opportunity.tree.service.dto.tree.TreeCommentWriteDTO;
 import java.util.List;
@@ -36,7 +37,7 @@ public class TreeCommentResource {
     @GetMapping("/nodes/{type}/{id}/comments")
     public List<TreeCommentDTO> getComments(@PathVariable("type") String type, @PathVariable("id") Long id) {
         LOG.debug("REST request to get the chat of {} {}", type, id);
-        return treeCommentService.getComments(TreeNodeTypePath.parse(type), id);
+        return treeCommentService.getComments(TreeNodeRules.parseType(type, "type"), id);
     }
 
     @PostMapping("/nodes/{type}/{id}/comments")
@@ -46,7 +47,9 @@ public class TreeCommentResource {
         @RequestBody(required = false) TreeCommentWriteDTO request
     ) {
         LOG.debug("REST request to post a comment on {} {}", type, id);
-        return ResponseEntity.status(HttpStatus.CREATED).body(treeCommentService.addComment(TreeNodeTypePath.parse(type), id, request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+            treeCommentService.addComment(TreeNodeRules.parseType(type, "type"), id, request)
+        );
     }
 
     @PatchMapping("/comments/{id}")

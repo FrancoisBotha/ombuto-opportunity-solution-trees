@@ -36,6 +36,7 @@ import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.security.AuthoritiesConstants;
+import java.sql.SQLException;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -43,6 +44,7 @@ import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,6 +56,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -63,9 +66,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Seeds the dev database with the Ombuto OST prototype's data (OST step 2, amendments A3 + A6).
  * <p>
  * Runs once at start-up under the {@code dev} profile when {@code application.seed.enabled} is true
- * (it is in {@code application-dev.yml}). Idempotent: it does nothing when a team named
- * {@value #TEAM_JUPITER} already exists. Everything is written in one transaction through the
- * generated repositories.
+ * (it is in {@code application-dev.yml}). Idempotent per team: each of the four teams is only
+ * created when no team of that name exists, and the tree is only seeded into a {@value #TEAM_JUPITER}
+ * created by the same run. Everything is written in one transaction through the generated
+ * repositories. Start-up retries only while the schema is not migrated yet (missing tables, Liquibase
+ * lock held); any other failure is logged once and seeding stops.
  * <p>
  * What it creates:
  * <ul>
@@ -95,7 +100,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   initial-state rules (link URLs and Jira keys use the node's index in {@code SEED}).
  *   Products get links but no history.</li>
  *   <li>Times: the prototype's "Mon 09:12" / "Tue 11:20" become UTC times in the most recent
- *   week whose Tuesday 17:00 has already passed.</li>
+ *   week whose Tuesday 17:00 has already passed — unless that Monday is in the previous calendar
+ *   month, in which case they move to the latest two days of the current month (see
+ *   {@link #seedAnchor(Instant)}), so everything seeded is in the current month and in the past.</li>
  *   <li>{@code sortOrder} follows array order within each parent (0-based, like products).</li>
  * </ul>
  */
@@ -343,9 +350,14 @@ public class DevDataSeeder implements ApplicationRunner {
                     seed();
                     return;
                 }
-                LOG.debug("Dev seed waiting for Liquibase (attempt {})", attempt);
+                LOG.info("Dev seed waiting for Liquibase to release its lock (attempt {}/{})", attempt, MAX_ATTEMPTS);
             } catch (RuntimeException e) {
-                LOG.debug("Dev seed attempt {} failed, schema probably not ready yet: {}", attempt, e.getMessage());
+                if (!isSchemaNotReady(e)) {
+                    // A real failure (bad data, constraint violation, bug): report it once and stop — retrying won't help.
+                    LOG.error("Dev seed failed; nothing was seeded by this attempt", e);
+                    return;
+                }
+                LOG.warn("Dev seed attempt {}/{}: schema not ready yet ({}), retrying", attempt, MAX_ATTEMPTS, e.getMessage());
                 if (attempt == MAX_ATTEMPTS) {
                     LOG.warn("Dev seed gave up after {} attempts", MAX_ATTEMPTS, e);
                     return;
@@ -356,6 +368,24 @@ public class DevDataSeeder implements ApplicationRunner {
         LOG.warn("Dev seed gave up: Liquibase still running after {} attempts", MAX_ATTEMPTS);
     }
 
+    /**
+     * True for the errors a not-yet-migrated schema produces: a missing table or column
+     * (SQLState class 42, e.g. PostgreSQL {@code 42P01} / {@code 42703}, H2 {@code 42S02}), which
+     * Spring reports as {@link InvalidDataAccessResourceUsageException} /
+     * {@link org.springframework.jdbc.BadSqlGrammarException}. Anything else is a genuine failure.
+     */
+    static boolean isSchemaNotReady(Throwable error) {
+        for (Throwable t = error; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof InvalidDataAccessResourceUsageException) {
+                return true;
+            }
+            if (t instanceof SQLException sql && sql.getSQLState() != null && sql.getSQLState().startsWith("42")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** True while Liquibase holds its lock; throws if the lock table does not exist yet. */
     private boolean liquibaseLocked() {
         Integer locked = jdbcTemplate.queryForObject("select count(*) from databasechangeloglock where locked = true", Integer.class);
@@ -363,7 +393,9 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     /**
-     * Seeds everything in one transaction.
+     * Seeds everything in one transaction. Idempotent per team: each seeded team is only created
+     * when no team of that name exists, and the Team Jupiter tree is only seeded when Team Jupiter
+     * is created by this run.
      *
      * @return {@code true} if data was written, {@code false} if seeding is disabled or already done.
      */
@@ -372,24 +404,17 @@ public class DevDataSeeder implements ApplicationRunner {
             LOG.debug("Dev seed disabled (application.seed.enabled=false)");
             return false;
         }
-        Boolean seeded = transactionTemplate.execute(status -> {
-            if (
-                teamRepository
-                    .findAll()
-                    .stream()
-                    .anyMatch(team -> TEAM_JUPITER.equals(team.getName()))
-            ) {
-                LOG.info("Dev seed skipped: '{}' already exists", TEAM_JUPITER);
-                return false;
-            }
-            seedAll();
-            return true;
-        });
+        Boolean seeded = transactionTemplate.execute(status -> seedAll(Instant.now()));
         return Boolean.TRUE.equals(seeded);
     }
 
-    private void seedAll() {
-        Instant now = Instant.now();
+    private boolean seedAll(Instant now) {
+        Set<String> existingTeams = new HashSet<>();
+        teamRepository.findAll().forEach(team -> existingTeams.add(team.getName()));
+        if (existingTeams.containsAll(List.of(TEAM_JUPITER, TEAM_VENUS, BEST_TEAM, TEAM_MARS))) {
+            LOG.info("Dev seed skipped: all seeded teams already exist");
+            return false;
+        }
         User admin = ensureUser(
             ADMIN_ID,
             ADMIN_LOGIN,
@@ -402,17 +427,35 @@ public class DevDataSeeder implements ApplicationRunner {
         User user = ensureUser(USER_ID, USER_LOGIN, "", "User", "user@localhost", AuthoritiesConstants.USER);
         Map<String, User> byLogin = Map.of(ADMIN_LOGIN, admin, USER_LOGIN, user);
 
-        Team jupiter = team(TEAM_JUPITER, "Discovery Canvas · Insight Library", now);
-        member(jupiter, user, TeamRole.OWNER, now);
-        member(jupiter, admin, TeamRole.VIEWER, now);
-        Team venus = team(TEAM_VENUS, null, now);
-        member(venus, user, TeamRole.OWNER, now);
-        member(venus, admin, TeamRole.VIEWER, now);
-        member(team(BEST_TEAM, null, now), admin, TeamRole.OWNER, now);
-        member(team(TEAM_MARS, null, now), admin, TeamRole.OWNER, now);
-
-        seedTree(jupiter, byLogin, referenceMonday(now));
-        LOG.info("Dev seed complete: 4 teams, {} tree nodes in '{}'", SEED.size(), TEAM_JUPITER);
+        List<String> created = new ArrayList<>();
+        if (!existingTeams.contains(TEAM_JUPITER)) {
+            Team jupiter = team(TEAM_JUPITER, "Discovery Canvas · Insight Library", now);
+            member(jupiter, user, TeamRole.OWNER, now);
+            member(jupiter, admin, TeamRole.VIEWER, now);
+            // The tree only goes into a Team Jupiter this run created, never into an existing one.
+            seedTree(jupiter, byLogin, seedAnchor(now), now);
+            created.add(TEAM_JUPITER);
+        }
+        if (!existingTeams.contains(TEAM_VENUS)) {
+            Team venus = team(TEAM_VENUS, null, now);
+            member(venus, user, TeamRole.OWNER, now);
+            member(venus, admin, TeamRole.VIEWER, now);
+            created.add(TEAM_VENUS);
+        }
+        if (!existingTeams.contains(BEST_TEAM)) {
+            member(team(BEST_TEAM, null, now), admin, TeamRole.OWNER, now);
+            created.add(BEST_TEAM);
+        }
+        if (!existingTeams.contains(TEAM_MARS)) {
+            member(team(TEAM_MARS, null, now), admin, TeamRole.OWNER, now);
+            created.add(TEAM_MARS);
+        }
+        LOG.info(
+            "Dev seed complete: created {}{}",
+            created,
+            created.contains(TEAM_JUPITER) ? " with " + SEED.size() + " tree nodes in '" + TEAM_JUPITER + "'" : ""
+        );
+        return true;
     }
 
     private User ensureUser(String id, String login, String firstName, String lastName, String email, String... authorities) {
@@ -463,13 +506,39 @@ public class DevDataSeeder implements ApplicationRunner {
         return start.toInstant();
     }
 
-    private static Instant at(Instant monday, String day, String time) {
-        int offset = "Tue".equals(day) ? 1 : 0;
-        LocalTime t = LocalTime.parse(time);
-        return monday.plusSeconds(offset * 86_400L + t.toSecondOfDay());
+    /**
+     * Midnight (UTC) of the day the prototype's "Mon" maps to; "Tue" is the day after.
+     * <p>
+     * Normally {@link #referenceMonday(Instant)}, so the seed keeps the prototype's weekdays. When that
+     * Monday falls in the previous calendar month, the seed is pulled into the current month (so
+     * "evidence this month" is non-zero straight after seeding): the anchor becomes the latest day of
+     * this month whose following day's 17:00 has passed — keeping the times of day but not the
+     * weekday — or the 1st when the month is not that old yet (see {@link #at}, which clamps to now).
+     */
+    static Instant seedAnchor(Instant now) {
+        Instant monday = referenceMonday(now);
+        LocalDate today = now.atZone(ZoneOffset.UTC).toLocalDate();
+        Instant monthStart = today.withDayOfMonth(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        if (!monday.isBefore(monthStart)) {
+            return monday;
+        }
+        ZonedDateTime day = today.minusDays(1).atStartOfDay(ZoneOffset.UTC);
+        if (day.plusDays(1).plusHours(17).toInstant().isAfter(now)) {
+            day = day.minusDays(1);
+        }
+        Instant anchor = day.toInstant();
+        return anchor.isBefore(monthStart) ? monthStart : anchor;
     }
 
-    private void seedTree(Team team, Map<String, User> byLogin, Instant monday) {
+    /** The prototype's "Mon 09:12" / "Tue 11:20" relative to {@code anchor}, never later than {@code now}. */
+    static Instant at(Instant anchor, String day, String time, Instant now) {
+        int offset = "Tue".equals(day) ? 1 : 0;
+        LocalTime t = LocalTime.parse(time);
+        Instant when = anchor.plusSeconds(offset * 86_400L + t.toSecondOfDay());
+        return when.isAfter(now) ? now : when;
+    }
+
+    private void seedTree(Team team, Map<String, User> byLogin, Instant monday, Instant now) {
         Map<String, Object> entities = new HashMap<>();
         Map<String, Integer> nextSort = new HashMap<>();
         int productSort = 0;
@@ -477,8 +546,8 @@ public class DevDataSeeder implements ApplicationRunner {
         for (int i = 0; i < SEED.size(); i++) {
             Node node = SEED.get(i);
             // Prototype history: "Mon 08:(10+i)" created, "Tue 11:(20+i)" status/link.
-            Instant created = at(monday, "Mon", "08:" + (10 + i));
-            Instant second = at(monday, "Tue", "11:" + (20 + i));
+            Instant created = at(monday, "Mon", "08:" + (10 + i), now);
+            Instant second = at(monday, "Tue", "11:" + (20 + i), now);
             int sortOrder = node.parent() == null ? productSort++ : nextSort.merge(node.parent() + "/" + node.type(), 1, Integer::sum) - 1;
             Object entity = switch (node.type()) {
                 case PRODUCT -> {
@@ -580,7 +649,7 @@ public class DevDataSeeder implements ApplicationRunner {
             for (Chat chat : node.comments()) {
                 Comment c = new Comment();
                 c.setBody(chat.text());
-                c.setCreatedDate(at(monday, chat.day(), chat.time()));
+                c.setCreatedDate(at(monday, chat.day(), chat.time(), now));
                 c.setAuthor(byLogin.get(PEOPLE.get(chat.who())));
                 c.setOpportunity((Opportunity) entity);
                 commentRepository.save(c);
