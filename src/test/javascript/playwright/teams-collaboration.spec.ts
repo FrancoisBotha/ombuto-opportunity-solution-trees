@@ -1,5 +1,6 @@
 import { type Browser, type BrowserContext, type Page, expect, test } from '@playwright/test';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { loginViaKeycloak } from './support/login';
 
 /**
@@ -19,6 +20,8 @@ import { loginViaKeycloak } from './support/login';
  * sessions do not pollute one another. The playwright.config.ts default
  * storageState (belonging to E2E_USERNAME/E2E_PASSWORD, i.e. admin) is not used
  * here; we override storageState on every context we create.
+ *
+ * The teams (and products) created here are deleted after the run (support/cleanup.ts).
  */
 
 const ADMIN_USERNAME = process.env.E2E_ADMIN_USERNAME ?? 'admin';
@@ -79,6 +82,7 @@ test.describe('TEAMS-008 — two-user team collaboration', () => {
     let teamId: number;
     try {
       teamId = await createTeam(owner.page, teamName, 'Two-user e2e team');
+      registerTeamForCleanup(teamId);
       await openTeam(owner.page, teamId, teamName);
 
       const membersBefore = await owner.page.locator('[data-cy^="memberRow-"]').count();
@@ -138,6 +142,7 @@ test.describe('TEAMS-008 — two-user team collaboration', () => {
     let teamId: number;
     try {
       teamId = await createTeam(owner.page, teamName, 'Only the owner should see this');
+      registerTeamForCleanup(teamId);
     } finally {
       await owner.context.close();
     }

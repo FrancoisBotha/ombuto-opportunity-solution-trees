@@ -19,6 +19,8 @@
       v-if="open"
       ref="menu"
       class="ost-team-combo__menu"
+      :class="{ 'is-above': placement === 'above' }"
+      :style="{ maxHeight: `${maxHeight}px` }"
       role="listbox"
       aria-label="Switch team"
       data-cy="ostTeamComboMenu"
@@ -50,7 +52,7 @@
 <script setup lang="ts">
 /** Team switcher in the OST top nav (combo button + listbox). */
 import { PhCaretDown, PhCheck } from '@phosphor-icons/vue';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import type { MyTeamDTO } from '../ost.model';
 
@@ -64,6 +66,34 @@ const menu = ref<HTMLElement | null>(null);
 const options = ref<HTMLButtonElement[]>([]);
 /** A press inside the combo is in progress (some browsers do not focus buttons on click). */
 const pointerInside = ref(false);
+
+/** Gap between trigger and menu, and the least room kept between the menu and the window edge. */
+const MENU_GAP = 6;
+const WINDOW_MARGIN = 8;
+const MENU_MAX_HEIGHT = 400;
+/** Below this much room under the trigger the menu opens upward, if there is more room above. */
+const MIN_ROOM_BELOW = 160;
+
+const placement = ref<'below' | 'above'>('below');
+const maxHeight = ref(MENU_MAX_HEIGHT);
+
+/**
+ * Sizes the menu to the room the window leaves below the trigger (at most 400px), so its last
+ * option is never cut off by the bottom edge; with too little room below it opens upward instead.
+ */
+function placeMenu() {
+  const box = trigger.value?.getBoundingClientRect();
+  if (!box) return;
+  const below = window.innerHeight - box.bottom - MENU_GAP - WINDOW_MARGIN;
+  const above = box.top - MENU_GAP - WINDOW_MARGIN;
+  const up = below < MIN_ROOM_BELOW && above > below;
+  placement.value = up ? 'above' : 'below';
+  maxHeight.value = Math.max(0, Math.floor(Math.min(MENU_MAX_HEIGHT, up ? above : below)));
+}
+
+watch(open, isOpen => {
+  if (isOpen) placeMenu();
+});
 
 const label = computed(() => props.currentName ?? props.teams.find(t => t.id === props.currentId)?.name ?? 'Choose a team');
 
@@ -151,12 +181,18 @@ function onDocumentPointerUp() {
   pointerInside.value = false;
 }
 
+function onWindowResize() {
+  if (open.value) placeMenu();
+}
+
 onMounted(() => {
+  window.addEventListener('resize', onWindowResize);
   document.addEventListener('pointerdown', onDocumentPointer);
   document.addEventListener('pointerup', onDocumentPointerUp);
   document.addEventListener('pointercancel', onDocumentPointerUp);
 });
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', onWindowResize);
   document.removeEventListener('pointerdown', onDocumentPointer);
   document.removeEventListener('pointerup', onDocumentPointerUp);
   document.removeEventListener('pointercancel', onDocumentPointerUp);
@@ -203,8 +239,8 @@ onBeforeUnmount(() => {
   right: 0;
   top: calc(100% + 6px);
   min-width: 196px;
-  /* A long team list scrolls inside the menu; the shell (overflow: clip) never scrolls. */
-  max-height: min(420px, calc(100vh - 80px));
+  /* A long team list scrolls inside the menu; the shell (overflow: clip) never scrolls.
+     max-height is set inline from the room left in the window (placeMenu). */
   overflow-y: auto;
   overscroll-behavior: contain;
   z-index: 80;
@@ -216,6 +252,11 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.ost-team-combo__menu.is-above {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 
 .ost-team-combo__empty {
