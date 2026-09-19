@@ -46,8 +46,8 @@ spring:
       # JHipster uses a custom h2-console initializer
       enabled: true
   liquibase:
-    # Remove 'faker' if you do not want the sample data to be loaded automatically
-    contexts: dev, faker
+    # 'faker' removed (OST-2): sample data now comes from DevDataSeeder (application.seed.enabled below)
+    contexts: dev
   messages:
     cache-duration: PT1S # 1 second, see the ISO 8601 standard
   thymeleaf:
@@ -96,4 +96,7 @@ jhipster:
 # https://www.jhipster.tech/common-application-properties/
 # ===================================================================
 
-# application:
+application:
+  seed:
+    # Seed the dev database with the prototype's teams and Team Jupiter tree (DevDataSeeder, idempotent).
+    enabled: true
