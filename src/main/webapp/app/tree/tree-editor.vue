@@ -77,9 +77,15 @@
         </div>
 
         <section
+          ref="canvasEl"
           class="tree-canvas"
           data-cy="treeEditorCanvas"
-          :class="{ 'tree-canvas--dragging': isDragging }"
+          :class="{
+            'tree-canvas--dragging': isDragging,
+            'tree-canvas--node-dragging': dragActive,
+            'tree-canvas--no-drop': dragActive && !dragTarget,
+            'tree-canvas--valid-drop': dragActive && !!dragTarget,
+          }"
           @mousedown="onCanvasMouseDown"
           @mousemove="onCanvasMouseMove"
           @mouseup="onCanvasMouseUp"
@@ -115,7 +121,12 @@
                 />
               </g>
             </svg>
-            <div class="tree-canvas__nodes" :style="{ transform: `translate(${canvasPadding}px, ${canvasPadding}px)` }">
+            <div
+              class="tree-canvas__nodes"
+              :style="{ transform: `translate(${canvasPadding}px, ${canvasPadding}px)` }"
+              @mousedown="onNodeMouseDown"
+              @click.capture="onNodesClickCapture"
+            >
               <TreeNodeCard
                 v-for="n in nodes"
                 :key="n.key"
@@ -130,6 +141,10 @@
                 :y="n.y"
                 :width="n.width"
                 :height="n.height"
+                :class="{
+                  'tree-node-card--drop-target': isDragValidReparentTarget(n.type, n.id),
+                  'tree-node-card--dragging-source': dragActive && dragMovingType === n.type && dragMovingId === n.id,
+                }"
                 @select="onNodeSelect(n.type, n.id)"
                 @add-child="openAddChildModal($event.parentType, $event.parentId, $event.childType)"
                 @delete="openDeleteModal($event.type, $event.id)"
@@ -137,10 +152,33 @@
                 @move-up="reorderPrev($event.type, $event.id)"
                 @move-down="reorderNext($event.type, $event.id)"
               />
+              <div
+                v-if="dragActive && dragTarget && dragTarget.kind === 'insert'"
+                class="tree-canvas__insert-marker"
+                data-cy="treeEditorInsertMarker"
+                :style="{
+                  left: dragTarget.markerX + 'px',
+                  top: dragTarget.markerY + 'px',
+                  height: dragTarget.markerHeight + 'px',
+                }"
+              ></div>
             </div>
           </div>
         </section>
       </template>
+    </div>
+
+    <!-- Drag ghost — follows the cursor in client (screen) coordinates while a
+         node drag is active. Kept outside the pan/zoom viewport so it appears
+         crisp regardless of zoom level. -->
+    <div
+      v-if="dragActive"
+      class="tree-editor-drag-ghost"
+      data-cy="treeEditorDragGhost"
+      :class="{ 'tree-editor-drag-ghost--no-drop': dragActive && !dragTarget }"
+      :style="{ left: dragGhostX + 'px', top: dragGhostY + 'px' }"
+    >
+      {{ dragGhostLabel }}
     </div>
 
     <!-- Add product modal -->
@@ -346,6 +384,53 @@
   &--dragging {
     cursor: grabbing;
   }
+
+  &--node-dragging {
+    cursor: not-allowed;
+  }
+
+  &--no-drop,
+  &--no-drop :deep(.tree-node-card) {
+    cursor: not-allowed !important;
+  }
+
+  &--valid-drop,
+  &--valid-drop :deep(.tree-node-card) {
+    cursor: grabbing !important;
+  }
+}
+
+.tree-canvas__insert-marker {
+  position: absolute;
+  width: 4px;
+  background: #e83e8c;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.tree-editor-drag-ghost {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #593196;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #212529;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 2000;
+  transform: translate(-50%, -50%);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &--no-drop {
+    border-color: #dc3545;
+    cursor: not-allowed;
+  }
 }
 
 .tree-canvas__viewport {
@@ -392,6 +477,12 @@
   }
   &--selected {
     box-shadow: 0 0 0 3px #e83e8c;
+  }
+  &--drop-target {
+    box-shadow: 0 0 0 3px #20c997;
+  }
+  &--dragging-source {
+    opacity: 0.45;
   }
 }
 

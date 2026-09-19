@@ -1,4 +1,4 @@
-import { computed, defineComponent, inject, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { useAlertService } from '@/shared/alert/alert.service';
@@ -10,6 +10,7 @@ import TreeNodeCard from './tree-node-card.vue';
 import TreeService, { type CreateChildInput, type CreateProductInput } from './tree.service';
 import { useTreeStore, type MoveToast } from './tree.store';
 import { listValidTargets, type MoveTarget } from './tree-move';
+import { createDragLifecycle, resolveDropTarget, type DropTarget } from './tree-drag';
 
 const CANVAS_PADDING = 40;
 const MIN_ZOOM = 0.25;
@@ -88,6 +89,9 @@ export default defineComponent({
     const dragStart = ref<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
     const onCanvasMouseDown = (event: MouseEvent) => {
+      // Never start a canvas pan when the mousedown originated on a node card —
+      // that mousedown is owned by the node-drag lifecycle below.
+      if ((event.target as HTMLElement).closest('.tree-node-card')) return;
       isDragging.value = true;
       dragStart.value = { x: event.clientX, y: event.clientY, panX: panX.value, panY: panY.value };
     };
@@ -371,6 +375,145 @@ export default defineComponent({
       returnFocusToNode(type, id);
     };
 
+    // ---------- Drag-and-drop re-parenting / reordering ----------
+    const canvasEl = ref<HTMLElement | null>(null);
+    const dragActive = ref(false);
+    const dragMovingType = ref<TreeNodeType | null>(null);
+    const dragMovingId = ref<number | null>(null);
+    const dragGhostLabel = ref<string>('');
+    const dragGhostX = ref(0);
+    const dragGhostY = ref(0);
+    const dragTarget = ref<DropTarget | null>(null);
+    /** Set to true when a drag activates so that the following click event is swallowed. */
+    const swallowNextClick = ref(false);
+
+    const clientToCanvas = (clientX: number, clientY: number) => {
+      const el = canvasEl.value;
+      if (!el) return { x: 0, y: 0 };
+      const rect = el.getBoundingClientRect();
+      // Reverse the viewport transform: translate(panX,panY) scale(zoom), then
+      // account for the canvasPadding offset applied inside the viewport.
+      const x = (clientX - rect.left - panX.value) / zoom.value - CANVAS_PADDING;
+      const y = (clientY - rect.top - panY.value) / zoom.value - CANVAS_PADDING;
+      return { x, y };
+    };
+
+    const drag = createDragLifecycle({
+      canStart: () => canEdit.value,
+      toCanvas: (cx, cy) => clientToCanvas(cx, cy),
+      resolveTarget: pointer => {
+        const type = dragMovingType.value;
+        const id = dragMovingId.value;
+        if (!type || id == null) return null;
+        const node = treeStore.findNode(type, id);
+        if (!node) return null;
+        const parent = treeStore.parentOf(type, id);
+        return resolveDropTarget({
+          pointer,
+          layoutNodes: nodes.value,
+          tree: tree.value,
+          movingType: type,
+          movingId: id,
+          movingNode: node as TreeNode,
+          currentParentType: parent ? parent.type : 'team',
+          currentParentId: parent ? parent.id : null,
+        });
+      },
+      onActivate: () => {
+        dragActive.value = true;
+        swallowNextClick.value = true;
+      },
+      onMove: (_pointer, clientX, clientY, target) => {
+        // Ghost tracks the cursor in client coordinates (fixed-position overlay).
+        dragGhostX.value = clientX;
+        dragGhostY.value = clientY;
+        dragTarget.value = target;
+      },
+      onDrop: async (target: DropTarget) => {
+        const type = dragMovingType.value;
+        const id = dragMovingId.value;
+        cleanupDragUI();
+        if (!type || id == null) return;
+        if (target.kind === 'reparent') {
+          await treeStore.moveNode(type, id, target.parentType, target.parentId, {
+            service: treeService(),
+            toast: moveToast,
+          });
+        } else {
+          await treeStore.moveNodeToPosition(
+            type,
+            id,
+            target.parentType === 'team' ? null : target.parentType,
+            target.parentType === 'team' ? null : target.parentId,
+            target.position,
+            { service: treeService(), toast: moveToast },
+          );
+        }
+      },
+      onCancel: () => {
+        cleanupDragUI();
+      },
+    });
+
+    const cleanupDragUI = () => {
+      dragActive.value = false;
+      dragMovingType.value = null;
+      dragMovingId.value = null;
+      dragGhostLabel.value = '';
+      dragTarget.value = null;
+    };
+
+    const onNodeMouseDown = (event: MouseEvent) => {
+      if (!canEdit.value) return;
+      if (event.button !== 0) return;
+      const cardEl = (event.target as HTMLElement).closest('.tree-node-card') as HTMLElement | null;
+      if (!cardEl) return;
+      // Ignore mousedown on any action button inside the card — those own the click.
+      if ((event.target as HTMLElement).closest('button')) return;
+      const rawType = cardEl.dataset.nodeType as TreeNodeType | undefined;
+      const rawId = cardEl.dataset.nodeId ? Number(cardEl.dataset.nodeId) : NaN;
+      if (!rawType || !Number.isFinite(rawId)) return;
+      const node = treeStore.findNode(rawType, rawId);
+      if (!node) return;
+      dragMovingType.value = rawType;
+      dragMovingId.value = rawId;
+      dragGhostLabel.value = rawType === 'product' ? (node as any).name : (node as any).title;
+      dragGhostX.value = event.clientX;
+      dragGhostY.value = event.clientY;
+      drag.onMouseDown(rawType, rawId, event.clientX, event.clientY);
+      // Prevent the browser's native text selection / element drag on the card.
+      event.preventDefault();
+    };
+
+    const onWindowMouseMove = (event: MouseEvent) => drag.onMouseMove(event.clientX, event.clientY);
+    const onWindowMouseUp = () => drag.onMouseUp();
+    const onWindowKeyDown = (event: KeyboardEvent) => drag.onKeyDown(event.key);
+
+    onMounted(() => {
+      window.addEventListener('mousemove', onWindowMouseMove);
+      window.addEventListener('mouseup', onWindowMouseUp);
+      window.addEventListener('keydown', onWindowKeyDown);
+    });
+    onBeforeUnmount(() => {
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+      window.removeEventListener('keydown', onWindowKeyDown);
+    });
+
+    /** Swallow the click that follows an activated drag so it doesn't also select the source node. */
+    const onNodesClickCapture = (event: MouseEvent) => {
+      if (swallowNextClick.value) {
+        swallowNextClick.value = false;
+        event.stopPropagation();
+        event.preventDefault();
+      }
+    };
+
+    const isDragValidReparentTarget = (type: TreeNodeType, id: number): boolean => {
+      const t = dragTarget.value;
+      return !!(t && t.kind === 'reparent' && t.parentType === type && t.parentId === id);
+    };
+
     return {
       teamId,
       isLoading,
@@ -443,6 +586,18 @@ export default defineComponent({
       canMoveToOf,
       reorderPrev,
       reorderNext,
+      // drag-and-drop
+      canvasEl,
+      dragActive,
+      dragMovingType,
+      dragMovingId,
+      dragGhostLabel,
+      dragGhostX,
+      dragGhostY,
+      dragTarget,
+      onNodeMouseDown,
+      onNodesClickCapture,
+      isDragValidReparentTarget,
     };
   },
 });
