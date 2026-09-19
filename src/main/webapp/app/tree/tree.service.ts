@@ -89,6 +89,36 @@ export interface CreateChildInput {
   description?: string | null;
 }
 
+export interface UpdateProductInput {
+  name?: string;
+  description?: string | null;
+  vision?: string | null;
+  archived?: boolean;
+}
+
+export interface UpdateOutcomeInput {
+  title?: string;
+  description?: string | null;
+  status?: OutcomeStatus;
+}
+
+export interface UpdateOpportunityInput {
+  title?: string;
+  description?: string | null;
+  status?: OpportunityStatus;
+  valuerating?: number;
+  complexity?: number;
+}
+
+export interface UpdateSolutionInput {
+  title?: string;
+  description?: string | null;
+  status?: SolutionStatus;
+  effort?: number | null;
+}
+
+const patchHeaders = { headers: { 'Content-Type': 'application/merge-patch+json' } } as const;
+
 const nowIso = (): string => new Date().toISOString();
 
 export default class TreeService {
@@ -161,6 +191,28 @@ export default class TreeService {
       opportunity: { id: opportunityId },
     };
     return axios.post<ISolutionTreeNode>(solutionsApiUrl, body).then(res => res.data);
+  }
+
+  updateProduct(id: number, patch: UpdateProductInput): Promise<IProductTreeNode> {
+    const body = { id, ...patch };
+    return axios.patch<IProductTreeNode>(`${productsApiUrl}/${id}`, body, patchHeaders).then(res => this.normaliseProduct(res.data));
+  }
+
+  updateOutcome(id: number, patch: UpdateOutcomeInput): Promise<IOutcomeTreeNode> {
+    const body = { id, ...patch };
+    return axios.patch<IOutcomeTreeNode>(`${outcomesApiUrl}/${id}`, body, patchHeaders).then(res => this.normaliseOutcome(res.data));
+  }
+
+  updateOpportunity(id: number, patch: UpdateOpportunityInput): Promise<IOpportunityTreeNode> {
+    const body = { id, ...patch };
+    return axios
+      .patch<IOpportunityTreeNode>(`${opportunitiesApiUrl}/${id}`, body, patchHeaders)
+      .then(res => this.normaliseOpportunity(res.data));
+  }
+
+  updateSolution(id: number, patch: UpdateSolutionInput): Promise<ISolutionTreeNode> {
+    const body = { id, ...patch };
+    return axios.patch<ISolutionTreeNode>(`${solutionsApiUrl}/${id}`, body, patchHeaders).then(res => res.data);
   }
 
   moveNode(request: MoveNodeRequest): Promise<MoveNodeResponse> {
