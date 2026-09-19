@@ -11,6 +11,10 @@ import com.opportunity.tree.domain.enumeration.HistoryEventType;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.NodeLinkRepository;
 import com.opportunity.tree.repository.TreeCollaborationRepository;
+import com.opportunity.tree.service.broadcast.LinkChangedPayload;
+import com.opportunity.tree.service.broadcast.LinkRemovedPayload;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.tree.TreeLinkDTO;
 import com.opportunity.tree.service.dto.tree.TreeLinkWriteDTO;
 import jakarta.persistence.EntityManager;
@@ -24,6 +28,13 @@ import org.springframework.transaction.annotation.Transactional;
  * member (links come with the tree read); add / edit / remove = OWNER or EDITOR.
  * Adding and removing a link is recorded in the node's history; renaming or
  * re-pointing one is not.
+ *
+ * <p>Every write publishes a {@code LINK_*} tree change event after commit through
+ * {@link TreeChangePublisher} — the publish call is made while still inside the write transaction
+ * and while holding the team's {@link TreeStructureLock}, so per-team {@code seq} ordering is
+ * preserved. A rejected write (access denied, invalid body) publishes nothing because the exception
+ * unwinds before the publish call runs; a rolled-back write publishes nothing because the
+ * broadcaster listens on AFTER_COMMIT only.
  */
 @Service
 @Transactional
@@ -39,6 +50,7 @@ public class TreeNodeLinkService {
     private final NodeLinkRepository nodeLinkRepository;
     private final TreeCollaborationRepository collaborationRepository;
     private final TreeStructureLock structureLock;
+    private final TreeChangePublisher changePublisher;
     private final EntityManager em;
 
     public TreeNodeLinkService(
@@ -47,6 +59,7 @@ public class TreeNodeLinkService {
         NodeLinkRepository nodeLinkRepository,
         TreeCollaborationRepository collaborationRepository,
         TreeStructureLock structureLock,
+        TreeChangePublisher changePublisher,
         EntityManager em
     ) {
         this.teamAccessService = teamAccessService;
@@ -54,6 +67,7 @@ public class TreeNodeLinkService {
         this.nodeLinkRepository = nodeLinkRepository;
         this.collaborationRepository = collaborationRepository;
         this.structureLock = structureLock;
+        this.changePublisher = changePublisher;
         this.em = em;
     }
 
@@ -79,12 +93,18 @@ public class TreeNodeLinkService {
         }
         link = nodeLinkRepository.save(link);
         historyRecorder.record(type, nodeId, HistoryEventType.LINK_ADDED, "Link added");
-        return toDto(link);
+        TreeLinkDTO dto = toDto(link);
+        changePublisher.publish(TreeChangeType.LINK_ADDED, teamId, new LinkChangedPayload(TreeNodeRef.key(type, nodeId), dto));
+        return dto;
     }
 
     /** Renames and/or re-points a link; absent fields are left unchanged. Writes no history. */
     public TreeLinkDTO updateLink(Long linkId, TreeLinkWriteDTO request) {
-        teamAccessService.requireEditLink(linkId);
+        TreeNodeRef node = teamAccessService.requireEditLink(linkId);
+        Long teamId = teamAccessService.teamIdForNode(node.type(), node.id()).orElseThrow(TeamAccessDeniedException::new);
+        // Lock the team before the read so a concurrent cascade delete does not race the update and
+        // the LINK_UPDATED seq lands strictly after any structural events for the same team.
+        structureLock.lockTeam(teamId);
         NodeLink link = nodeLinkRepository.findById(linkId).orElseThrow(TeamAccessDeniedException::new);
         if (request != null && request.name() != null) {
             link.setName(validName(request.name()));
@@ -92,15 +112,20 @@ public class TreeNodeLinkService {
         if (request != null && request.url() != null) {
             link.setUrl(validUrl(request.url()));
         }
-        return toDto(nodeLinkRepository.save(link));
+        TreeLinkDTO dto = toDto(nodeLinkRepository.save(link));
+        changePublisher.publish(TreeChangeType.LINK_UPDATED, teamId, new LinkChangedPayload(node.key(), dto));
+        return dto;
     }
 
     /** Removes a link. History: LINK_REMOVED "Link removed" (prototype wording). */
     public void deleteLink(Long linkId) {
         TreeNodeRef node = teamAccessService.requireEditLink(linkId);
+        Long teamId = teamAccessService.teamIdForNode(node.type(), node.id()).orElseThrow(TeamAccessDeniedException::new);
+        structureLock.lockTeam(teamId);
         NodeLink link = nodeLinkRepository.findById(linkId).orElseThrow(TeamAccessDeniedException::new);
         nodeLinkRepository.delete(link);
         historyRecorder.record(node.type(), node.id(), HistoryEventType.LINK_REMOVED, "Link removed");
+        changePublisher.publish(TreeChangeType.LINK_REMOVED, teamId, new LinkRemovedPayload(node.key(), linkId));
     }
 
     private int nextSortOrder(TreeNodeType type, Long nodeId) {

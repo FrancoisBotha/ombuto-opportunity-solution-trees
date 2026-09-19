@@ -18,6 +18,7 @@ import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.repository.UserRepository;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
 import com.opportunity.tree.service.dto.AddTeamMemberRequest;
 import com.opportunity.tree.service.dto.ChangeTeamMemberRoleRequest;
 import com.opportunity.tree.service.dto.CreateTeamRequest;
@@ -72,6 +73,9 @@ class TeamManagementServiceTest {
     @Mock
     private TeamAccessService teamAccessService;
 
+    @Mock
+    private TreeChangePublisher changePublisher;
+
     private TeamManagementService service;
 
     private User creator;
@@ -79,7 +83,14 @@ class TeamManagementServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TeamManagementService(teamRepository, teamMemberRepository, productRepository, userRepository, teamAccessService);
+        service = new TeamManagementService(
+            teamRepository,
+            teamMemberRepository,
+            productRepository,
+            userRepository,
+            teamAccessService,
+            changePublisher
+        );
         creator = user(CREATOR_USER_ID, LOGIN, "Alice", "Anderson");
         bob = user(OTHER_USER_ID, "bob", "Bob", "Brown");
         lenient().when(userRepository.findOneByLogin(LOGIN)).thenReturn(Optional.of(creator));

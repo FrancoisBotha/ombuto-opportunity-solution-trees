@@ -13,6 +13,10 @@ import com.opportunity.tree.repository.CommentRepository;
 import com.opportunity.tree.repository.TreeCollaborationRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.security.SecurityUtils;
+import com.opportunity.tree.service.broadcast.CommentChangedPayload;
+import com.opportunity.tree.service.broadcast.CommentDeletedPayload;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.tree.TreeCommentDTO;
 import com.opportunity.tree.service.dto.tree.TreeCommentWriteDTO;
 import jakarta.persistence.EntityManager;
@@ -43,6 +47,12 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Chat is flat by design: there is no threading in the model, so every comment on the node is
  * returned as one thread, oldest first.
+ *
+ * <p>Every write publishes a {@code COMMENT_*} tree change event after commit through
+ * {@link TreeChangePublisher}, carrying the node's new {@code commentCount} so the client panel
+ * badge updates without a tree reload. The publish call runs under the team's structure lock so
+ * per-team {@code seq} ordering is preserved. Nothing is published for a rejected or rolled-back
+ * write.
  */
 @Service
 @Transactional
@@ -57,6 +67,7 @@ public class TreeCommentService {
     private final CommentRepository commentRepository;
     private final TreeCollaborationRepository collaborationRepository;
     private final UserRepository userRepository;
+    private final TreeChangePublisher changePublisher;
     private final EntityManager em;
 
     public TreeCommentService(
@@ -66,6 +77,7 @@ public class TreeCommentService {
         CommentRepository commentRepository,
         TreeCollaborationRepository collaborationRepository,
         UserRepository userRepository,
+        TreeChangePublisher changePublisher,
         EntityManager em
     ) {
         this.teamAccessService = teamAccessService;
@@ -74,6 +86,7 @@ public class TreeCommentService {
         this.commentRepository = commentRepository;
         this.collaborationRepository = collaborationRepository;
         this.userRepository = userRepository;
+        this.changePublisher = changePublisher;
         this.em = em;
     }
 
@@ -119,41 +132,79 @@ public class TreeCommentService {
         }
         comment = commentRepository.save(comment);
         historyRecorder.record(type, nodeId, HistoryEventType.COMMENT_ADDED, "Comment added");
-        return toDto(comment, author.getLogin());
+        em.flush();
+        TreeCommentDTO dto = toDto(comment, author.getLogin());
+        changePublisher.publish(
+            TreeChangeType.COMMENT_ADDED,
+            teamId,
+            new CommentChangedPayload(TreeNodeRef.key(type, nodeId), dto, commentCount(type, nodeId))
+        );
+        return dto;
     }
 
     /** Edits the current user's own message and stamps {@code editedDate}. Writes no history. */
     public TreeCommentDTO updateComment(Long commentId, TreeCommentWriteDTO request) {
         TreeNodeRef node = teamAccessService.requireEditComment(commentId);
         String body = validBody(request == null ? null : request.body());
-        lockNodeOfComment(node, commentId);
+        Long teamId = lockNodeOfComment(node, commentId);
         Comment comment = requireOwnComment(commentId);
         comment.setBody(body);
         comment.setEditedDate(Instant.now());
         comment = commentRepository.save(comment);
-        return toDto(comment, comment.getAuthor().getLogin());
+        em.flush();
+        TreeCommentDTO dto = toDto(comment, comment.getAuthor().getLogin());
+        changePublisher.publish(
+            TreeChangeType.COMMENT_UPDATED,
+            teamId,
+            new CommentChangedPayload(node.key(), dto, commentCount(node.type(), node.id()))
+        );
+        return dto;
     }
 
     /** Deletes the current user's own message. History: COMMENT_DELETED "Comment deleted". */
     public void deleteComment(Long commentId) {
         TreeNodeRef node = teamAccessService.requireEditComment(commentId);
-        lockNodeOfComment(node, commentId);
+        Long teamId = lockNodeOfComment(node, commentId);
         Comment comment = requireOwnComment(commentId);
         commentRepository.delete(comment);
         historyRecorder.record(node.type(), node.id(), HistoryEventType.COMMENT_DELETED, "Comment deleted");
+        em.flush();
+        changePublisher.publish(
+            TreeChangeType.COMMENT_DELETED,
+            teamId,
+            new CommentDeletedPayload(node.key(), commentId, commentCount(node.type(), node.id()))
+        );
     }
 
     /**
      * Takes the structure lock of the comment's team, then re-checks that the node and the comment
-     * survived the previous lock holder (409 otherwise).
+     * survived the previous lock holder (409 otherwise). Returns the team id so callers can pass it
+     * to the change publisher.
      */
-    private void lockNodeOfComment(TreeNodeRef node, Long commentId) {
+    private Long lockNodeOfComment(TreeNodeRef node, Long commentId) {
         Long teamId = teamAccessService.teamIdForNode(node.type(), node.id()).orElseThrow(TeamAccessDeniedException::new);
         structureLock.lockTeam(teamId);
         structureLock.requireNode(node.type(), node.id(), teamId);
         if (teamAccessService.nodeOfComment(commentId).isEmpty()) {
             throw new ConcurrencyFailureException("Comment " + commentId + " was deleted by a concurrent request");
         }
+        return teamId;
+    }
+
+    private long commentCount(TreeNodeType type, Long nodeId) {
+        String fk = switch (type) {
+            case OUTCOME -> "outcome";
+            case OPPORTUNITY -> "opportunity";
+            case SOLUTION -> "solution";
+            case ASSUMPTION -> "assumption";
+            case EVIDENCE -> "evidence";
+            case PRODUCT -> throw new IllegalStateException("unreachable");
+        };
+        Long count = em
+            .createQuery("select count(c) from Comment c where c." + fk + ".id = :id", Long.class)
+            .setParameter("id", nodeId)
+            .getSingleResult();
+        return count == null ? 0L : count;
     }
 
     private Comment requireOwnComment(Long commentId) {

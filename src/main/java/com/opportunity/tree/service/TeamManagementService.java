@@ -9,6 +9,9 @@ import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.security.SecurityUtils;
+import com.opportunity.tree.service.broadcast.MembershipChangedPayload;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.AddTeamMemberRequest;
 import com.opportunity.tree.service.dto.ChangeTeamMemberRoleRequest;
 import com.opportunity.tree.service.dto.CreateTeamRequest;
@@ -46,19 +49,22 @@ public class TeamManagementService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final TeamAccessService teamAccessService;
+    private final TreeChangePublisher changePublisher;
 
     public TeamManagementService(
         TeamRepository teamRepository,
         TeamMemberRepository teamMemberRepository,
         ProductRepository productRepository,
         UserRepository userRepository,
-        TeamAccessService teamAccessService
+        TeamAccessService teamAccessService,
+        TreeChangePublisher changePublisher
     ) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
         this.teamAccessService = teamAccessService;
+        this.changePublisher = changePublisher;
     }
 
     // ---------------------------------------------------------------------
@@ -174,6 +180,9 @@ public class TeamManagementService {
         }
         member.setRole(request.getRole());
         member = teamMemberRepository.save(member);
+        User user = member.getUser();
+        String login = user == null ? null : user.getLogin();
+        changePublisher.publish(TreeChangeType.MEMBERSHIP_CHANGED, teamId, new MembershipChangedPayload(login, member.getRole(), false));
         return toTeamMemberViewDTO(member);
     }
 
@@ -185,7 +194,13 @@ public class TeamManagementService {
         if (member.getRole() == TeamRole.OWNER) {
             requireNotLastOwner(teamId);
         }
+        User user = member.getUser();
+        String login = user == null ? null : user.getLogin();
         teamMemberRepository.delete(member);
+        // Broadcast on the team topic — the removed member's client sees its own login in the
+        // payload, updates canEdit / currentUserRole, and unsubscribes so no further tree events
+        // on this team reach it (FR-037, RTC-002 AC #6).
+        changePublisher.publish(TreeChangeType.MEMBERSHIP_CHANGED, teamId, new MembershipChangedPayload(login, null, true));
     }
 
     // ---------------------------------------------------------------------
