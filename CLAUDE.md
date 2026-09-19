@@ -29,3 +29,10 @@ in this project.**
 Add your project-specific rules, coding conventions, forbidden patterns,
 and other agent guidance below this line. Anything you add here is read
 into the agent's context on every run.
+
+### npm scripts call Maven through `mvnw.cjs`
+
+The `package.json` scripts run `node mvnw.cjs …`, not `./mvnw …`. npm runs scripts through
+cmd.exe on Windows, where `./mvnw` fails, so `mvnw.cjs` picks `mvnw.cmd` or `./mvnw` for the
+platform. The JHipster generator rewrites these scripts back to `./mvnw` — when it offers to
+overwrite `package.json`, keep the `node mvnw.cjs` form.
