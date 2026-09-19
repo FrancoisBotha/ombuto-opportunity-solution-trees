@@ -50,6 +50,17 @@ accompanying code is MIT. Attribution: _Icons by [Font Awesome](https://fontawes
 Awesome Free, © Fonticons, Inc., [licence](https://fontawesome.com/license/free)._ The icon files
 also carry this attribution in embedded comments, which must not be stripped.
 
+### Inter — font under the SIL Open Font License 1.1
+
+The Inter typeface, bundled through `@fontsource/inter`, is licensed under the
+[SIL Open Font License, Version 1.1](https://openfontlicense.org/) (OFL-1.1); the Fontsource
+packaging is MIT. Copyright: _© 2016 The Inter Project Authors
+([github.com/rsms/inter](https://github.com/rsms/inter))._ The OFL allows the font to be used,
+embedded, bundled and redistributed with any software, provided that the font files are not sold
+on their own, that this copyright and licence notice accompany them, and that modified versions are
+not published under the reserved font name. The font files are shipped unmodified. The full licence
+text is in `node_modules/@fontsource/inter/LICENSE` and at the link above.
+
 ### Liquibase — source-available, not open source
 
 `org.liquibase:liquibase-core` 5.x is published under the
@@ -76,12 +87,13 @@ production uses PostgreSQL. H2 is nevertheless present in the production build, 
 
 ## Licence summary
 
-**Frontend** — 131 packages in the web client's production dependency tree:
+**Frontend** — 150 packages in the web client's production dependency tree:
 
-- MIT: 117
+- MIT: 126
+- ISC: 11
 - Apache-2.0: 6
-- ISC: 3
-- BSD-3-Clause: 2
+- BSD-3-Clause: 3
+- OFL-1.1: 1
 - (CC-BY-4.0 AND MIT): 1
 - BSD-2-Clause: 1
 - 0BSD: 1
@@ -115,6 +127,7 @@ Packages marked **direct** are declared in `package.json`; the rest are pulled i
 | @babel/helper-validator-identifier                                                                         | 7.29.7  | MIT                 |        |
 | [@babel/parser](https://babel.dev/docs/en/next/babel-parser)                                               | 7.29.8  | MIT                 |        |
 | [@babel/types](https://babel.dev/docs/en/next/babel-types)                                                 | 7.29.8  | MIT                 |        |
+| [@fontsource/inter](https://fontsource.org/fonts/inter)                                                    | 5.3.0   | OFL-1.1             | direct |
 | [@fortawesome/fontawesome-common-types](https://fontawesome.com)                                           | 7.2.0   | MIT                 |        |
 | [@fortawesome/fontawesome-svg-core](https://fontawesome.com)                                               | 7.2.0   | MIT                 | direct |
 | [@fortawesome/free-solid-svg-icons](https://fontawesome.com)                                               | 7.2.0   | (CC-BY-4.0 AND MIT) | direct |
@@ -124,10 +137,15 @@ Packages marked **direct** are declared in `package.json`; the rest are pulled i
 | @jridgewell/resolve-uri                                                                                    | 3.1.2   | MIT                 |        |
 | [@jridgewell/sourcemap-codec](https://github.com/jridgewell/sourcemaps/tree/main/packages/sourcemap-codec) | 1.6.0   | MIT                 |        |
 | [@jridgewell/trace-mapping](https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping)     | 0.3.31  | MIT                 |        |
+| @phosphor-icons/vue                                                                                        | 2.2.1   | MIT                 | direct |
 | @popperjs/core                                                                                             | 2.11.8  | MIT                 |        |
 | [@stomp/rx-stomp](https://github.com/stomp-js/rx-stomp#readme)                                             | 2.3.0   | Apache-2.0          | direct |
 | [@stomp/stompjs](https://github.com/stomp-js/stompjs#readme)                                               | 7.3.0   | Apache-2.0          |        |
 | [@types/web-bluetooth](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/web-bluetooth) | 0.0.21  | MIT                 |        |
+| [@types/web-bluetooth](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/web-bluetooth) | 0.0.20  | MIT                 |        |
+| [@vue-flow/background](https://github.com/bcakmakoglu/vue-flow#readme)                                     | 1.3.2   | MIT                 | direct |
+| [@vue-flow/core](https://vueflow.dev)                                                                      | 1.48.2  | MIT                 | direct |
+| [@vue-flow/minimap](https://github.com/bcakmakoglu/vue-flow#readme)                                        | 1.5.4   | MIT                 | direct |
 | [@vue-macros/common](https://vue-macros.dev)                                                               | 3.1.4   | MIT                 |        |
 | [@vue/compiler-core](https://github.com/vuejs/core/tree/main/packages/compiler-core#readme)                | 3.5.30  | MIT                 |        |
 | [@vue/compiler-dom](https://github.com/vuejs/core/tree/main/packages/compiler-dom#readme)                  | 3.5.30  | MIT                 |        |
@@ -146,8 +164,11 @@ Packages marked **direct** are declared in `package.json`; the rest are pulled i
 | [@vue/shared](https://github.com/vuejs/core/tree/main/packages/shared#readme)                              | 3.5.30  | MIT                 |        |
 | @vuelidate/core                                                                                            | 2.0.3   | MIT                 | direct |
 | @vuelidate/validators                                                                                      | 2.0.4   | MIT                 | direct |
+| [@vueuse/core](https://github.com/vueuse/vueuse#readme)                                                    | 10.11.1 | MIT                 | direct |
 | [@vueuse/core](https://github.com/vueuse/vueuse#readme)                                                    | 14.2.1  | MIT                 | direct |
+| [@vueuse/metadata](https://github.com/vueuse/vueuse/tree/main/packages/metadata#readme)                    | 10.11.1 | MIT                 |        |
 | [@vueuse/metadata](https://github.com/vueuse/vueuse/tree/main/packages/metadata#readme)                    | 14.2.1  | MIT                 |        |
+| [@vueuse/shared](https://github.com/vueuse/vueuse/tree/main/packages/shared#readme)                        | 10.11.1 | MIT                 |        |
 | [@vueuse/shared](https://github.com/vueuse/vueuse/tree/main/packages/shared#readme)                        | 14.2.1  | MIT                 |        |
 | [acorn](https://github.com/acornjs/acorn)                                                                  | 8.18.0  | MIT                 |        |
 | [ast-kit](https://github.com/sxzz/ast-kit#readme)                                                          | 2.2.0   | MIT                 |        |
@@ -165,6 +186,15 @@ Packages marked **direct** are declared in `package.json`; the rest are pulled i
 | confbox                                                                                                    | 0.1.8   | MIT                 |        |
 | [copy-anything](https://github.com/mesqueeb/copy-anything#readme)                                          | 4.1.0   | MIT                 |        |
 | csstype                                                                                                    | 3.2.3   | MIT                 |        |
+| [d3-color](https://d3js.org/d3-color/)                                                                     | 3.1.0   | ISC                 |        |
+| [d3-dispatch](https://d3js.org/d3-dispatch/)                                                               | 3.0.1   | ISC                 |        |
+| [d3-drag](https://d3js.org/d3-drag/)                                                                       | 3.0.0   | ISC                 |        |
+| [d3-ease](https://d3js.org/d3-ease/)                                                                       | 3.0.1   | BSD-3-Clause        |        |
+| [d3-interpolate](https://d3js.org/d3-interpolate/)                                                         | 3.0.1   | ISC                 |        |
+| [d3-selection](https://d3js.org/d3-selection/)                                                             | 3.0.0   | ISC                 |        |
+| [d3-timer](https://d3js.org/d3-timer/)                                                                     | 3.0.1   | ISC                 |        |
+| [d3-transition](https://d3js.org/d3-transition/)                                                           | 3.0.1   | ISC                 |        |
+| [d3-zoom](https://d3js.org/d3-zoom/)                                                                       | 3.0.0   | ISC                 |        |
 | [dayjs](https://day.js.org)                                                                                | 1.11.19 | MIT                 | direct |
 | debug                                                                                                      | 3.2.7   | MIT                 |        |
 | [delayed-stream](https://github.com/felixge/node-delayed-stream)                                           | 1.0.0   | MIT                 |        |
@@ -235,6 +265,7 @@ Packages marked **direct** are declared in `package.json`; the rest are pulled i
 | url-parse                                                                                                  | 1.5.10  | MIT                 |        |
 | uuid                                                                                                       | 11.1.1  | MIT                 |        |
 | [vue](https://github.com/vuejs/core/tree/main/packages/vue#readme)                                         | 3.5.30  | MIT                 | direct |
+| vue-demi                                                                                                   | 0.14.10 | MIT                 |        |
 | vue-demi                                                                                                   | 0.13.11 | MIT                 |        |
 | [vue-router](https://router.vuejs.org)                                                                     | 5.0.3   | MIT                 | direct |
 | [webpack-virtual-modules](https://github.com/sysgears/webpack-virtual-modules#readme)                      | 0.6.2   | MIT                 |        |

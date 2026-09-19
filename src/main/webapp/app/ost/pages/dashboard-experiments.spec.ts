@@ -13,6 +13,8 @@ import { useOstTreeStore } from '../stores/ost-tree.store';
 import ExperimentsPage from './ExperimentsPage.vue';
 import TreesDashboardPage from './TreesDashboardPage.vue';
 
+const monthStartUtc = () => Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1);
+
 const Stub = (cy: string) => ({ template: `<div data-cy="${cy}"></div>` });
 
 /** Two products; branch 1 has two outcomes, nested opportunities, solutions, assumptions and evidence. */
@@ -31,8 +33,11 @@ function fixtureTree(): TeamTreeDTO {
       dto('solution-1', 'opportunity-1', { title: 'In-app invite', status: 'CANDIDATE' }),
       dto('assumption-1', 'solution-1', { title: 'Users accept invites', status: 'TESTING', confidence: 40, ownerLogin: 'user' }),
       dto('assumption-2', 'solution-1', { title: 'Sales won’t block', status: 'UNTESTED', confidence: 20, sortOrder: 1 }),
-      dto('evidence-1', 'opportunity-1'),
-      dto('evidence-2', 'assumption-1'),
+      // created this month (UTC), but before the product's last activity 5 minutes ago
+      dto('evidence-1', 'opportunity-1', { createdDate: new Date(Math.max(Date.now() - 60 * 60_000, monthStartUtc())).toISOString() }),
+      dto('evidence-2', 'assumption-1', {
+        createdDate: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 15)).toISOString(),
+      }),
       dto('product-2', null, { title: 'Insights', sortOrder: 2, archived: true }),
       dto('outcome-3', 'product-2', { title: 'Insight outcome' }),
       dto('opportunity-3', 'outcome-3', { status: 'VALIDATED' }),
@@ -92,7 +97,7 @@ describe('Trees dashboard and Experiments tracker', () => {
   const text = (w: VueWrapper, cy: string) => w.find(`[data-cy="${cy}"]`).text();
 
   describe('dashboard', () => {
-    it('shows the team kicker and the four counters from the tree (A5: evidence this month from the server)', async () => {
+    it('shows the team kicker and the four counters derived from the nodes (A5: evidence created this UTC month)', async () => {
       const w = await mountAt('/trees/7');
       expect(w.find('[data-cy="ost-dashboard"]').exists()).toBe(true);
       expect(text(w, 'ostDashboardKicker')).toBe('Team Jupiter · continuous discovery');
@@ -100,7 +105,8 @@ describe('Trees dashboard and Experiments tracker', () => {
       expect(value('opportunities')).toBe('3');
       expect(value('solutions')).toBe('2');
       expect(value('tests')).toBe('2');
-      expect(value('evidence')).toBe('5');
+      // One evidence created this month, one last month; the tree read's snapshot (5) is not used.
+      expect(value('evidence')).toBe('1');
       expect(text(w, 'ost-stat-evidence')).toContain('Evidence this month');
     });
 

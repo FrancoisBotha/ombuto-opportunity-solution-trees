@@ -27,7 +27,7 @@
           :key="card.product.id"
           :card="card"
           :position="i + 1"
-          :outcomes="outcomesOf(card.product.id)"
+          :outcomes="card.outcomes"
           :members="members"
           :to="canvasRoute({ product: card.product.id })"
         />
@@ -49,7 +49,7 @@
 <script setup lang="ts">
 /**
  * Trees dashboard (/trees/:teamId): four portfolio counters (A5: the fourth is evidence created
- * this month, from the tree read) and one card per product. Read-only — viewers see the same page.
+ * this UTC month, derived from the nodes) and one card per product. Read-only — viewers see the same page.
  * Archived products are shown, marked "Archived" and dimmed (the prototype has no archived state).
  */
 import { computed } from 'vue';
@@ -67,7 +67,7 @@ const teamName = computed(() => tree.team?.name ?? '');
 const members = computed(() => tree.team?.members ?? []);
 
 const stats = computed(() => {
-  const s = dashboardStats(tree.nodes, { evidenceThisMonth: tree.team?.evidenceThisMonth });
+  const s = dashboardStats(tree.nodes);
   return [
     { key: 'opportunities', label: 'Opportunities', value: s.opportunities },
     { key: 'solutions', label: 'Solutions live', value: s.solutions },
@@ -77,9 +77,6 @@ const stats = computed(() => {
 });
 
 const cards = computed(() => productCards(tree.nodes));
-
-/** Every outcome of the product, in tree order. */
-const outcomesOf = (productKey: string) => tree.nodes.filter(n => n.parent === productKey && n.type === 'outcome').map(n => n.title);
 
 const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas', params: { teamId: teamId.value }, query });
 </script>
@@ -182,6 +179,23 @@ const canvasRoute = (query: Record<string, string> = {}) => ({ name: 'OstCanvas'
 @media (max-width: 720px) {
   .ost-page {
     padding: 24px 16px 48px;
+  }
+
+  .ost-page__head {
+    flex-wrap: wrap;
+  }
+
+  .ost-page__head > div:first-child {
+    min-width: 0;
+  }
+
+  .ost-root .ost-page__title {
+    font-size: 30px;
+    overflow-wrap: anywhere;
+  }
+
+  .ost-page__actions {
+    margin-left: 0;
   }
 
   .ost-stats {

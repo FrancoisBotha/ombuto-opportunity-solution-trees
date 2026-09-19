@@ -6,7 +6,7 @@
     </div>
     <h2 class="ost-product-card__name">{{ card.product.title }}</h2>
     <div class="ost-product-card__outcomes">
-      <p v-for="outcome in outcomes" :key="outcome" class="ost-product-card__outcome">{{ outcome }}</p>
+      <p v-for="outcome in outcomes" :key="outcome.key" class="ost-product-card__outcome">{{ outcome.title }}</p>
       <p v-if="!outcomes.length" class="ost-product-card__outcome is-empty">No outcome set</p>
     </div>
     <div class="ost-product-card__counts">
@@ -36,7 +36,8 @@ const props = defineProps<{
   card: ProductCard;
   /** 1-based position among the team's products ("Product branch 01"). */
   position: number;
-  outcomes: string[];
+  /** The product's outcomes, keyed by node key (titles need not be unique). */
+  outcomes: ProductCard['outcomes'];
   members: TeamMemberDTO[];
   to: RouteLocationRaw;
 }>();
@@ -50,7 +51,7 @@ const counts = computed(() => [
   { label: 'Evid', cy: 'evidence', n: props.card.counts.evidence },
 ]);
 
-const updated = computed(() => lastEditedLabel(props.card.lastActivity, props.card.product.lastActivity?.byLogin ?? null, props.members));
+const updated = computed(() => lastEditedLabel(props.card.lastActivity, props.card.lastEditedBy, props.members));
 </script>
 
 <style scoped>

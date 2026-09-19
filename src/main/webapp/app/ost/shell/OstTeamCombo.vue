@@ -1,5 +1,5 @@
 <template>
-  <div ref="root" class="ost-team-combo" data-cy="ostTeamCombo">
+  <div ref="root" class="ost-team-combo" data-cy="ostTeamCombo" @focusout="onFocusOut" @pointerdown="pointerInside = true">
     <button
       ref="trigger"
       type="button"
@@ -10,11 +10,20 @@
       data-cy="ostTeamComboButton"
       @click="toggle"
       @keydown.down.prevent="openAndFocus(0)"
+      @keydown.esc="onTriggerEscape"
     >
       <span class="ost-team-combo__label" data-cy="ostTeamComboLabel">{{ label }}</span>
       <PhCaretDown :size="12" weight="bold" class="ost-team-combo__caret" aria-hidden="true" />
     </button>
-    <div v-if="open" class="ost-team-combo__menu" role="listbox" aria-label="Switch team" data-cy="ostTeamComboMenu" @keydown="onMenuKey">
+    <div
+      v-if="open"
+      ref="menu"
+      class="ost-team-combo__menu"
+      role="listbox"
+      aria-label="Switch team"
+      data-cy="ostTeamComboMenu"
+      @keydown="onMenuKey"
+    >
       <p v-if="!teams.length" class="ost-team-combo__empty">You are not in any team yet.</p>
       <button
         v-for="team in teams"
@@ -51,7 +60,10 @@ const emit = defineEmits<{ select: [teamId: number] }>();
 const open = ref(false);
 const root = ref<HTMLElement | null>(null);
 const trigger = ref<HTMLButtonElement | null>(null);
+const menu = ref<HTMLElement | null>(null);
 const options = ref<HTMLButtonElement[]>([]);
+/** A press inside the combo is in progress (some browsers do not focus buttons on click). */
+const pointerInside = ref(false);
 
 const label = computed(() => props.currentName ?? props.teams.find(t => t.id === props.currentId)?.name ?? 'Choose a team');
 
@@ -66,7 +78,23 @@ function toggle() {
 async function openAndFocus(index: number) {
   open.value = true;
   await nextTick();
-  options.value[index]?.focus();
+  focusOption(index);
+}
+
+/**
+ * Focuses an option without letting the browser scroll any ancestor into view (the OST shell and
+ * page must never scroll), then scrolls only the menu so the option is visible.
+ */
+function focusOption(index: number) {
+  const el = options.value[index];
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  const list = menu.value;
+  if (!list) return;
+  const top = el.offsetTop;
+  const bottom = top + el.offsetHeight;
+  if (top < list.scrollTop) list.scrollTop = top;
+  else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
 }
 
 function close(returnFocus = false) {
@@ -79,27 +107,60 @@ function choose(teamId: number) {
   if (teamId !== props.currentId) emit('select', teamId);
 }
 
+function onTriggerEscape(event: KeyboardEvent) {
+  if (!open.value) return;
+  event.preventDefault();
+  close();
+}
+
 function onMenuKey(event: KeyboardEvent) {
   const i = options.value.findIndex(el => el === document.activeElement);
+  const last = options.value.length - 1;
   if (event.key === 'Escape') {
     event.preventDefault();
     close(true);
   } else if (event.key === 'ArrowDown') {
     event.preventDefault();
-    options.value[Math.min(options.value.length - 1, i + 1)]?.focus();
+    focusOption(Math.min(last, i + 1));
   } else if (event.key === 'ArrowUp') {
     event.preventDefault();
-    if (i <= 0) trigger.value?.focus();
-    else options.value[i - 1]?.focus();
+    if (i <= 0) trigger.value?.focus({ preventScroll: true });
+    else focusOption(i - 1);
+  } else if (event.key === 'Home') {
+    event.preventDefault();
+    focusOption(0);
+  } else if (event.key === 'End') {
+    event.preventDefault();
+    focusOption(last);
   }
+}
+
+/** Focus leaving the combo (Tab, a click elsewhere) closes the menu. */
+function onFocusOut(event: FocusEvent) {
+  const next = event.relatedTarget as Node | null;
+  if (!open.value || (next && root.value?.contains(next))) return;
+  if (!next && pointerInside.value) return;
+  close();
 }
 
 function onDocumentPointer(event: Event) {
   if (open.value && root.value && !root.value.contains(event.target as Node)) close();
 }
 
-onMounted(() => document.addEventListener('pointerdown', onDocumentPointer));
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointer));
+function onDocumentPointerUp() {
+  pointerInside.value = false;
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointer);
+  document.addEventListener('pointerup', onDocumentPointerUp);
+  document.addEventListener('pointercancel', onDocumentPointerUp);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointer);
+  document.removeEventListener('pointerup', onDocumentPointerUp);
+  document.removeEventListener('pointercancel', onDocumentPointerUp);
+});
 </script>
 
 <style scoped>
@@ -142,6 +203,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
   right: 0;
   top: calc(100% + 6px);
   min-width: 196px;
+  /* A long team list scrolls inside the menu; the shell (overflow: clip) never scrolls. */
+  max-height: min(420px, calc(100vh - 80px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   z-index: 80;
   padding: 5px;
   background: var(--color-surface);
@@ -160,6 +225,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
 }
 
 .ost-team-combo__option {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 10px;
