@@ -17,7 +17,7 @@
     <NotesField :value="node.note" :readonly="readonly" @change="save({ note: $event })" />
 
     <div class="ost-field">
-      <div class="ost-field__label">Children ({{ children.length }})</div>
+      <div class="ost-field__label ost-field__label--7">Children ({{ children.length }})</div>
       <div v-if="children.length" class="ost-children">
         <button
           v-for="child in children"
@@ -129,7 +129,7 @@ async function add(type: NodeType) {
   padding: 7px 9px;
   background: transparent;
   border: 1px solid var(--color-divider);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   cursor: pointer;
   color: inherit;
 }
@@ -146,7 +146,7 @@ async function add(type: NodeType) {
   text-transform: uppercase;
   opacity: 0.6;
   flex: none;
-  min-width: 44px;
+  width: 44px;
 }
 
 .ost-children__title {

@@ -1,6 +1,6 @@
 <template>
   <div class="ost-field">
-    <div class="ost-field__label ost-field__label--split">
+    <div class="ost-field__label ost-field__label--split ost-field__label--8">
       <span :id="labelId">Priority</span><span data-cy="ost-priority-label">{{ priorityLabel(shown) }} · {{ Math.round(shown) }}</span>
     </div>
     <div
@@ -23,6 +23,7 @@
       @pointercancel="onCancel"
       @lostpointercapture="onUp"
       @keydown="onKey"
+      @blur="flushKeys"
     >
       <i class="ost-priority__track"></i>
       <i class="ost-priority__fill" :style="fillStyle"></i>
@@ -35,9 +36,10 @@
 /**
  * Opportunity priority: continuous 1–100 slider with the cold → warm oklch ramp (FR-V1).
  * Dragging only moves a local draft; the value is committed once, on release. Arrow keys
- * (±1), Page Up/Down (±10), Home/End commit immediately.
+ * (±1), Page Up/Down (±10), Home/End move a draft too, committed once the keys have been idle for
+ * KEY_COMMIT_MS (or on blur / unmount) — holding an arrow key sends one PATCH, not one per repeat.
  */
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { priorityColor, priorityLabel } from '../../domain/rules';
 
@@ -48,9 +50,15 @@ const labelId = `ost-pri-${Math.random().toString(36).slice(2, 9)}`;
 const track = ref<HTMLElement | null>(null);
 /** Value under the pointer while dragging; null when idle. */
 const draft = ref<number | null>(null);
+/** Value reached with the keyboard, not yet committed; null when idle. */
+const keyDraft = ref<number | null>(null);
+let keyTimer: ReturnType<typeof setTimeout> | null = null;
 let rect: DOMRect | null = null;
 
-const shown = computed(() => draft.value ?? props.value);
+/** Idle time after the last key press before the keyboard value is committed. */
+const KEY_COMMIT_MS = 400;
+
+const shown = computed(() => draft.value ?? keyDraft.value ?? props.value);
 
 const clamp = (v: number) => Math.min(100, Math.max(1, Math.round(v)));
 
@@ -76,6 +84,7 @@ function valueAt(clientX: number) {
 function onDown(event: PointerEvent) {
   if (props.readonly || event.button > 0) return;
   event.preventDefault();
+  flushKeys();
   rect = track.value?.getBoundingClientRect() ?? null;
   try {
     track.value?.setPointerCapture?.(event.pointerId);
@@ -103,17 +112,30 @@ function onCancel() {
   rect = null;
 }
 
+function flushKeys() {
+  if (keyTimer) clearTimeout(keyTimer);
+  keyTimer = null;
+  const value = keyDraft.value;
+  keyDraft.value = null;
+  if (value !== null && value !== props.value) emit('change', value);
+}
+
 function onKey(event: KeyboardEvent) {
   if (props.readonly) return;
   const steps: Record<string, number> = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1, PageDown: -10, PageUp: 10 };
+  const base = keyDraft.value ?? props.value;
   let next: number | null = null;
-  if (event.key in steps) next = clamp(props.value + steps[event.key]);
+  if (event.key in steps) next = clamp(base + steps[event.key]);
   else if (event.key === 'Home') next = 1;
   else if (event.key === 'End') next = 100;
   if (next === null) return;
   event.preventDefault();
-  if (next !== props.value) emit('change', next);
+  keyDraft.value = next;
+  if (keyTimer) clearTimeout(keyTimer);
+  keyTimer = setTimeout(flushKeys, KEY_COMMIT_MS);
 }
+
+onBeforeUnmount(flushKeys);
 </script>
 
 <style scoped>

@@ -1,6 +1,6 @@
 <template>
   <div class="ost-field">
-    <div class="ost-field__label ost-field__label--split">
+    <div class="ost-field__label ost-field__label--split ost-field__label--7">
       <span>Evidence strength</span
       ><span data-cy="ost-evidence-score">{{ strength.score === null ? 'untested' : `${strength.score}%` }}</span>
     </div>
@@ -11,12 +11,13 @@
       aria-valuemin="0"
       aria-valuemax="100"
       :aria-valuenow="strength.score ?? 0"
+      :aria-valuetext="strength.score === null ? 'Untested: no assumption tests yet' : `${strength.score}%`"
       data-cy="ost-evidence-bar"
       :data-score="strength.score ?? ''"
     >
       <i class="ost-evidence__fill" :style="{ width: `${strength.score ?? 0}%` }"></i>
     </div>
-    <div class="ost-field__hint" data-cy="ost-evidence-note">{{ evidenceNote(strength) }}</div>
+    <div class="ost-field__hint ost-field__hint--7" data-cy="ost-evidence-note">{{ evidenceNote(strength) }}</div>
   </div>
 </template>
 

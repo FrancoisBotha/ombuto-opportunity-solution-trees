@@ -201,6 +201,19 @@
   opacity: 0.6;
 }
 
+/* Label-to-control spacing differs per field in the prototype (6 / 7 / 8px). */
+.ost-root .ost-field__label--6 {
+  margin-bottom: 6px;
+}
+
+.ost-root .ost-field__label--7 {
+  margin-bottom: 7px;
+}
+
+.ost-root .ost-field__label--8 {
+  margin-bottom: 8px;
+}
+
 .ost-root .ost-field__label--split {
   display: flex;
   justify-content: space-between;
@@ -212,6 +225,14 @@
   font-size: 10.5px;
   line-height: 1.4;
   color: var(--color-neutral-400);
+}
+
+.ost-root .ost-field__hint--tight {
+  line-height: 1.35;
+}
+
+.ost-root .ost-field__hint--7 {
+  margin-top: 7px;
 }
 
 /* ---- state messages (loading / empty / forbidden / not found) -------------------------------- */

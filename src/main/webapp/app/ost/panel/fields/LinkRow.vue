@@ -3,6 +3,7 @@
     <div class="ost-link__head">
       <span class="ost-link__dot" :class="{ 'is-wiki': isWikiLink(link.url) }"></span>
       <input
+        ref="nameInput"
         v-model="name"
         class="ost-input ost-link__name"
         aria-label="Link name"
@@ -37,6 +38,7 @@
       </button>
     </div>
     <input
+      ref="urlInput"
       v-model="url"
       class="ost-input ost-link__url"
       aria-label="Link URL"
@@ -67,14 +69,25 @@ const emit = defineEmits<{ save: [patch: { name?: string; url?: string }]; remov
 const name = ref(props.link.name);
 const url = ref(props.link.url);
 const invalid = ref<string | null>(null);
+const nameInput = ref<HTMLInputElement | null>(null);
+const urlInput = ref<HTMLInputElement | null>(null);
 let cancelling = false;
 
-// Follow the stored link (server response, rollback) — the drafts reset to it.
+const focused = (el: HTMLInputElement | null) => !!el && document.activeElement === el;
+
+// Follow the stored link (server response, rollback): each draft resets on its own field's
+// change only, and never while the user is typing in it (a save of the other field must not
+// wipe what is being typed here).
 watch(
-  () => [props.link.name, props.link.url] as const,
-  ([n, u]) => {
-    name.value = n;
-    url.value = u;
+  () => props.link.name,
+  n => {
+    if (!focused(nameInput.value)) name.value = n;
+  },
+);
+watch(
+  () => props.link.url,
+  u => {
+    if (!focused(urlInput.value)) url.value = u;
   },
 );
 

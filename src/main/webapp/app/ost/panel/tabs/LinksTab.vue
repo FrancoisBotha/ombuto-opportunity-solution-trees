@@ -53,7 +53,9 @@
         <button type="submit" class="ost-btn ost-btn--primary ost-links__small" :disabled="busy" data-cy="ost-link-new-save">Add</button>
       </div>
     </form>
-    <button v-else-if="!readonly" type="button" class="ost-btn ost-links__add" data-cy="ost-link-add" @click="openForm">+ Add link</button>
+    <button v-else-if="!readonly" ref="addButton" type="button" class="ost-btn ost-links__add" data-cy="ost-link-add" @click="openForm">
+      + Add link
+    </button>
   </div>
 </template>
 
@@ -84,6 +86,7 @@ const busy = ref(false);
 const draft = reactive({ name: '', url: 'https://' });
 const formError = ref<string | null>(null);
 const nameInput = ref<HTMLInputElement | null>(null);
+const addButton = ref<HTMLButtonElement | null>(null);
 
 function restoreIcon(name: string) {
   if (/confluence|space/i.test(name)) return PhFileText;
@@ -121,9 +124,12 @@ async function openForm() {
   nameInput.value?.focus();
 }
 
-function closeForm() {
+/** Closing the form (Cancel, Escape, or after adding) hands focus back to "+ Add link". */
+async function closeForm() {
   adding.value = false;
   formError.value = null;
+  await nextTick();
+  addButton.value?.focus();
 }
 
 async function submit() {
@@ -142,7 +148,7 @@ async function submit() {
   busy.value = true;
   try {
     const ok = await run(() => tree.addLink(props.nodeKey, { name, url }));
-    if (ok) adding.value = false;
+    if (ok) void closeForm();
   } finally {
     busy.value = false;
   }

@@ -1,6 +1,6 @@
 <template>
   <div class="ost-field">
-    <div class="ost-field__label ost-field__label--split">
+    <div class="ost-field__label ost-field__label--split ost-field__label--7">
       <span :id="labelId">Opportunity value</span><span data-cy="ost-value-label">{{ valueLabel(value || 3) }}</span>
     </div>
     <div class="ost-value" role="group" :aria-labelledby="labelId">
