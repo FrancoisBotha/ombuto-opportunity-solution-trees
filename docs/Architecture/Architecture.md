@@ -60,10 +60,17 @@ hand-written pieces sit on top of the generated code:
 - **Tree collaboration.** All writes go through the REST API, which validates,
   authorises and persists them. After commit, the service publishes a small
   change event (`nodeType`, `id`, `action`, DTO, `user`) to
-  `/topic/teams/{teamId}/tree`. Clients never write over the socket.
-  Subscriptions are checked against `TeamAccessService` in a STOMP channel
-  interceptor, so a user can only listen to trees they are allowed to see.
-  Comments use the same mechanism.
+  `/topic/teams/{teamId}/tree`. Clients never write over the socket: a client
+  `SEND` to any `/topic/**` destination is rejected by
+  `WebsocketSecurityConfiguration` (server-to-client only), and
+  `TreeTopicChannelInterceptor` additionally drops any `SEND` that targets a
+  tree topic. SUBSCRIBE frames are authorised against `TeamAccessService` in the
+  same channel interceptor (`TreeTopicChannelInterceptor`): the `teamId` is
+  resolved from the destination and a non-member's SUBSCRIBE is dropped, so no
+  events ever reach that session. Viewers subscribe and receive events like any
+  other member (FR-034). The WebSocket handshake reuses the authenticated HTTP
+  session and unauthenticated handshakes are refused (NFR-011). Comments use
+  the same mechanism.
 - **MCP server.** Read-only tools (list products, get tree, get node, list
   interviews) call the same services, so they are scoped the same way. Callers
   present a Keycloak bearer token.
@@ -85,7 +92,14 @@ winning value immediately.
   exists on the MVC stack, and nothing here needs reactive throughput.
 - JHipster's STOMP WebSocket with the in-memory simple broker, not RabbitMQ or
   Redis pub/sub: the app runs as a single instance, so there is nothing to fan
-  out across. A second instance would require an external broker.
+  out across. A second instance would require an external broker. This is the
+  single-instance / in-memory-broker limitation called out by **NFR-012**:
+  every tree change event is fanned out from one JVM's `SimpMessagingTemplate`
+  to that same JVM's connected STOMP sessions. Horizontal scaling (a second
+  application instance behind a load balancer, or blue/green with connected
+  clients) is out of scope; it would need an external broker (RabbitMQ or Redis
+  STOMP relay) and per-team `seq`/`epoch` state moved out of process, both of
+  which are a separate architecture decision.
 - Writes over REST, WebSocket for broadcast only: one write path to validate and
   secure. Considered sending edits as STOMP messages and rejected it because it
   duplicates the generated REST layer.
@@ -102,11 +116,15 @@ winning value immediately.
   a deferral, and epic 6 is closed against it. Live delivery of messages is the
   only chat work left, and it belongs to epic 5.
 - JHipster's `tracker` WebSocket sample (`web/websocket/ActivityService`,
-  `app/admin/tracker/*`) was deleted on 2026-09-20: it tracked page views per
-  session and had nothing to do with the tree. The STOMP infrastructure it came
-  with — `WebsocketConfiguration` (SockJS endpoint, simple `/topic` broker) and
-  `WebsocketSecurityConfiguration` (authentication required on `/topic/**`,
-  everything else denied) — is kept for the team topic in epic 5.
+  `app/admin/tracker/*`) was deleted on 2026-09-20 and stays deleted (RTC-003
+  confirmed the decision): it tracked page views per session, had nothing to do
+  with the tree, and would have shared the `/topic` prefix with the team topic
+  — a footgun the interceptor should not have to work around. The STOMP
+  infrastructure it came with — `WebsocketConfiguration` (SockJS endpoint,
+  simple `/topic` broker) and `WebsocketSecurityConfiguration` (authentication
+  required on `/topic/**`, client SEND denied, everything else denied) — is
+  kept for the team topic in epic 5, with `TreeTopicChannelInterceptor` layered
+  on top for the per-team check.
 - Keycloak for all sign-in, local accounts included: Keycloak brokers the
   company IdP and holds local username/password users, so the app stores no
   passwords and sees one OIDC provider. Considered JHipster JWT auth with its
