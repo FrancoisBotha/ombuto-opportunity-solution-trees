@@ -202,6 +202,8 @@ test.describe('OST full-page node detail', () => {
     await expect(page.getByTestId('ost-node-detail-status')).toHaveText('exploring');
     await expect(page.getByTestId('ost-notes')).toHaveValue('Learned on the full page');
 
+    // Loaded directly (not from the canvas): "Open on canvas" with an arrow-up-right.
+    await expect(page.getByTestId('ost-node-detail-open-canvas')).toHaveText('Open on canvas');
     await page.getByTestId('ost-node-detail-open-canvas').click();
     await expect(page).toHaveURL(new RegExp(`/trees/${teamId}/canvas\\?node=${n.op1.key}$`));
     await expect(canvasNode(page, n.op1.key)).toHaveClass(/\bis-selected\b/);
@@ -209,6 +211,12 @@ test.describe('OST full-page node detail', () => {
     await expect(canvasNode(page, n.op1.key).getByTestId('ost-node-status')).toHaveText('exploring');
     await expect(page.getByTestId('ost-panel-title')).toHaveValue('Renamed on the page');
     await expect(panel(page).getByTestId('ost-notes')).toHaveValue('Learned on the full page');
+
+    // Opened from the canvas: the way back says so (prototype), and it lands on the node again.
+    await page.getByTestId('ost-open-detail').click();
+    await expect(page.getByTestId('ost-node-detail-open-canvas')).toHaveText('← Back to canvas');
+    await page.getByTestId('ost-node-detail-open-canvas').click();
+    await expect(canvasNode(page, n.op1.key)).toHaveClass(/\bis-selected\b/);
   });
 
   test('a message posted on the page shows in the panel’s Chat tab', async () => {

@@ -300,6 +300,59 @@ test.describe('OST tree canvas — editing', () => {
     await expect(node(page, k.opA).getByTestId('ost-node-title')).toHaveText('Renamed on blur');
   });
 
+  test('a rename ended by clicking into the search box or the notes keeps focus there, with what is typed next', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    const title = node(page, k.opA).getByTestId('ost-node-title');
+    const input = page.getByTestId('ost-rename-input');
+    const search = page.getByTestId('ost-search');
+
+    await title.dblclick();
+    await input.fill('Renamed then searched');
+    await search.click();
+    await page.keyboard.type('abc');
+    await expect(input).toHaveCount(0);
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue('abc');
+    await expect(title).toHaveText('Renamed then searched');
+    await expect.poll(async () => (await serverNode(k.opA))?.title).toBe('Renamed then searched');
+    await search.fill('');
+
+    // The same with the panel's notes (the node is selected by the rename, so the panel shows it).
+    await title.dblclick();
+    await input.fill('Renamed then noted');
+    const notes = page.getByTestId('ost-notes');
+    await notes.click();
+    await page.keyboard.type('xyz');
+    await expect(notes).toBeFocused();
+    await expect(notes).toHaveValue(/xyz$/);
+    await expect(title).toHaveText('Renamed then noted');
+    await notes.fill('');
+    await notes.blur();
+  });
+
+  test('the delete dialog dims and covers the app chrome (navbar and sidebar) and centres on the viewport', async () => {
+    const page = user.page;
+    await openCanvas(page);
+    await node(page, k.opA).locator('.ost-node__kicker').click();
+    await page.keyboard.press('Delete');
+    const dialog = page.getByTestId('ostConfirmDelete');
+    await expect(dialog).toBeVisible();
+    // What is on top at the navbar's and the sidebar's spot is the dialog backdrop.
+    const onTop = await page.evaluate(() =>
+      [
+        [window.innerWidth / 2, 10],
+        [20, window.innerHeight / 2],
+      ].map(([x, y]) => (document.elementFromPoint(x, y) as HTMLElement | null)?.dataset.cy ?? null),
+    );
+    expect(onTop).toEqual(['ostDialogBackdrop', 'ostDialogBackdrop']);
+    const b = (await dialog.boundingBox())!;
+    const vp = page.viewportSize()!;
+    expect(Math.abs(b.x + b.width / 2 - vp.width / 2)).toBeLessThan(2);
+    await page.getByTestId('ostConfirmDeleteCancel').click();
+    await expect(dialog).toHaveCount(0);
+  });
+
   test('dragging an opportunity onto another outcome re-parents it (and it persists)', async () => {
     const page = user.page;
     await openCanvas(page);

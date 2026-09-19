@@ -110,13 +110,14 @@ defineExpose({ focusAndSelect });
 }
 
 /*
- * The field's padding + border (3px / 7px) sit outside the text column: the typed title lines up
- * with the kicker and breadcrumb exactly like the read-only heading does.
+ * The field's left padding + border (7px) and its vertical ones (3px) sit outside the text column,
+ * so the typed title lines up with the kicker and breadcrumb exactly like the read-only heading; the
+ * right edge stays inside the heading (nothing sticks out on a narrow page).
  */
 .ost-nd-title__input {
   display: block;
-  width: calc(100% + 14px);
-  margin: -3px -7px;
+  width: calc(100% + 7px);
+  margin: -3px 0 -3px -7px;
   padding: 2px 6px;
   font: inherit;
   line-height: inherit;
