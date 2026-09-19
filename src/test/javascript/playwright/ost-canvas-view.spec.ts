@@ -382,7 +382,7 @@ test.describe('OST tree canvas — render & navigate', () => {
     await node(page, k.op2).locator('.ost-node__title').click();
     await expect(node(page, k.op2)).toHaveClass(/\bis-selected\b/);
     await expect(page).toHaveURL(new RegExp(`node=${k.op2}`));
-    await expect(page.getByTestId('ostDetailPanelTitle')).toHaveText('Nested opportunity');
+    await expect(page.getByTestId('ost-panel-title')).toHaveValue('Nested opportunity');
     await expect(page.locator('.ost-node.is-selected')).toHaveCount(1);
     await expect(page.getByTestId(`ost-minimap-node-${k.op2}`)).toHaveClass(/\bis-selected\b/);
   });
@@ -396,7 +396,7 @@ test.describe('OST tree canvas — render & navigate', () => {
 
     await page.goto(`/trees/${teamId}/canvas?node=${k.as1}`);
     await expect(node(page, k.as1)).toHaveClass(/\bis-selected\b/);
-    await expect(page.getByTestId('ostDetailPanelTitle')).toHaveText('Assumption one');
+    await expect(page.getByTestId('ost-panel-title')).toHaveValue('Assumption one');
     await settle(page);
     const canvas = centre(await box(page.getByTestId('ost-canvas')));
     await expect

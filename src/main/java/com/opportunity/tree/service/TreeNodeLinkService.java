@@ -38,6 +38,7 @@ public class TreeNodeLinkService {
     private final NodeHistoryRecorder historyRecorder;
     private final NodeLinkRepository nodeLinkRepository;
     private final TreeCollaborationRepository collaborationRepository;
+    private final TreeStructureLock structureLock;
     private final EntityManager em;
 
     public TreeNodeLinkService(
@@ -45,20 +46,27 @@ public class TreeNodeLinkService {
         NodeHistoryRecorder historyRecorder,
         NodeLinkRepository nodeLinkRepository,
         TreeCollaborationRepository collaborationRepository,
+        TreeStructureLock structureLock,
         EntityManager em
     ) {
         this.teamAccessService = teamAccessService;
         this.historyRecorder = historyRecorder;
         this.nodeLinkRepository = nodeLinkRepository;
         this.collaborationRepository = collaborationRepository;
+        this.structureLock = structureLock;
         this.em = em;
     }
 
     /** Adds a link at the end of the node's list. History: LINK_ADDED "Link added" (prototype wording). */
     public TreeLinkDTO addLink(TreeNodeType type, Long nodeId, TreeLinkWriteDTO request) {
-        teamAccessService.requireEditNode(type, nodeId);
+        Long teamId = teamAccessService.requireEditNode(type, nodeId);
         String name = validName(request == null ? null : request.name());
         String url = validUrl(request == null ? null : request.url());
+
+        // max(sortOrder) + 1 under the team's structure lock, or concurrent adds share a sortOrder;
+        // then make sure the node was not deleted by the previous lock holder.
+        structureLock.lockTeam(teamId);
+        structureLock.requireNode(type, nodeId, teamId);
 
         NodeLink link = new NodeLink().name(name).url(url).sortOrder(nextSortOrder(type, nodeId)).createdDate(Instant.now());
         switch (type) {

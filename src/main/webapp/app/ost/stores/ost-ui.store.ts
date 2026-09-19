@@ -47,6 +47,8 @@ export interface OstUiState {
   editingId: string | null;
   chatId: string | null;
   confirmId: string | null;
+  /** Asks the canvas to centre a node (panel breadcrumb / child list); seq makes repeats observable. */
+  centreRequest: { key: string; seq: number } | null;
 }
 
 const initialState = (): OstUiState => ({
@@ -66,6 +68,7 @@ const initialState = (): OstUiState => ({
   editingId: null,
   chatId: null,
   confirmId: null,
+  centreRequest: null,
 });
 
 /** View state of the OST screens. Never holds tree data (see ost-tree.store.ts). */
@@ -82,6 +85,9 @@ export const useOstUiStore = defineStore('ostUi', {
       this.selectedId = key;
       if (key) this.rightOpen = true;
       this.addMenuId = null;
+    },
+    requestCentre(key: string) {
+      this.centreRequest = { key, seq: (this.centreRequest?.seq ?? 0) + 1 };
     },
     setPanelTab(tab: PanelTab) {
       this.panelTab = tab;

@@ -19,7 +19,6 @@ import com.opportunity.tree.service.dto.tree.TreeNodeDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -127,22 +126,24 @@ public class TreeNodeWriteService {
         }
         TreeNodeType type = TreeNodeRules.parseType(request.type(), "type");
         TreeNodeType parentType = TreeNodeRules.parseType(request.parentType(), "parentType");
-        if (request.parentId() == null) {
+        Long parentId = TreeNodeRules.wholeLong(request.parentId(), "parentId", "parentmissing");
+        if (parentId == null) {
             throw new NodeWriteRuleException("parentId is required", TreeNodeRules.ENTITY_NAME, "parentmissing");
         }
         // Purely type-based, so checking it before access leaks nothing about existing ids.
         TreeNodeRules.requireAllowed(parentType, type);
         // Access before field validation (as PATCH does): a viewer never learns why their body is wrong.
-        Long teamId = teamAccessService.requireEditNode(parentType, request.parentId());
+        Long teamId = teamAccessService.requireEditNode(parentType, parentId);
         String title =
             request.title() == null || request.title().isBlank() ? TreeNodeRules.defaultTitle(type) : validTitle(type, request.title());
-        LOG.debug("Create {} under {} {}", type, parentType, request.parentId());
+        LOG.debug("Create {} under {} {}", type, parentType, parentId);
 
         // sortOrder = max + 1 must be computed under the team's structure lock, or concurrent
         // creates under one parent (a double-click) all get the same sortOrder.
         structureLock.lockTeam(teamId);
+        // Access was checked before the wait: the previous lock holder may have deleted the parent.
+        structureLock.requireNode(parentType, parentId, teamId);
         Instant now = Instant.now();
-        Long parentId = request.parentId();
         Object entity = switch (type) {
             case OUTCOME -> {
                 Outcome o = new Outcome()
@@ -438,7 +439,7 @@ public class TreeNodeWriteService {
      * rejected instead of wrapping (e.g. 2^64 + 50 is not 50).
      */
     static int integer(Object value, int min, int max, String errorKey) {
-        BigDecimal exact = exactNumber(value);
+        BigDecimal exact = TreeNodeRules.exactNumber(value);
         if (
             exact != null &&
             exact.stripTrailingZeros().scale() <= 0 &&
@@ -452,25 +453,6 @@ public class TreeNodeWriteService {
             TreeNodeRules.ENTITY_NAME,
             errorKey
         );
-    }
-
-    private static BigDecimal exactNumber(Object value) {
-        if (value instanceof BigDecimal b) {
-            return b;
-        }
-        if (value instanceof BigInteger b) {
-            return new BigDecimal(b);
-        }
-        if (value instanceof Double d) {
-            return d.isNaN() || d.isInfinite() ? null : BigDecimal.valueOf(d);
-        }
-        if (value instanceof Float f) {
-            return f.isNaN() || f.isInfinite() ? null : BigDecimal.valueOf(f.doubleValue());
-        }
-        if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
-            return BigDecimal.valueOf(((Number) value).longValue());
-        }
-        return null;
     }
 
     private static Boolean bool(Object value, String errorKey) {

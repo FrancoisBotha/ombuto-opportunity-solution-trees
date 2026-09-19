@@ -29,6 +29,7 @@ public class TreeOpenQuestionService {
     private final NodeHistoryRecorder historyRecorder;
     private final OpenQuestionRepository openQuestionRepository;
     private final TreeCollaborationRepository collaborationRepository;
+    private final TreeStructureLock structureLock;
     private final EntityManager em;
 
     public TreeOpenQuestionService(
@@ -36,19 +37,24 @@ public class TreeOpenQuestionService {
         NodeHistoryRecorder historyRecorder,
         OpenQuestionRepository openQuestionRepository,
         TreeCollaborationRepository collaborationRepository,
+        TreeStructureLock structureLock,
         EntityManager em
     ) {
         this.teamAccessService = teamAccessService;
         this.historyRecorder = historyRecorder;
         this.openQuestionRepository = openQuestionRepository;
         this.collaborationRepository = collaborationRepository;
+        this.structureLock = structureLock;
         this.em = em;
     }
 
     /** Adds an open (not done) question at the end of the list. History: QUESTION_ADDED "Open question added". */
     public TreeQuestionDTO addQuestion(Long opportunityId, TreeQuestionWriteDTO request) {
-        teamAccessService.requireEditNode(TreeNodeType.OPPORTUNITY, opportunityId);
+        Long teamId = teamAccessService.requireEditNode(TreeNodeType.OPPORTUNITY, opportunityId);
         String text = validText(request == null ? null : request.text());
+        // max(sortOrder) + 1 under the team's structure lock (see TreeStructureLock), then re-check.
+        structureLock.lockTeam(teamId);
+        structureLock.requireNode(TreeNodeType.OPPORTUNITY, opportunityId, teamId);
         Integer max = collaborationRepository.maxQuestionSortOrderOfOpportunity(opportunityId);
         OpenQuestion question = new OpenQuestion()
             .questionText(text)

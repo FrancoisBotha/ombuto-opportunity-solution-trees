@@ -43,7 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
  *       evidence → opportunity | assumption.</li>
  *   <li>The caller must be OWNER/EDITOR of the node's team and of the new parent's team (else
  *       403, same for missing ids); node and parent must be in the same team (else 400
- *       {@code crossteam}).</li>
+ *       {@code crossteam}). The move then waits for the team's {@link TreeStructureLock}; a node or
+ *       parent deleted by a concurrent request meanwhile is a 409 {@code error.concurrencyFailure}.</li>
  *   <li>An opportunity cannot move under itself or one of its descendants (400 {@code cycle}).
  *       Moving an opportunity to another outcome carries its whole nested subtree along.</li>
  *   <li>Siblings of the moved node's type are renumbered densely (0..n-1) under the new parent
@@ -104,11 +105,11 @@ public class TreeNodeMoveService {
             throw new NodeWriteRuleException("Request body is required", TreeNodeRules.ENTITY_NAME, "unknowntype");
         }
         TreeNodeType nodeType = TreeNodeRules.parseType(request.nodeType(), "nodeType");
-        Long nodeId = request.nodeId();
+        Long nodeId = TreeNodeRules.wholeLong(request.nodeId(), "nodeId", "nodemissing");
         if (nodeId == null) {
             throw new NodeWriteRuleException("nodeId is required", TreeNodeRules.ENTITY_NAME, "nodemissing");
         }
-        Integer position = request.position();
+        Integer position = TreeNodeRules.wholeInt(request.position(), "position", "invalidposition");
         if (position != null && position < 0) {
             throw new NodeWriteRuleException("position must be zero or greater", TreeNodeRules.ENTITY_NAME, "invalidposition");
         }
@@ -119,11 +120,12 @@ public class TreeNodeMoveService {
         }
 
         TreeNodeType parentType = TreeNodeRules.parseType(request.parentType(), "parentType");
-        if (request.parentId() == null) {
+        Long parentId = TreeNodeRules.wholeLong(request.parentId(), "parentId", "parentmissing");
+        if (parentId == null) {
             throw new NodeWriteRuleException("parentId is required", TreeNodeRules.ENTITY_NAME, "parentmissing");
         }
         TreeNodeRules.requireAllowed(parentType, nodeType);
-        TreeNodeRef newParent = new TreeNodeRef(parentType, request.parentId());
+        TreeNodeRef newParent = new TreeNodeRef(parentType, parentId);
 
         Long nodeTeamId = teamAccessService.requireEditNode(nodeType, nodeId);
         Long parentTeamId = teamAccessService.requireEditNode(parentType, newParent.id());
@@ -133,6 +135,9 @@ public class TreeNodeMoveService {
         // Serialise with other structural writes in this team before reading any parent/sibling state
         // (concurrent moves between the same parents would otherwise deadlock on the renumbering).
         structureLock.lockTeam(nodeTeamId);
+        // Access was checked before the wait: the previous lock holder may have deleted either one.
+        structureLock.requireNode(nodeType, nodeId, nodeTeamId);
+        structureLock.requireNode(parentType, newParent.id(), nodeTeamId);
         if (nodeType == TreeNodeType.OPPORTUNITY && parentType == TreeNodeType.OPPORTUNITY && wouldFormCycle(nodeId, newParent.id())) {
             throw new NodeWriteRuleException(
                 "Cannot move an opportunity under itself or one of its descendants",
@@ -173,6 +178,7 @@ public class TreeNodeMoveService {
         }
         Long teamId = teamAccessService.requireEditNode(TreeNodeType.PRODUCT, productId);
         structureLock.lockTeam(teamId);
+        structureLock.requireNode(TreeNodeType.PRODUCT, productId, teamId);
         List<SiblingOrderDTO> siblings = renumber(TreeNodeType.PRODUCT, new TreeNodeRef(null, teamId), productId, position);
         em.flush();
         return new MoveTreeNodeResponse(dtoAssembler.toDto(TreeNodeType.PRODUCT, productId), siblings);
