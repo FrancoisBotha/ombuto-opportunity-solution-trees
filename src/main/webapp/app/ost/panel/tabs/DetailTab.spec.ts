@@ -328,4 +328,41 @@ describe('DetailTab', () => {
       expect(label('Children').classes()).toContain('ost-field__label--7');
     });
   });
+
+  describe('notes', () => {
+    it('a failed save keeps the typed notes in the field (rolled back in the tree only)', async () => {
+      const { wrapper, service, tree } = await mountTab('solution-1');
+      service.patchNode.rejects(apiError(403));
+      const notes = wrapper.get('[data-cy="ost-notes"]');
+      await notes.trigger('focus');
+      await notes.setValue('Typed notes worth keeping');
+      await notes.trigger('blur');
+      await flushPromises();
+      expect(service.patchNode.calledOnceWith('solution', 1, { notes: 'Typed notes worth keeping' })).toBe(true);
+      expect(tree.byId('solution-1')?.note).toBe('');
+      expect((notes.element as HTMLTextAreaElement).value).toBe('Typed notes worth keeping');
+      // Blurring again retries with the kept text.
+      service.patchNode.resolves(dto('solution-1', 'opportunity-1', { notes: 'Typed notes worth keeping' }));
+      await notes.trigger('focus');
+      await notes.trigger('blur');
+      await flushPromises();
+      expect(service.patchNode.callCount).toBe(2);
+      expect(tree.byId('solution-1')?.note).toBe('Typed notes worth keeping');
+      expect((notes.element as HTMLTextAreaElement).value).toBe('Typed notes worth keeping');
+    });
+
+    it('a successful save follows the server copy', async () => {
+      const { wrapper, service, tree } = await mountTab('solution-1');
+      service.patchNode.resolves(dto('solution-1', 'opportunity-1', { notes: 'Saved' }));
+      const notes = wrapper.get('[data-cy="ost-notes"]');
+      await notes.trigger('focus');
+      await notes.setValue('Saved');
+      await notes.trigger('blur');
+      await flushPromises();
+      expect(tree.byId('solution-1')?.note).toBe('Saved');
+      tree.byId('solution-1')!.note = 'Changed elsewhere';
+      await flushPromises();
+      expect((notes.element as HTMLTextAreaElement).value).toBe('Changed elsewhere');
+    });
+  });
 });

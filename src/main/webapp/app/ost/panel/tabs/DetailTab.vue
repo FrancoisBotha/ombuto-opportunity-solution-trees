@@ -14,7 +14,7 @@
       <PrioritySlider :value="node.priority" :readonly="readonly" @change="save({ priority: $event })" />
     </template>
 
-    <NotesField :value="node.note" :readonly="readonly" @change="save({ note: $event })" />
+    <NotesField :value="node.note" :readonly="readonly" @change="saveNotes" />
 
     <div class="ost-field">
       <div class="ost-field__label ost-field__label--7">Children ({{ children.length }})</div>
@@ -69,7 +69,7 @@ import OwnerSelect from '../fields/OwnerSelect.vue';
 import PrioritySlider from '../fields/PrioritySlider.vue';
 import StatusChips from '../fields/StatusChips.vue';
 import ValueScale from '../fields/ValueScale.vue';
-import { usePanelAction } from '../panel-action';
+import { type Settled, usePanelAction } from '../panel-action';
 
 const props = defineProps<{ nodeKey: string }>();
 const tree = useOstTreeStore();
@@ -86,6 +86,12 @@ const adding = ref(false);
 function save(patch: NodePatch) {
   if (readonly.value || !node.value) return;
   void run(() => tree.patchNode(props.nodeKey, patch));
+}
+
+/** Notes report back whether the save stuck, so a failed draft stays in the field. */
+async function saveNotes(note: string, settled: Settled) {
+  if (readonly.value || !node.value) return settled(false);
+  settled(await run(() => tree.patchNode(props.nodeKey, { note })));
 }
 
 function go(key: string) {

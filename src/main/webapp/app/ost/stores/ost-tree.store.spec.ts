@@ -377,6 +377,58 @@ describe('OST tree store', () => {
     });
   });
 
+  describe('a write about a node someone else deleted (403 / 409 concurrencyFailure)', () => {
+    const withoutSolution = TREE.filter(d => !['solution-1', 'assumption-1', 'evidence-1'].includes(d.key));
+
+    it('re-reads the tree; a node that is gone is removed, deselected, and the message says so', async () => {
+      ui.select('solution-1');
+      service.patchNode.rejects(apiError(403));
+      service.getTree.resolves(treeDto(withoutSolution));
+      expect(await tree.patchNode('solution-1', { note: 'typed' })).toBe(false);
+      expect(service.getTree.callCount).toBe(2); // load + the re-read
+      expect(tree.byId('solution-1')).toBeUndefined();
+      expect(tree.byId('assumption-1')).toBeUndefined();
+      expect(ui.selectedId).toBeNull();
+      expect(tree.error).toBe('This item was deleted by someone else.');
+    });
+
+    it('keeps the permission message when the node still exists', async () => {
+      service.patchNode.rejects(apiError(403));
+      expect(await tree.patchNode('solution-1', { note: 'typed' })).toBe(false);
+      expect(service.getTree.callCount).toBe(2);
+      expect(tree.byId('solution-1')?.note).toBe('');
+      expect(tree.error).toBe('You do not have permission to change this tree.');
+    });
+
+    it('a 409 concurrencyFailure on a move whose target was deleted', async () => {
+      service.moveNode.rejects(apiError(409, 'error.concurrencyFailure'));
+      service.getTree.resolves(treeDto(TREE.filter(d => d.key !== 'opportunity-2')));
+      expect(await tree.moveNode('solution-1', 'opportunity-2')).toBe(false);
+      expect(tree.byId('solution-1')?.parent).toBe('opportunity-1');
+      expect(tree.byId('opportunity-2')).toBeUndefined();
+      expect(tree.error).toBe('This item was deleted by someone else.');
+    });
+
+    it('a delete of a node that is already gone', async () => {
+      service.deleteNode.rejects(apiError(403));
+      service.getTree.resolves(treeDto(withoutSolution));
+      expect(await tree.deleteNode('solution-1')).toBe(false);
+      expect(tree.byId('solution-1')).toBeUndefined();
+      expect(tree.error).toBe('This item was deleted by someone else.');
+    });
+
+    it('keeps the message when the tree itself cannot be re-read; other errors do not re-read', async () => {
+      service.patchNode.rejects(apiError(403));
+      service.getTree.rejects(apiError(403));
+      expect(await tree.patchNode('solution-1', { note: 'typed' })).toBe(false);
+      expect(tree.byId('solution-1')).toBeDefined();
+      expect(tree.error).toBe('You do not have permission to change this tree.');
+      service.patchNode.rejects(apiError(400, 'error.invalidnotes'));
+      await tree.patchNode('solution-1', { note: 'typed' });
+      expect(service.getTree.callCount).toBe(2);
+    });
+  });
+
   describe('collaboration', () => {
     it('adds, edits and removes links, rolling back a failed removal', async () => {
       service.addLink.resolves({ id: 5, name: 'Doc', url: 'https://x.test' });

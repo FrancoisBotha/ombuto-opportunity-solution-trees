@@ -7,7 +7,7 @@ import { layoutTree } from '../domain/layout';
 import { type NodePatch, fromDto, parseKey, toApiType, toPatchBody } from '../domain/mapping';
 import { ALLOWED, canReparent, defaultLinks } from '../domain/rules';
 import type { NodeType, OstNode } from '../domain/types';
-import { type LoadFailure, describeError, loadFailure } from '../ost-errors';
+import { DELETED_ELSEWHERE, type LoadFailure, describeError, httpStatus, loadFailure, messageKey } from '../ost-errors';
 import type { CommentDTO, HistoryEntryDTO, MyTeamDTO, TeamMemberDTO, TeamTreeDTO } from '../ost.model';
 import OstService from '../ost.service';
 
@@ -180,6 +180,48 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     touchBranch(key, at);
   };
 
+  /** Drops a node and its subtree locally, with everything that refers to them (chat, history, view state). */
+  function removeSubtree(key: string) {
+    const doomed = new Set([key, ...descendantIds(key, nodes.value)]);
+    nodes.value = nodes.value.filter(n => !doomed.has(n.id));
+    const nextComments = { ...comments.value };
+    const nextHistory = { ...history.value };
+    for (const k of doomed) {
+      delete nextComments[k];
+      delete nextHistory[k];
+    }
+    comments.value = nextComments;
+    history.value = nextHistory;
+    useOstUiStore().forgetNodes(doomed);
+  }
+
+  /**
+   * Surfaces a failed write about `keys` (the node, and for creates/moves the parent or target).
+   * The server answers 403 for an unknown id (no existence leak), and a 409 concurrencyFailure when
+   * a concurrent delete won; both can mean "someone else deleted it". Then the tree is re-read:
+   * a node that is gone is removed here (deselected, panel closed) and the message says so;
+   * otherwise the permission / conflict message stands.
+   */
+  async function failOnNodes(err: unknown, keys: (string | null | undefined)[], fallback?: string, type?: NodeType) {
+    fail(err, fallback, type);
+    const status = httpStatus(err);
+    if (status !== 403 && !(status === 409 && messageKey(err) === 'concurrencyFailure')) return;
+    const id = teamId.value;
+    if (id === null) return;
+    const seq = loadSeq.value;
+    let alive: Set<string>;
+    try {
+      alive = new Set(((await api().getTree(id)).nodes ?? []).map(n => fromDto(n).id));
+    } catch {
+      return; // the team itself is out of reach (access revoked): the permission message stands
+    }
+    if (seq !== loadSeq.value || teamId.value !== id) return;
+    const gone = keys.filter((k): k is string => !!k && !!byId(k) && !alive.has(k));
+    if (!gone.length) return;
+    for (const k of gone) if (byId(k)) removeSubtree(k);
+    error.value = DELETED_ELSEWHERE;
+  }
+
   // ---- actions: configuration ----------------------------------------------------------------
   function setServiceFactory(factory: OstServiceFactory) {
     serviceFactory = factory;
@@ -284,7 +326,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       return true;
     } catch (err) {
       if (live()) rollbackPatch(key, ownTrack, seq, fields);
-      fail(err, undefined, node.type);
+      await failOnNodes(err, [key], undefined, node.type);
       return false;
     } finally {
       if (live() && --ownTrack.inflight === 0) patchTracks.delete(key);
@@ -367,7 +409,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       touchBranch(created.id, created.createdDate);
       return created.id;
     } catch (err) {
-      fail(err, 'The node could not be created.');
+      await failOnNodes(err, [parentKey], 'The node could not be created.');
       return null;
     }
   }
@@ -444,7 +486,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
         current.sortOrder = before.sortOrder;
         nodes.value = orderTree(nodes.value);
       }
-      fail(err, 'The node could not be moved.');
+      await failOnNodes(err, [key, targetKey], 'The node could not be moved.');
       return false;
     } finally {
       if (latest()) moveSeqs.delete(key);
@@ -459,21 +501,11 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     try {
       await api().deleteNode(parsed.type, parsed.id);
     } catch (err) {
-      fail(err, 'The node could not be deleted.');
+      await failOnNodes(err, [key], 'The node could not be deleted.');
       return false;
     }
     if (node.type !== 'product') touchBranch(key);
-    const doomed = new Set([key, ...descendantIds(key, nodes.value)]);
-    nodes.value = nodes.value.filter(n => !doomed.has(n.id));
-    const nextComments = { ...comments.value };
-    const nextHistory = { ...history.value };
-    for (const k of doomed) {
-      delete nextComments[k];
-      delete nextHistory[k];
-    }
-    comments.value = nextComments;
-    history.value = nextHistory;
-    useOstUiStore().forgetNodes(doomed);
+    removeSubtree(key);
     return true;
   }
 
@@ -488,7 +520,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       recordWrite(key);
       return true;
     } catch (err) {
-      fail(err, 'The link could not be added.');
+      await failOnNodes(err, [key], 'The link could not be added.');
       return false;
     }
   }
@@ -504,7 +536,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       return true;
     } catch (err) {
       Object.assign(link, snapshot);
-      fail(err, 'The link could not be saved.');
+      await failOnNodes(err, [key], 'The link could not be saved.');
       return false;
     }
   }
@@ -520,7 +552,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       return true;
     } catch (err) {
       node.links.splice(i, 0, removed);
-      fail(err, 'The link could not be removed.');
+      await failOnNodes(err, [key], 'The link could not be removed.');
       return false;
     }
   }
@@ -547,7 +579,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       recordWrite(key);
       return true;
     } catch (err) {
-      fail(err, 'The question could not be added.');
+      await failOnNodes(err, [key], 'The question could not be added.');
       return false;
     }
   }
@@ -563,7 +595,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       return true;
     } catch (err) {
       Object.assign(question, snapshot);
-      fail(err, 'The question could not be saved.');
+      await failOnNodes(err, [key], 'The question could not be saved.');
       return false;
     }
   }
@@ -578,7 +610,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       return true;
     } catch (err) {
       node.questions.splice(i, 0, removed);
-      fail(err, 'The question could not be removed.');
+      await failOnNodes(err, [key], 'The question could not be removed.');
       return false;
     }
   }
