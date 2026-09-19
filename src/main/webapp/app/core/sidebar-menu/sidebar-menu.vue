@@ -59,11 +59,11 @@
       <template v-if="hasAnyAuthority('ROLE_ADMIN')">
         <li class="section" :class="{ active: !openGroups.admin && currentPath.startsWith('/admin') }" data-cy="adminMenu">
           <div class="menu-item-parent" @click="toggleGroup('admin')">
-            <font-awesome-icon class="va-icon" icon="users-cog" />
-            <span class="nav-item">Administration</span>
+            <font-awesome-icon class="va-icon" icon="wrench" />
+            <span class="nav-item">System</span>
             <font-awesome-icon class="va-icon-toggle" :icon="groupIcon('admin')" />
           </div>
-          <span class="menu-tooltip">Administration</span>
+          <span class="menu-tooltip">System</span>
         </li>
         <transition name="slide">
           <div v-show="openGroups.admin">

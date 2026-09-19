@@ -155,6 +155,48 @@ describe('TeamMembers Component', () => {
     expect(comp.showAddForm).toBe(false);
   });
 
+  it('shows a friendly message when the selected user is already a member', async () => {
+    const wrapper = await mountAs(TeamRole.OWNER, [member('u1', TeamRole.OWNER)]);
+    const comp = wrapper.vm as any;
+    // Shape of the real BadRequestAlertException response
+    teamsServiceStub.addMember.rejects({
+      response: {
+        status: 400,
+        data: {
+          title: 'Bad Request',
+          status: 400,
+          detail: "400 BAD_REQUEST, ProblemDetailWithCause[title='Bad Request', properties='{message=error.memberexists}']",
+          message: 'error.memberexists',
+          params: 'teamMember',
+        },
+      },
+    });
+
+    comp.openAddForm();
+    comp.selectUser({ id: 'u1', login: 'admin', name: 'Admin Administrator' });
+    await comp.submitAdd();
+
+    expect(comp.addError).toBe('That user is already a member of this team.');
+    expect(comp.showAddForm).toBe(true);
+  });
+
+  it('never shows a raw ProblemDetail dump for an unrecognised error', async () => {
+    const wrapper = await mountAs(TeamRole.OWNER, [member('u1', TeamRole.OWNER)]);
+    const comp = wrapper.vm as any;
+    teamsServiceStub.addMember.rejects({
+      response: {
+        status: 400,
+        data: { detail: "400 BAD_REQUEST, ProblemDetailWithCause[title='Bad Request']", message: 'error.somethingnew' },
+      },
+    });
+
+    comp.openAddForm();
+    comp.selectUser({ id: 'u9', login: 'new', name: 'New Person' });
+    await comp.submitAdd();
+
+    expect(comp.addError).toBe('Could not add member');
+  });
+
   it('the picker mentions that users must have signed in at least once', async () => {
     const wrapper = await mountAs(TeamRole.OWNER, [member('u1', TeamRole.OWNER)]);
     const comp = wrapper.vm as any;

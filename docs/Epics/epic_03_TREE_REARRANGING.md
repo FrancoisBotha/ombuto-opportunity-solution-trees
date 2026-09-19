@@ -1,6 +1,6 @@
 # Epic 3: Tree Rearranging
 
-Status: NEW
+Status: TICKETS
 Owner: human
 Created: 2026-09-18
 Last Updated: 2026-09-18
