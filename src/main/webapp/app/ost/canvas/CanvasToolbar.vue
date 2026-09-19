@@ -43,7 +43,7 @@
       >
         −
       </button>
-      <div class="ost-toolbar__zoom-level" aria-live="polite" data-cy="ost-zoom-level">{{ Math.round(zoom * 100) }}%</div>
+      <div class="ost-toolbar__zoom-level" data-cy="ost-zoom-level">{{ Math.round(zoom * 100) }}%</div>
       <button
         type="button"
         class="ost-btn ost-toolbar__zoom-btn"

@@ -49,8 +49,29 @@ async function zoomPercent(page: Page) {
   return Number((await page.getByTestId('ost-zoom-level').textContent())!.replace('%', '').trim());
 }
 
-/** Lets the 180ms re-layout ease settle. */
-const settle = (page: Page) => page.waitForTimeout(350);
+/**
+ * Waits until the canvas is still: the viewport transform and every node's computed transform
+ * (mid-transition values included) are unchanged across two probes — i.e. the 180ms re-layout
+ * ease and any viewport change have settled.
+ */
+async function settle(page: Page) {
+  let last = '';
+  await expect
+    .poll(
+      async () => {
+        const now = await page.evaluate(() => {
+          const pane = document.querySelector<HTMLElement>('.vue-flow__transformationpane');
+          const nodes = Array.from(document.querySelectorAll<HTMLElement>('.vue-flow__node'), n => getComputedStyle(n).transform);
+          return `${pane ? getComputedStyle(pane).transform : ''}|${nodes.join('|')}`;
+        });
+        const still = now === last;
+        last = now;
+        return still;
+      },
+      { intervals: [120] },
+    )
+    .toBe(true);
+}
 
 test.describe.configure({ mode: 'serial' });
 
@@ -219,8 +240,14 @@ test.describe('OST tree canvas — render & navigate', () => {
     await openCanvas(page);
     const chip = page.getByTestId(`ost-collapse-${k.op1}`);
     await expect(chip).toHaveText('–');
+    const before = centre(await box(chip));
     await chip.click();
     await expect(chip).toHaveText('+3');
+    // The collapsed node stays where it was on screen (the view follows the re-layout).
+    await settle(page);
+    const after = centre(await box(chip));
+    expect(Math.abs(after.x - before.x)).toBeLessThan(2);
+    expect(Math.abs(after.y - before.y)).toBeLessThan(2);
     for (const key of [k.op2, k.s1, k.as1, k.ev1, k.ev2]) await expect(node(page, key)).toHaveCount(0);
     await expect(node(page, k.op1)).toBeVisible();
     await expect(page.locator('.ost-node')).toHaveCount(6);
@@ -387,6 +414,39 @@ test.describe('OST tree canvas — render & navigate', () => {
     await expect(page.getByTestId(`ost-collapse-${k.op1}`)).toHaveText('–');
   });
 
+  test('a ?node= outside the chosen ?product= scopes the canvas to its product; a bogus ?product= is dropped', async () => {
+    const page = user.page;
+    // op1 lives in product A: the canvas switches to A (and says so in the URL), selects and centres op1.
+    await page.goto(`/trees/${teamId}/canvas?product=${k.productB}&node=${k.op1}`);
+    await expect(page).toHaveURL(new RegExp(`product=${k.productA}`));
+    await expect(page).toHaveURL(new RegExp(`node=${k.op1}`));
+    await expect(page.getByTestId('ost-product-combo-label')).toHaveText(`Canvas A ${stamp}`);
+    await expect(node(page, k.op1)).toHaveClass(/\bis-selected\b/);
+    await expect(node(page, k.productB)).toHaveCount(0);
+    await settle(page);
+    const canvas = centre(await box(page.getByTestId('ost-canvas')));
+    const op1 = centre(await box(node(page, k.op1)));
+    expect(Math.max(Math.abs(op1.x - canvas.x), Math.abs(op1.y - canvas.y))).toBeLessThan(40);
+
+    // Switching to all products re-fits: the plain Fit framing (as pressing Fit), no late jump.
+    await page.getByTestId('ost-product-combo').click();
+    await page.getByTestId('ost-product-option-all').click();
+    await expect(node(page, k.productB)).toBeVisible();
+    await settle(page);
+    const afterSwitch = centre(await box(node(page, k.productA)));
+    await page.getByTestId('ost-fit').click();
+    await settle(page);
+    const fitted = centre(await box(node(page, k.productA)));
+    expect(Math.abs(afterSwitch.x - fitted.x)).toBeLessThan(2);
+    expect(Math.abs(afterSwitch.y - fitted.y)).toBeLessThan(2);
+
+    await page.goto(`/trees/${teamId}/canvas?product=product-999999999`);
+    await expect(node(page, k.productA)).toBeVisible();
+    await expect(node(page, k.productB)).toBeVisible();
+    await expect(page).not.toHaveURL(/product=/);
+    await expect(page.getByTestId('ost-product-combo-label')).toHaveText('All products');
+  });
+
   test('viewers see the same canvas without + buttons', async () => {
     const page = admin.page;
     await page.goto(`/trees/${teamId}/canvas`);
@@ -402,6 +462,84 @@ test.describe('OST tree canvas — render & navigate', () => {
     await expect(page).toHaveURL(new RegExp(`node=${k.s1}`));
     await page.getByTestId('ost-zoom-in').click();
   });
+
+  test('very long titles are clamped so a node never runs into the row below', async () => {
+    const page = user.page;
+    const long = `A very long opportunity title ${'that keeps going and going '.repeat(6)}`.slice(0, 190);
+    const op = await mk('opportunity', 'outcome', Number(k.o2.split('-')[1]), long);
+    const child = await mk('solution', 'opportunity', op.id, 'Long solution title that wraps '.repeat(6).slice(0, 180));
+    const kid = await mk('assumption', 'solution', child.id, 'Long assumption statement that wraps '.repeat(10).slice(0, 400));
+    await page.goto(`/trees/${teamId}/canvas?product=${k.productB}`);
+    await expect(node(page, kid.key)).toBeVisible();
+    await settle(page);
+    const zoom = (await zoomPercent(page)) / 100;
+    for (const [parent, below] of [
+      [op.key, child.key],
+      [child.key, kid.key],
+    ]) {
+      const p = await box(node(page, parent));
+      const c = await box(node(page, below));
+      // Node + collapse chip (11px below) stay clear of the child row; the node stays above the
+      // edge elbow (halfway down the gap between its layout box and the next row).
+      expect(p.y + p.height + 11 * zoom).toBeLessThan(c.y);
+      expect(p.height / zoom).toBeLessThan(122);
+    }
+    const title = node(page, op.key).getByTestId('ost-node-title');
+    await expect(title).toHaveAttribute('title', long);
+    expect(await title.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true); // clamped
+    await expect(node(page, op.key)).toHaveAttribute('aria-label', `Opportunity: ${long}, unexplored`);
+    for (const n of [kid, child, op]) await user.api('delete', `/api/tree/nodes/${n.type.toLowerCase()}/${n.id}`);
+  });
+
+  test('an empty tree shows an empty state instead of a blank canvas', async () => {
+    const page = user.page;
+    const res = await user.api('post', '/api/team-management/teams', { name: `e2e empty canvas ${stamp}`, description: 'ost-canvas-view' });
+    expect(res.status()).toBe(201);
+    const emptyId = (await res.json()).id as number;
+    try {
+      await page.goto(`/trees/${emptyId}/canvas`);
+      await expect(page.getByTestId('ost-canvas-empty')).toContainText('No products in this tree yet');
+      await expect(page.getByTestId('ost-canvas-go-to-team')).toHaveAttribute('href', `/teams/${emptyId}`);
+      await expect(page.locator('.ost-node')).toHaveCount(0);
+    } finally {
+      expect((await admin.api('delete', `/api/admin/teams/${emptyId}`)).status()).toBe(204);
+    }
+  });
+
+  for (const [width, height] of [
+    [1920, 1080],
+    [1600, 1000],
+  ]) {
+    test(`the first fit of a wide tree matches Fit and shows every product (${width}x${height}, Team Jupiter read-only)`, async () => {
+      // As admin (a Jupiter VIEWER): its longer app sidebar settles after the canvas first lays out.
+      const page = admin.page;
+      const teams = (await (await admin.api('get', '/api/team-management/my-teams')).json()) as { id: number; name: string }[];
+      const jupiter = teams.find(t => t.name === 'Team Jupiter');
+      expect(jupiter, 'Team Jupiter').toBeTruthy();
+      const tree = (await (await admin.api('get', `/api/teams/${jupiter!.id}/tree`)).json()) as { nodes: TreeNode[] };
+      const products = tree.nodes.filter(n => n.type === 'PRODUCT');
+      expect(products.length).toBeGreaterThan(1);
+
+      await page.setViewportSize({ width, height });
+      try {
+        await page.goto(`/trees/${jupiter!.id}/canvas`);
+        await expect(node(page, products[0].key)).toBeVisible();
+        await settle(page);
+        const initial = await zoomPercent(page);
+        const canvas = await box(page.getByTestId('ost-canvas'));
+        for (const p of products) {
+          const b = await box(node(page, p.key));
+          expect(b.x, `${p.key} left`).toBeGreaterThanOrEqual(canvas.x - 1);
+          expect(b.x + b.width, `${p.key} right`).toBeLessThanOrEqual(canvas.x + canvas.width + 1);
+        }
+        await page.getByTestId('ost-fit').click();
+        await settle(page);
+        expect(Math.abs((await zoomPercent(page)) - initial)).toBeLessThanOrEqual(1);
+      } finally {
+        await page.setViewportSize({ width: 1600, height: 1000 });
+      }
+    });
+  }
 
   test('seeded Team Jupiter renders all 24 nodes (read-only check)', async () => {
     const page = user.page;

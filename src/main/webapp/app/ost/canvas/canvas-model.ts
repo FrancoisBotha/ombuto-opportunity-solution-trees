@@ -30,22 +30,36 @@ export function edgeKind(childType: NodeType): OstEdgeKind {
 /** Nodes that are laid out (in scope, not under a collapsed ancestor), in tree order. */
 export const laidOutNodes = (nodes: OstNode[], placed: Record<string, Placed>): OstNode[] => nodes.filter(n => placed[n.id]);
 
-export function toFlowNodes(visible: OstNode[], placed: Record<string, Placed>): Node<OstFlowNodeData>[] {
+/**
+ * `draggable` decides per node whether it can be dragged onto another to re-parent (editors only,
+ * never products). Dragging never places a node: the canvas resets positions after every drag.
+ * Vue Flow's own wrapper stays unfocusable — the node body (OstNode) is the focus target.
+ */
+export function toFlowNodes(
+  visible: OstNode[],
+  placed: Record<string, Placed>,
+  draggable: (n: OstNode) => boolean = () => false,
+): Node<OstFlowNodeData>[] {
   return visible.map(n => {
     const p = placed[n.id];
     return {
       id: n.id,
       type: 'ost',
-      // layoutTree gives the CENTRE x and the TOP y; Vue Flow wants the top-left corner.
-      position: { x: p.x - p.w / 2, y: p.y },
+      position: flowPosition(p),
       data: { key: n.id },
-      draggable: false,
+      draggable: draggable(n),
       connectable: false,
       selectable: false,
       focusable: false,
     };
   });
 }
+
+/** layoutTree gives the CENTRE x and the TOP y; Vue Flow wants the top-left corner. */
+export const flowPosition = (p: Placed) => ({ x: p.x - p.w / 2, y: p.y });
+
+/** May this node be dragged to re-parent it? Editors only; products have no parent to change. */
+export const isDraggable = (n: Pick<OstNode, 'type'>, canEdit: boolean): boolean => canEdit && n.type !== 'product';
 
 export function toFlowEdges(visible: OstNode[], placed: Record<string, Placed>): Edge<OstEdgeData>[] {
   const edges: Edge<OstEdgeData>[] = [];
@@ -86,6 +100,11 @@ export function evidenceBySolution(nodes: OstNode[]): Map<string, { tests: numbe
     acc.set(n.parent, a);
   }
   return new Map([...acc].map(([key, a]) => [key, { tests: a.tests, score: Math.round(a.sum / a.tests) }]));
+}
+
+/** Evidence score per tested solution as a primitive, so an unchanged score never re-renders a node. */
+export function evidenceScores(nodes: OstNode[]): Map<string, number> {
+  return new Map([...evidenceBySolution(nodes)].map(([key, e]) => [key, e.score]));
 }
 
 // ---- overview map (prototype: Ombuto OST.dc.html "mini") ------------------------------------------
