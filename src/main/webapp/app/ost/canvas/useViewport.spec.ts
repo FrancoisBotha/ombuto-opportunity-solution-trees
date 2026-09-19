@@ -8,7 +8,9 @@ import {
   childCounts,
   edgeKind,
   evidenceBySolution,
+  evidenceScores,
   isDimmed,
+  isDraggable,
   laidOutNodes,
   matchesQuery,
   minimapToFlow,
@@ -146,6 +148,16 @@ describe('canvas-model', () => {
     expect(flow.every(f => f.draggable === false && f.type === 'ost')).toBe(true);
   });
 
+  it('only editors may drag, and never a product', () => {
+    const placed = layoutTree(nodes, { roots: ['product-1'], collapsed: {} });
+    const flow = toFlowNodes(laidOutNodes(nodes, placed), placed, n => isDraggable(n, true));
+    expect(flow.find(f => f.id === 'product-1')!.draggable).toBe(false);
+    expect(flow.filter(f => f.id !== 'product-1').every(f => f.draggable)).toBe(true);
+    expect(isDraggable({ type: 'opportunity' }, false)).toBe(false);
+    // Vue Flow's wrapper never takes focus: the node body does.
+    expect(flow.every(f => f.focusable === false)).toBe(true);
+  });
+
   it('builds one orthogonal edge per laid-out child with the child-type style', () => {
     const placed = layoutTree(nodes, { roots: ['product-1'], collapsed: {} });
     const edges = toFlowEdges(laidOutNodes(nodes, placed), placed);
@@ -169,6 +181,7 @@ describe('canvas-model', () => {
     const rule = evidenceStrength('solution-1', nodes);
     expect(strength.get('solution-1')).toEqual({ tests: rule.tests, score: rule.score });
     expect(strength.has('opportunity-1')).toBe(false);
+    expect(evidenceScores(nodes).get('solution-1')).toBe(rule.score);
   });
 
   it('search matches title + notes case-insensitively; empty query dims nothing', () => {
