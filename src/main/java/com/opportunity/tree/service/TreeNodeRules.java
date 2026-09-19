@@ -73,7 +73,6 @@ public final class TreeNodeRules {
         }
     }
 
-    /** Lower-case display label, e.g. {@code opportunity}. */
     /**
      * The exact value of a JSON number as Jackson binds it (Integer, Long, BigInteger, Double,
      * Float or BigDecimal); {@code null} for anything else, NaN or infinity.
@@ -129,6 +128,7 @@ public final class TreeNodeRules {
         return whole.intValue();
     }
 
+    /** Lower-case display label, e.g. {@code opportunity}. */
     public static String label(TreeNodeType type) {
         return type == null ? "node" : type.name().toLowerCase(Locale.ROOT);
     }

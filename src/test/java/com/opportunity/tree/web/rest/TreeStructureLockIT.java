@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,6 +86,7 @@ class TreeStructureLockIT {
     private boolean postgres;
     private String editorLogin;
     private Long teamId;
+    private Long otherTeamId;
     private Long emptyProductId;
     private Long outcome1Id;
     private Long emptyOutcomeId;
@@ -105,6 +107,8 @@ class TreeStructureLockIT {
             Team team = data.team("Lock Team " + editorLogin);
             User editor = data.user(editorLogin);
             data.member(team, editor, TeamRole.EDITOR);
+            Team otherTeam = data.team("Lock Team B " + editorLogin);
+            data.member(otherTeam, editor, TeamRole.EDITOR);
             Product product = data.product(team, "lock-prod", 0);
             Product emptyProduct = data.product(team, "lock-empty-prod", 1);
             Outcome o1 = data.outcome(product, "O1", 0);
@@ -114,6 +118,7 @@ class TreeStructureLockIT {
             Opportunity nested = data.opportunity(o1, b, "Nested", 0);
             em.flush();
             teamId = team.getId();
+            otherTeamId = otherTeam.getId();
             emptyProductId = emptyProduct.getId();
             outcome1Id = o1.getId();
             emptyOutcomeId = emptyOutcome.getId();
@@ -127,14 +132,15 @@ class TreeStructureLockIT {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(editorLogin, "n/a", List.of()));
         try {
             tt.executeWithoutResult(status -> {
+                List<Long> teamIds = List.of(teamId, otherTeamId);
                 for (Long id : em
-                    .createQuery("select p.id from Product p where p.team.id = :id", Long.class)
-                    .setParameter("id", teamId)
+                    .createQuery("select p.id from Product p where p.team.id in :ids", Long.class)
+                    .setParameter("ids", teamIds)
                     .getResultList()) {
                     cascadeService.deleteNode(TreeNodeType.PRODUCT, id);
                 }
-                em.createQuery("delete from TeamMember tm where tm.team.id = :id").setParameter("id", teamId).executeUpdate();
-                em.createQuery("delete from Team t where t.id = :id").setParameter("id", teamId).executeUpdate();
+                em.createQuery("delete from TeamMember tm where tm.team.id in :ids").setParameter("ids", teamIds).executeUpdate();
+                em.createQuery("delete from Team t where t.id in :ids").setParameter("ids", teamIds).executeUpdate();
                 em.createQuery("delete from User u where u.login = :l").setParameter("l", editorLogin).executeUpdate();
             });
         } finally {
@@ -216,6 +222,32 @@ class TreeStructureLockIT {
         );
         assertConcurrencyConflict(response);
         assertThat(count("select count(l) from NodeLink l where l.name = 'Late'")).isZero();
+    }
+
+    @Test
+    void openQuestionAddOnAnOpportunityDeletedMeanwhileIsAConflict() throws Exception {
+        MockHttpServletResponse response = whileHolderDeletes(
+            "delete from Opportunity o where o.id = " + oppAId,
+            json(post("/api/tree/opportunities/{id}/questions", oppAId), Map.of("text", "Late"))
+        );
+        assertConcurrencyConflict(response);
+        assertThat(count("select count(q) from OpenQuestion q where q.questionText = 'Late'")).isZero();
+    }
+
+    @Test
+    void productTeamChangeOfAProductDeletedMeanwhileIsAConflict() throws Exception {
+        // The team change locks the lower team id first: the one the holder has.
+        assertThat(teamId).isLessThan(otherTeamId);
+        MockHttpServletResponse response = whileHolderDeletes(
+            "delete from Product p where p.id = " + emptyProductId,
+            patch("/api/products/{id}", emptyProductId)
+                .with(csrf())
+                .with(user(editorLogin))
+                .contentType("application/merge-patch+json")
+                .content("{\"id\": " + emptyProductId + ", \"team\": {\"id\": " + otherTeamId + "}}")
+        );
+        assertConcurrencyConflict(response);
+        assertThat(count("select count(p) from Product p where p.team.id = " + otherTeamId)).isZero();
     }
 
     @Test

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +52,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>concurrent creates under one parent (a double-click) get distinct sort orders — likewise
  *   concurrent product creates in one team, link adds on one node and open-question adds on one
  *   opportunity;</li>
+ *   <li>two products changing team in opposite directions at once never deadlock (both teams are
+ *   locked lower id first);</li>
  *   <li>the generated admin DELETE of a node that still has children is a clean 409 without SQL.</li>
  * </ul>
  *
@@ -88,6 +91,9 @@ class TreeConcurrencyIT {
     private String ownerLogin;
     private String editorLogin;
     private Long teamId;
+    private Long otherTeamId;
+    private Long movingProductId;
+    private Long otherMovingProductId;
     private Long productId;
     private Long outcome1Id;
     private Long outcome2Id;
@@ -109,6 +115,11 @@ class TreeConcurrencyIT {
             data.member(team, owner, TeamRole.OWNER);
             data.member(team, editor, TeamRole.EDITOR);
             Product product = data.product(team, "conc-prod-" + suffix, 0);
+            Product moving = data.product(team, "conc-moving-" + suffix, 1);
+            Team otherTeam = data.team("Concurrency Team B " + suffix);
+            data.member(otherTeam, owner, TeamRole.EDITOR);
+            data.member(otherTeam, editor, TeamRole.OWNER);
+            Product otherMoving = data.product(otherTeam, "conc-other-moving-" + suffix, 0);
             Outcome o1 = data.outcome(product, "O1", 0);
             Outcome o2 = data.outcome(product, "O2", 1);
             Opportunity b = data.opportunity(o1, null, "Opp B", 0);
@@ -117,6 +128,9 @@ class TreeConcurrencyIT {
             data.opportunity(o2, null, "Opp D", 0);
             em.flush();
             teamId = team.getId();
+            otherTeamId = otherTeam.getId();
+            movingProductId = moving.getId();
+            otherMovingProductId = otherMoving.getId();
             productId = product.getId();
             outcome1Id = o1.getId();
             outcome2Id = o2.getId();
@@ -130,15 +144,16 @@ class TreeConcurrencyIT {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(ownerLogin, "n/a", List.of()));
         try {
             tt.executeWithoutResult(status -> {
-                // The seeded product plus any created through the API by a test.
+                // The seeded products plus any created through the API by a test.
+                List<Long> teamIds = List.of(teamId, otherTeamId);
                 for (Long id : em
-                    .createQuery("select p.id from Product p where p.team.id = :id", Long.class)
-                    .setParameter("id", teamId)
+                    .createQuery("select p.id from Product p where p.team.id in :ids", Long.class)
+                    .setParameter("ids", teamIds)
                     .getResultList()) {
                     cascadeService.deleteNode(TreeNodeType.PRODUCT, id);
                 }
-                em.createQuery("delete from TeamMember tm where tm.team.id = :id").setParameter("id", teamId).executeUpdate();
-                em.createQuery("delete from Team t where t.id = :id").setParameter("id", teamId).executeUpdate();
+                em.createQuery("delete from TeamMember tm where tm.team.id in :ids").setParameter("ids", teamIds).executeUpdate();
+                em.createQuery("delete from Team t where t.id in :ids").setParameter("ids", teamIds).executeUpdate();
                 em
                     .createQuery("delete from User u where u.login in :l")
                     .setParameter("l", List.of(ownerLogin, editorLogin))
@@ -228,8 +243,8 @@ class TreeConcurrencyIT {
                 .setParameter("id", teamId)
                 .getResultList()
         );
-        // The seeded product has sortOrder 0; the new ones append after it.
-        assertThat(sortOrders).containsExactlyElementsOf(IntStream.rangeClosed(0, PARALLEL_CREATES).boxed().toList());
+        // The two seeded products have sortOrder 0 and 1; the new ones append after them.
+        assertThat(sortOrders).containsExactlyElementsOf(IntStream.rangeClosed(0, PARALLEL_CREATES + 1).boxed().toList());
     }
 
     @Test
@@ -287,6 +302,31 @@ class TreeConcurrencyIT {
     }
 
     @Test
+    void oppositeConcurrentProductTeamChangesNeverDeadlock() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < ROUNDS; round++) {
+                // Even rounds swap the two products' teams, odd rounds swap them back.
+                boolean out = round % 2 == 0;
+                List<Integer> statuses = runTogether(
+                    pool,
+                    List.of(
+                        teamChange(movingProductId, out ? otherTeamId : teamId, ownerLogin),
+                        teamChange(otherMovingProductId, out ? teamId : otherTeamId, editorLogin)
+                    )
+                );
+                assertThat(statuses).as("round " + round + ": both teams are locked in id order, so both succeed").containsOnly(200);
+                assertThat(teamOf(movingProductId)).isEqualTo(out ? otherTeamId : teamId);
+                assertThat(teamOf(otherMovingProductId)).isEqualTo(out ? teamId : otherTeamId);
+                assertDistinctProductSortOrders(teamId);
+                assertDistinctProductSortOrders(otherTeamId);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void adminDeleteOfANodeWithChildrenIsAConflictWithoutSql() throws Exception {
         // B gets a child solution through the API; the generated admin endpoint cannot delete B then.
         mvc
@@ -315,6 +355,30 @@ class TreeConcurrencyIT {
             Map.of("nodeType", "opportunity", "nodeId", nodeId, "parentType", "outcome", "parentId", outcomeId, "position", 0),
             login
         );
+    }
+
+    private MockHttpServletRequestBuilder teamChange(Long productId, Long toTeamId, String login) {
+        return patch("/api/products/{id}", productId)
+            .with(csrf())
+            .with(user(login))
+            .contentType("application/merge-patch+json")
+            .content("{\"id\": " + productId + ", \"team\": {\"id\": " + toTeamId + "}}");
+    }
+
+    private Long teamOf(Long productId) {
+        return tt.execute(status ->
+            em.createQuery("select p.team.id from Product p where p.id = :id", Long.class).setParameter("id", productId).getSingleResult()
+        );
+    }
+
+    private void assertDistinctProductSortOrders(Long team) {
+        List<Integer> sortOrders = tt.execute(status ->
+            em
+                .createQuery("select p.sortOrder from Product p where p.team.id = :id", Integer.class)
+                .setParameter("id", team)
+                .getResultList()
+        );
+        assertThat(sortOrders).as("product sort orders in team " + team).doesNotHaveDuplicates();
     }
 
     private MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder builder, Object body, String login) throws Exception {
