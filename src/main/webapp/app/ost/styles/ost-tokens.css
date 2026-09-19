@@ -36,6 +36,8 @@
 
   --font-heading: 'Inter', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body-weight: 400;
 
   --space-1: 2.8px;
   --space-2: 5.6px;

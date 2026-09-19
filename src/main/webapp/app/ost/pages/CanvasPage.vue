@@ -21,7 +21,7 @@
  * the palette and ends any palette drag, so no armed type or drop highlight outlives the canvas.
  */
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { type LocationQuery, useRoute, useRouter } from 'vue-router';
+import { type LocationQuery, onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 
 import CanvasToolbar from '../canvas/CanvasToolbar.vue';
 import NodePalette from '../canvas/NodePalette.vue';
@@ -66,12 +66,16 @@ watch(
   { immediate: true },
 );
 
-// Keep ?node= in step with the selection, whoever changed it (canvas, panel, ...).
+// Keep ?node= in step with the selection, whoever changed it (canvas, panel, the node detail page
+// before we got here). Immediate, so a selection made elsewhere shows in the URL on arrival; but an
+// empty selection never drops a ?node= before the tree (and so the deep link) has been resolved.
 watch(
   () => ui.selectedId,
   key => {
+    if (!key && !tree.team) return;
     if ((key ?? null) !== queryKey(route.query.node)) replaceQuery({ node: key ?? undefined });
   },
+  { immediate: true },
 );
 
 // The panel (breadcrumb, child list, quick-add) asks for a node to be centred.
@@ -85,6 +89,9 @@ onMounted(() => {
   if (nodeKey && tree.byId(nodeKey)) canvas.value?.centreOn(nodeKey);
   window.addEventListener('keydown', onKeydown);
 });
+// The node detail page offers "← Back to canvas" when it was opened from here.
+onBeforeRouteLeave(to => ui.setDetailFromCanvas(to.name === 'OstNodeDetail'));
+
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown);
   if (ui.tool) ui.armTool(null);

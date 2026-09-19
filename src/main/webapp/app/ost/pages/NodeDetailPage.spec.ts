@@ -249,7 +249,60 @@ describe('NodeDetailPage', () => {
 
   it('"Open on canvas" deep-links the node', async () => {
     const { wrapper } = await mountPage('assumption-1');
-    expect(wrapper.get('[data-cy="ost-node-detail-open-canvas"]').attributes('href')).toBe('/trees/7/canvas?node=assumption-1');
+    const link = wrapper.get('[data-cy="ost-node-detail-open-canvas"]');
+    expect(link.attributes('href')).toBe('/trees/7/canvas?node=assumption-1');
+    expect(link.text()).toBe('Open on canvas');
+    expect(link.find('svg').exists()).toBe(true); // arrow-up-right
+  });
+
+  it('says "← Back to canvas" when opened from the canvas, and forgets it when leaving the node pages', async () => {
+    const ctx = await setupStores(PANEL_TREE);
+    ctx.ui.setDetailFromCanvas(true);
+    const router: Router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/trees/:teamId/canvas', name: 'OstCanvas', component: Stub('canvas') },
+        { path: '/trees/:teamId/nodes/:nodeKey', name: 'OstNodeDetail', component: NodeDetailPage },
+      ],
+    });
+    await router.push('/trees/7/nodes/solution-1');
+    const wrapper = mount({ template: '<router-view />' }, { attachTo: document.body, global: { plugins: [router, ctx.pinia] } });
+    await flushPromises();
+    const link = () => wrapper.get('[data-cy="ost-node-detail-open-canvas"]');
+    expect(link().text()).toBe('← Back to canvas');
+    expect(link().attributes('href')).toBe('/trees/7/canvas?node=solution-1');
+    await router.push('/trees/7/nodes/opportunity-1');
+    await flushPromises();
+    expect(link().text()).toBe('← Back to canvas');
+    await router.push('/trees/7/canvas');
+    await flushPromises();
+    expect(ctx.ui.detailFromCanvas).toBe(false);
+  });
+
+  it('makes its node the selection without opening the canvas panel', async () => {
+    const ctx = await setupStores(PANEL_TREE);
+    ctx.ui.setRightOpen(false);
+    const router: Router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/trees/:teamId/canvas', name: 'OstCanvas', component: Stub('canvas') },
+        { path: '/trees/:teamId/nodes/:nodeKey', name: 'OstNodeDetail', component: NodeDetailPage },
+      ],
+    });
+    await router.push('/trees/7/nodes/solution-2');
+    mount({ template: '<router-view />' }, { attachTo: document.body, global: { plugins: [router, ctx.pinia] } });
+    await flushPromises();
+    expect(ctx.ui.selectedId).toBe('solution-2');
+    expect(ctx.ui.rightOpen).toBe(false);
+  });
+
+  it('shares the typed fields with the panel (NodeFields) and titles the not-found state as a heading', async () => {
+    const first = await mountPage('assumption-2');
+    expect(first.wrapper.get('[data-cy="ost-node-fields"]').classes()).toContain('ost-node-fields--page');
+    expect(has(first.wrapper, 'ost-confidence')).toBe(true);
+    first.wrapper.unmount();
+    const missing = await mountPage('opportunity-999');
+    expect(missing.wrapper.get('[data-cy="ost-node-detail-missing"] h1').text()).toBe('Node not found');
   });
 });
 

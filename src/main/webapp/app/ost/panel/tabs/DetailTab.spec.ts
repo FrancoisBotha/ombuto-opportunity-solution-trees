@@ -68,6 +68,14 @@ describe('DetailTab', () => {
       expect(await present('evidence-1')).toEqual([]);
     });
 
+    it('the typed fields are the shared NodeFields (panel layout), absent for types without any', async () => {
+      const opp = await mountTab('opportunity-1');
+      expect(opp.wrapper.get('[data-cy="ost-node-fields"]').classes()).toContain('ost-node-fields--panel');
+      opp.wrapper.unmount();
+      const outcome = await mountTab('outcome-1');
+      expect(outcome.wrapper.find('[data-cy="ost-node-fields"]').exists()).toBe(false);
+    });
+
     it('every type has notes and a child list', async () => {
       const { wrapper } = await mountTab('evidence-1');
       expect(wrapper.find('[data-cy="ost-notes"]').exists()).toBe(true);

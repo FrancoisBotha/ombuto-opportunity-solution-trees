@@ -25,7 +25,7 @@
         v-for="childType in addTypes"
         :key="childType"
         type="button"
-        class="ost-btn ost-nd-children__add-btn"
+        class="ost-btn ost-btn--quick"
         :disabled="adding"
         :data-cy="`ost-node-detail-add-${childType}`"
         @click="add(childType)"
@@ -41,35 +41,34 @@
  * "Beneath this node": the children as cards (kicker, title, status badge; a card opens that
  * child's detail page) and, for editors, quick-add buttons for the permitted child types.
  */
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 
 import { childrenOf, statusTone } from '../domain/derive';
-import { ALLOWED, TYPE_BOX } from '../domain/rules';
+import { TYPE_BOX } from '../domain/rules';
 import type { NodeType } from '../domain/types';
-import { usePanelAction } from '../panel/panel-action';
+import { useQuickAdd } from '../panel/useQuickAdd';
 import { useOstTreeStore } from '../stores/ost-tree.store';
 
 const props = defineProps<{ nodeKey: string; teamId: string; readonly: boolean }>();
 const emit = defineEmits<{ created: [key: string] }>();
 
 const tree = useOstTreeStore();
-const { run } = usePanelAction();
 
 const type = computed<NodeType>(() => tree.byId(props.nodeKey)?.type ?? 'evidence');
 const children = computed(() => childrenOf(props.nodeKey, tree.nodes));
-const addTypes = computed<NodeType[]>(() => ALLOWED[type.value]);
 const beneath = (key: string) => tree.descendantCount(key);
-const adding = ref(false);
+const {
+  addTypes,
+  adding,
+  add: quickAdd,
+} = useQuickAdd(
+  () => props.nodeKey,
+  () => props.readonly,
+);
 
 async function add(childType: NodeType) {
-  if (props.readonly || adding.value) return;
-  adding.value = true;
-  try {
-    const key = await run(() => tree.createNode(props.nodeKey, childType), 'The node could not be created.');
-    if (key) emit('created', key);
-  } finally {
-    adding.value = false;
-  }
+  const key = await quickAdd(childType);
+  if (key) emit('created', key);
 }
 </script>
 
@@ -102,7 +101,9 @@ async function add(childType: NodeType) {
   outline-offset: 2px;
 }
 
+/* Nocturne .card-kicker / .card-title: kicker in the body weight, title in the heading weight. */
 .ost-nd-card__kicker {
+  font-weight: var(--font-body-weight);
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -111,6 +112,7 @@ async function add(childType: NodeType) {
 
 .ost-nd-card__title {
   font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
   font-size: 16px;
   line-height: 1.2;
   text-wrap: pretty;
@@ -137,13 +139,5 @@ async function add(childType: NodeType) {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 12px;
-}
-
-.ost-root .ost-nd-children__add-btn {
-  height: 28px;
-  padding: 0 10px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 </style>
