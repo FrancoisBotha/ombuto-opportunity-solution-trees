@@ -4,6 +4,8 @@ import com.opportunity.tree.domain.enumeration.AssumptionStatus;
 import com.opportunity.tree.domain.enumeration.OpportunityStatus;
 import com.opportunity.tree.domain.enumeration.SolutionStatus;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -72,6 +74,61 @@ public final class TreeNodeRules {
     }
 
     /** Lower-case display label, e.g. {@code opportunity}. */
+    /**
+     * The exact value of a JSON number as Jackson binds it (Integer, Long, BigInteger, Double,
+     * Float or BigDecimal); {@code null} for anything else, NaN or infinity.
+     */
+    static BigDecimal exactNumber(Object value) {
+        if (value instanceof BigDecimal b) {
+            return b;
+        }
+        if (value instanceof BigInteger b) {
+            return new BigDecimal(b);
+        }
+        if (value instanceof Double d) {
+            return d.isNaN() || d.isInfinite() ? null : BigDecimal.valueOf(d);
+        }
+        if (value instanceof Float f) {
+            return f.isNaN() || f.isInfinite() ? null : BigDecimal.valueOf(f.doubleValue());
+        }
+        if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return BigDecimal.valueOf(((Number) value).longValue());
+        }
+        return null;
+    }
+
+    /**
+     * A request id or index that must be a whole number ({@code 7} or {@code 7.0}; not {@code 7.5}
+     * and not outside the long range). {@code null} stays {@code null}; anything else is a 400
+     * with {@code errorKey}.
+     */
+    public static Long wholeLong(Number value, String field, String errorKey) {
+        if (value == null) {
+            return null;
+        }
+        BigDecimal exact = exactNumber(value);
+        if (exact != null && exact.stripTrailingZeros().scale() <= 0) {
+            try {
+                return exact.longValueExact();
+            } catch (ArithmeticException e) {
+                // Outside the long range: fall through to the 400.
+            }
+        }
+        throw new NodeWriteRuleException(field + " must be a whole number", ENTITY_NAME, errorKey);
+    }
+
+    /** As {@link #wholeLong}, limited to the int range. */
+    public static Integer wholeInt(Number value, String field, String errorKey) {
+        Long whole = wholeLong(value, field, errorKey);
+        if (whole == null) {
+            return null;
+        }
+        if (whole < Integer.MIN_VALUE || whole > Integer.MAX_VALUE) {
+            throw new NodeWriteRuleException(field + " must be a whole number", ENTITY_NAME, errorKey);
+        }
+        return whole.intValue();
+    }
+
     public static String label(TreeNodeType type) {
         return type == null ? "node" : type.name().toLowerCase(Locale.ROOT);
     }
