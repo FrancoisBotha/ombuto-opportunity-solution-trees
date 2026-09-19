@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
+
 test.describe('sidebar navigation', () => {
   test('is shown when signed in', async ({ page }) => {
     await page.goto('/');
@@ -53,5 +55,33 @@ test.describe('sidebar navigation', () => {
     await sidebar.getByTestId('adminMenu').click();
     await sidebar.getByRole('link', { name: 'Health' }).click();
     await expect(page).toHaveURL(/\/admin\/health$/);
+  });
+
+  test('lists Trees above Teams and shows Static Data to an admin', async ({ page }) => {
+    await page.goto('/');
+    const sidebar = page.getByTestId('sidebar');
+    await expect(sidebar.locator('.nav-item', { hasText: 'Static Data' })).toBeVisible();
+    const items = (await sidebar.locator('.nav-item').allTextContents()).map(t => t.trim());
+    expect(items.indexOf('Trees')).toBeGreaterThan(-1);
+    expect(items.indexOf('Trees')).toBeLessThan(items.indexOf('Teams'));
+    expect(items).toContain('Static Data');
+    expect(items).not.toContain('Tree');
+    // The former Discovery group now lives inside Static Data.
+    expect(items).not.toContain('Discovery');
+    expect(items).toEqual(expect.arrayContaining(['Opportunities', 'Assumptions', 'Tags']));
+  });
+
+  test('hides Static Data from a user who is not an admin', async ({ browser }) => {
+    const session = await openSession(browser, USER_USERNAME, USER_PASSWORD);
+    try {
+      await session.page.goto('/');
+      const sidebar = session.page.getByTestId('sidebar');
+      await expect(sidebar.getByTestId('treesMenu')).toBeVisible();
+      await expect(sidebar.locator('.nav-item', { hasText: 'Discovery' })).toHaveCount(0);
+      await expect(sidebar.locator('.nav-item', { hasText: 'Assumptions' })).toHaveCount(0);
+      await expect(sidebar.locator('.nav-item', { hasText: 'Static Data' })).toHaveCount(0);
+    } finally {
+      await session.context.close();
+    }
   });
 });

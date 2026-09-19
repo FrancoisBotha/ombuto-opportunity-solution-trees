@@ -14,15 +14,6 @@
         <span class="menu-tooltip">Home</span>
       </li>
 
-      <!-- My teams (signed-in users) -->
-      <li v-if="authenticated" :class="{ active: isTeamsActive }" data-cy="myTeamsMenu">
-        <router-link to="/teams" class="menu-item">
-          <font-awesome-icon class="va-icon" icon="users" />
-          <span class="nav-item">Teams</span>
-        </router-link>
-        <span class="menu-tooltip">Teams</span>
-      </li>
-
       <!-- Trees (signed-in users) -->
       <li v-if="authenticated" :class="{ active: isTreesActive }" data-cy="treesMenu">
         <router-link to="/trees" class="menu-item">
@@ -32,27 +23,38 @@
         <span class="menu-tooltip">Trees</span>
       </li>
 
+      <!-- My teams (signed-in users) -->
+      <li v-if="authenticated" :class="{ active: isTeamsActive }" data-cy="myTeamsMenu">
+        <router-link to="/teams" class="menu-item">
+          <font-awesome-icon class="va-icon" icon="users" />
+          <span class="nav-item">Teams</span>
+        </router-link>
+        <span class="menu-tooltip">Teams</span>
+      </li>
+
       <!-- Entity groups -->
       <template v-for="group in groups" :key="group.key">
-        <li class="section" :class="{ active: !openGroups[group.key] && groupHasActive(group) }">
-          <div class="menu-item-parent" @click="toggleGroup(group.key)">
-            <font-awesome-icon class="va-icon" :icon="group.icon" />
-            <span class="nav-item">{{ group.label }}</span>
-            <font-awesome-icon class="va-icon-toggle" :icon="groupIcon(group.key)" />
-          </div>
-          <span class="menu-tooltip">{{ group.label }}</span>
-        </li>
-        <transition name="slide">
-          <div v-show="openGroups[group.key]">
-            <li v-for="link in group.links" :key="link.path" :class="{ active: isLinkActive(link) }">
-              <router-link :to="link.path" class="menu-item menu-item-child">
-                <font-awesome-icon class="va-icon" :icon="link.icon" />
-                <span class="nav-item">{{ link.label }}</span>
-              </router-link>
-              <span class="menu-tooltip">{{ link.label }}</span>
-            </li>
-          </div>
-        </transition>
+        <template v-if="!group.authority || hasAnyAuthority(group.authority)">
+          <li class="section" :class="{ active: !openGroups[group.key] && groupHasActive(group) }">
+            <div class="menu-item-parent" @click="toggleGroup(group.key)">
+              <font-awesome-icon class="va-icon" :icon="group.icon" />
+              <span class="nav-item">{{ group.label }}</span>
+              <font-awesome-icon class="va-icon-toggle" :icon="groupIcon(group.key)" />
+            </div>
+            <span class="menu-tooltip">{{ group.label }}</span>
+          </li>
+          <transition name="slide">
+            <div v-show="openGroups[group.key]">
+              <li v-for="link in group.links" :key="link.path" :class="{ active: isLinkActive(link) }">
+                <router-link :to="link.path" class="menu-item menu-item-child">
+                  <font-awesome-icon class="va-icon" :icon="link.icon" />
+                  <span class="nav-item">{{ link.label }}</span>
+                </router-link>
+                <span class="menu-tooltip">{{ link.label }}</span>
+              </li>
+            </div>
+          </transition>
+        </template>
       </template>
 
       <!-- Admin (ROLE_ADMIN only) -->

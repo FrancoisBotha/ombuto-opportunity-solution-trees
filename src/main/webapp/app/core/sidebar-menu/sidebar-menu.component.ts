@@ -18,15 +18,21 @@ export interface SidebarGroup {
   label: string;
   icon: string;
   links: SidebarLink[];
+  /** When set, the group is only shown to users holding this authority. */
+  authority?: string;
 }
 
 const STORAGE_KEY = 'va-sidebar-expanded';
 
-/** The tree itself, in the order Teresa Torres draws it. */
-export const treeGroup: SidebarGroup = {
-  key: 'tree',
-  label: 'Tree',
-  icon: 'sitemap',
+/**
+ * Raw CRUD screens for every entity: the tree in the order Teresa Torres draws it, then the
+ * discovery and collaboration entities. Administrators only — everyone else works in Trees and Teams.
+ */
+export const staticDataGroup: SidebarGroup = {
+  key: 'staticData',
+  label: 'Static Data',
+  icon: 'database',
+  authority: 'ROLE_ADMIN',
   links: [
     { path: '/team', label: 'Teams', icon: 'users', prefix: true },
     { path: '/team-member', label: 'Team Members', icon: 'user', prefix: true },
@@ -36,15 +42,6 @@ export const treeGroup: SidebarGroup = {
     { path: '/opportunity-link', label: 'Opportunity Links', icon: 'link', prefix: true },
     { path: '/solution', label: 'Solutions', icon: 'puzzle-piece', prefix: true },
     { path: '/solution-link', label: 'Solution Links', icon: 'link', prefix: true },
-  ],
-};
-
-/** Discovery and collaboration entities. */
-export const discoveryGroup: SidebarGroup = {
-  key: 'discovery',
-  label: 'Discovery',
-  icon: 'flask',
-  links: [
     { path: '/assumption', label: 'Assumptions', icon: 'question-circle', prefix: true },
     { path: '/experiment', label: 'Experiments', icon: 'vial', prefix: true },
     { path: '/interview', label: 'Interviews', icon: 'comments', prefix: true },
@@ -91,8 +88,7 @@ export default defineComponent({
 
     // Collapsible groups. A group opens automatically when one of its links is the current route.
     const openGroups = ref<Record<string, boolean>>({
-      tree: true,
-      discovery: false,
+      staticData: true,
       admin: false,
     });
     const toggleGroup = (key: string) => {
@@ -103,7 +99,7 @@ export default defineComponent({
     watch(
       currentPath,
       path => {
-        for (const group of [treeGroup, discoveryGroup]) {
+        for (const group of [staticDataGroup]) {
           if (groupHasActive(group) && !openGroups.value[group.key]) {
             openGroups.value = { ...openGroups.value, [group.key]: true };
           }
@@ -124,7 +120,7 @@ export default defineComponent({
       currentPath,
       isTeamsActive,
       isTreesActive,
-      groups: [treeGroup, discoveryGroup],
+      groups: [staticDataGroup],
       isLinkActive,
       groupHasActive,
       toggleSidebar,
