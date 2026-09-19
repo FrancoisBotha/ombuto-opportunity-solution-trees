@@ -4,6 +4,8 @@
  */
 .ost-root {
   font-size: 13px;
+  /* The app body is 300 (global.scss); the OST design sets body text at 400. */
+  font-weight: 400;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
 }
