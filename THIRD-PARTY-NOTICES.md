@@ -87,9 +87,9 @@ production uses PostgreSQL. H2 is nevertheless present in the production build, 
 
 ## Licence summary
 
-**Frontend** — 150 packages in the web client's production dependency tree:
+**Frontend** — 148 packages in the web client's production dependency tree:
 
-- MIT: 126
+- MIT: 124
 - ISC: 11
 - Apache-2.0: 6
 - BSD-3-Clause: 3
@@ -143,9 +143,7 @@ Packages marked **direct** are declared in `package.json`; the rest are pulled i
 | [@stomp/stompjs](https://github.com/stomp-js/stompjs#readme)                                               | 7.3.0   | Apache-2.0          |        |
 | [@types/web-bluetooth](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/web-bluetooth) | 0.0.21  | MIT                 |        |
 | [@types/web-bluetooth](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/web-bluetooth) | 0.0.20  | MIT                 |        |
-| [@vue-flow/background](https://github.com/bcakmakoglu/vue-flow#readme)                                     | 1.3.2   | MIT                 | direct |
 | [@vue-flow/core](https://vueflow.dev)                                                                      | 1.48.2  | MIT                 | direct |
-| [@vue-flow/minimap](https://github.com/bcakmakoglu/vue-flow#readme)                                        | 1.5.4   | MIT                 | direct |
 | [@vue-macros/common](https://vue-macros.dev)                                                               | 3.1.4   | MIT                 |        |
 | [@vue/compiler-core](https://github.com/vuejs/core/tree/main/packages/compiler-core#readme)                | 3.5.30  | MIT                 |        |
 | [@vue/compiler-dom](https://github.com/vuejs/core/tree/main/packages/compiler-dom#readme)                  | 3.5.30  | MIT                 |        |

@@ -7,6 +7,5 @@ import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@vue-flow/core/dist/style.css';
-import '@vue-flow/minimap/dist/style.css';
 import './ost-tokens.css';
 import './ost-base.css';
