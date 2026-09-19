@@ -8,8 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Assumption;
+import com.opportunity.tree.domain.Comment;
 import com.opportunity.tree.domain.Evidence;
 import com.opportunity.tree.domain.Interview;
+import com.opportunity.tree.domain.NodeHistory;
 import com.opportunity.tree.domain.NodeLink;
 import com.opportunity.tree.domain.OpenQuestion;
 import com.opportunity.tree.domain.Opportunity;
@@ -20,9 +22,11 @@ import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.AssumptionStatus;
+import com.opportunity.tree.domain.enumeration.HistoryEventType;
 import com.opportunity.tree.domain.enumeration.OpportunityStatus;
 import com.opportunity.tree.domain.enumeration.SolutionStatus;
 import com.opportunity.tree.domain.enumeration.TeamRole;
+import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.OpportunityRepository;
 import com.opportunity.tree.repository.OutcomeRepository;
 import com.opportunity.tree.repository.ProductRepository;
@@ -33,6 +37,7 @@ import com.opportunity.tree.repository.UserRepository;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -459,6 +464,184 @@ class TreeNodeCascadeResourceIT {
         assertThat(countById("Evidence", evidence.getId())).isZero();
         assertThat(countById("OpenQuestion", question.getId())).isZero();
         assertThat(countById("NodeLink", link.getId())).isZero();
+    }
+
+    // ---------------------------------------------------------------
+    // Assumption / evidence entry points and NodeHistory clean-up.
+    // ---------------------------------------------------------------
+
+    private Assumption persistAssumption(Solution solution) {
+        Assumption assumption = new Assumption()
+            .statement("users need this")
+            .status(AssumptionStatus.UNTESTED)
+            .confidence(40)
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .solution(solution);
+        em.persist(assumption);
+        return assumption;
+    }
+
+    private void persistHistory(TreeNodeType type, Long nodeId) {
+        em.persist(
+            new NodeHistory()
+                .nodeType(type)
+                .nodeId(nodeId)
+                .eventType(HistoryEventType.CREATED)
+                .summary("Created")
+                .createdDate(Instant.now())
+        );
+    }
+
+    private Long historyCount(TreeNodeType type, Long nodeId) {
+        return em
+            .createQuery("select count(h) from NodeHistory h where h.nodeType = :type and h.nodeId = :id", Long.class)
+            .setParameter("type", type)
+            .setParameter("id", nodeId)
+            .getSingleResult();
+    }
+
+    @Test
+    @Transactional
+    void editorDeletesAssumptionWithItsEvidenceLinksCommentsAndHistory() throws Exception {
+        Fixture f = seedFullFixture();
+        Solution sol1 = solutionRepository.findById(f.sol1.getId()).orElseThrow();
+        Assumption assumption = persistAssumption(sol1);
+        Assumption sibling = persistAssumption(sol1);
+        Evidence evidence = new Evidence().title("result").sortOrder(0).createdDate(Instant.now()).assumption(assumption);
+        em.persist(evidence);
+        NodeLink link = new NodeLink()
+            .name("Doc")
+            .url("https://example.com/doc")
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .assumption(assumption);
+        em.persist(link);
+        Comment comment = new Comment().body("hmm").createdDate(Instant.now()).author(ownerUser).assumption(assumption);
+        em.persist(comment);
+        em.flush();
+        persistHistory(TreeNodeType.ASSUMPTION, assumption.getId());
+        persistHistory(TreeNodeType.EVIDENCE, evidence.getId());
+        persistHistory(TreeNodeType.ASSUMPTION, sibling.getId());
+        persistHistory(TreeNodeType.SOLUTION, sol1.getId());
+        em.flush();
+        em.clear();
+
+        mvc
+            .perform(delete("/api/tree/assumptions/{id}", assumption.getId()).with(user(EDITOR_LOGIN)).with(csrf()))
+            .andExpect(status().isNoContent());
+
+        assertThat(countById("Assumption", assumption.getId())).isZero();
+        assertThat(countById("Evidence", evidence.getId())).isZero();
+        assertThat(countById("NodeLink", link.getId())).isZero();
+        assertThat(countById("Comment", comment.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.ASSUMPTION, assumption.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.EVIDENCE, evidence.getId())).isZero();
+        // Sibling assumption, parent solution and their history are untouched.
+        assertThat(countById("Assumption", sibling.getId())).isEqualTo(1);
+        assertThat(historyCount(TreeNodeType.ASSUMPTION, sibling.getId())).isEqualTo(1);
+        assertThat(historyCount(TreeNodeType.SOLUTION, sol1.getId())).isEqualTo(1);
+        assertThat(solutionRepository.existsById(f.sol1.getId())).isTrue();
+    }
+
+    @Test
+    @Transactional
+    void ownerDeletesEvidenceUnderOpportunityWithItsLinksCommentsAndHistory() throws Exception {
+        Fixture f = seedFullFixture();
+        Opportunity opp = opportunityRepository.findById(f.opp1.getId()).orElseThrow();
+        Evidence evidence = new Evidence().title("snippet").sortOrder(0).createdDate(Instant.now()).opportunity(opp);
+        em.persist(evidence);
+        Evidence sibling = new Evidence().title("other").sortOrder(1).createdDate(Instant.now()).opportunity(opp);
+        em.persist(sibling);
+        NodeLink link = new NodeLink()
+            .name("Rec")
+            .url("https://example.com/rec")
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .evidence(evidence);
+        em.persist(link);
+        Comment comment = new Comment().body("nice").createdDate(Instant.now()).author(ownerUser).evidence(evidence);
+        em.persist(comment);
+        em.flush();
+        persistHistory(TreeNodeType.EVIDENCE, evidence.getId());
+        persistHistory(TreeNodeType.EVIDENCE, sibling.getId());
+        em.flush();
+        em.clear();
+
+        mvc
+            .perform(delete("/api/tree/evidence/{id}", evidence.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .andExpect(status().isNoContent());
+
+        assertThat(countById("Evidence", evidence.getId())).isZero();
+        assertThat(countById("NodeLink", link.getId())).isZero();
+        assertThat(countById("Comment", comment.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.EVIDENCE, evidence.getId())).isZero();
+        assertThat(countById("Evidence", sibling.getId())).isEqualTo(1);
+        assertThat(historyCount(TreeNodeType.EVIDENCE, sibling.getId())).isEqualTo(1);
+        assertThat(opportunityRepository.existsById(f.opp1.getId())).isTrue();
+    }
+
+    @Test
+    @Transactional
+    void viewerAndNonMemberCannotDeleteAssumptionOrEvidence() throws Exception {
+        Fixture f = seedFullFixture();
+        Solution sol1 = solutionRepository.findById(f.sol1.getId()).orElseThrow();
+        Assumption assumption = persistAssumption(sol1);
+        Evidence evidence = new Evidence().title("result").sortOrder(0).createdDate(Instant.now()).assumption(assumption);
+        em.persist(evidence);
+        em.flush();
+        em.clear();
+
+        for (String login : List.of(VIEWER_LOGIN, OUTSIDER_LOGIN)) {
+            mvc
+                .perform(delete("/api/tree/assumptions/{id}", assumption.getId()).with(user(login)).with(csrf()))
+                .andExpect(status().isForbidden());
+            mvc
+                .perform(delete("/api/tree/evidence/{id}", evidence.getId()).with(user(login)).with(csrf()))
+                .andExpect(status().isForbidden());
+        }
+        // Unknown ids are indistinguishable from foreign ones.
+        mvc
+            .perform(delete("/api/tree/evidence/{id}", Long.MAX_VALUE).with(user(OWNER_LOGIN)).with(csrf()))
+            .andExpect(status().isForbidden());
+
+        assertThat(countById("Assumption", assumption.getId())).isEqualTo(1);
+        assertThat(countById("Evidence", evidence.getId())).isEqualTo(1);
+    }
+
+    @Test
+    @Transactional
+    void deleteProductRemovesHistoryOfEveryNodeInTheBranchOnly() throws Exception {
+        Fixture f = seedFullFixture();
+        Solution sol1 = solutionRepository.findById(f.sol1.getId()).orElseThrow();
+        Assumption assumption = persistAssumption(sol1);
+        Evidence evidence = new Evidence().title("result").sortOrder(0).createdDate(Instant.now()).assumption(assumption);
+        em.persist(evidence);
+        em.flush();
+        persistHistory(TreeNodeType.PRODUCT, f.productA1.getId());
+        persistHistory(TreeNodeType.OUTCOME, f.outcome1.getId());
+        persistHistory(TreeNodeType.OPPORTUNITY, f.opp3.getId());
+        persistHistory(TreeNodeType.SOLUTION, f.sol1.getId());
+        persistHistory(TreeNodeType.ASSUMPTION, assumption.getId());
+        persistHistory(TreeNodeType.EVIDENCE, evidence.getId());
+        // Untouched: sibling product, other team, and a same-id row of another type.
+        persistHistory(TreeNodeType.PRODUCT, f.productA2.getId());
+        persistHistory(TreeNodeType.OPPORTUNITY, f.oppB.getId());
+        em.flush();
+        em.clear();
+
+        mvc
+            .perform(delete("/api/tree/products/{id}", f.productA1.getId()).with(user(OWNER_LOGIN)).with(csrf()))
+            .andExpect(status().isNoContent());
+
+        assertThat(historyCount(TreeNodeType.PRODUCT, f.productA1.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.OUTCOME, f.outcome1.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.OPPORTUNITY, f.opp3.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.SOLUTION, f.sol1.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.ASSUMPTION, assumption.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.EVIDENCE, evidence.getId())).isZero();
+        assertThat(historyCount(TreeNodeType.PRODUCT, f.productA2.getId())).isEqualTo(1);
+        assertThat(historyCount(TreeNodeType.OPPORTUNITY, f.oppB.getId())).isEqualTo(1);
     }
 
     private Long countById(String entity, Long id) {

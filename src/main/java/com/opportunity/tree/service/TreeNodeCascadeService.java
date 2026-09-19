@@ -1,5 +1,6 @@
 package com.opportunity.tree.service;
 
+import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
@@ -12,10 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cascade delete for the four tree node types (Product, Outcome, Opportunity,
- * Solution) — see TREE-003 / FR-016. Assumptions, evidence, node links, open
- * questions and node comments under a deleted node are removed with it.
- * TODO(OST step 3): NodeHistory rows and direct assumption/evidence deletes.
+ * Cascade delete for all six tree node types (Product, Outcome, Opportunity,
+ * Solution, Assumption, Evidence) — see TREE-003 / FR-016. Every descendant
+ * node is removed with it, together with the node links, open questions,
+ * comments and NodeHistory rows of every deleted node.
  *
  * <p>Lives in its own class (rather than in the JHipster-generated
  * {@code *ServiceImpl} classes) so the logic survives entity regeneration and
@@ -60,6 +61,7 @@ public class TreeNodeCascadeService {
             .executeUpdate();
         em.createQuery("delete from Interview i where i.product.id = :pid").setParameter("pid", productId).executeUpdate();
         em.createQuery("delete from NodeLink l where l.product.id = :pid").setParameter("pid", productId).executeUpdate();
+        deleteHistoryFor(TreeNodeType.PRODUCT, List.of(productId));
         em.createQuery("delete from Product p where p.id = :id").setParameter("id", productId).executeUpdate();
         em.flush();
     }
@@ -85,6 +87,39 @@ public class TreeNodeCascadeService {
         em.flush();
     }
 
+    public void deleteAssumption(Long assumptionId) {
+        LOG.debug("Cascade delete Assumption {}", assumptionId);
+        teamAccessService.requireEditNode(TreeNodeType.ASSUMPTION, assumptionId);
+        deleteAssumptionsInternal(List.of(assumptionId));
+        em.flush();
+    }
+
+    public void deleteEvidence(Long evidenceId) {
+        LOG.debug("Cascade delete Evidence {}", evidenceId);
+        teamAccessService.requireEditNode(TreeNodeType.EVIDENCE, evidenceId);
+        deleteEvidenceInternal(List.of(evidenceId));
+        em.flush();
+    }
+
+    /**
+     * Delete any node with its whole subtree. The caller must be OWNER or EDITOR
+     * of the node's team; otherwise (or when the node does not exist)
+     * {@link TeamAccessDeniedException} is thrown and nothing is deleted.
+     */
+    public void deleteNode(TreeNodeType type, Long id) {
+        if (type == null) {
+            throw new TeamAccessDeniedException();
+        }
+        switch (type) {
+            case PRODUCT -> deleteProduct(id);
+            case OUTCOME -> deleteOutcome(id);
+            case OPPORTUNITY -> deleteOpportunity(id);
+            case SOLUTION -> deleteSolution(id);
+            case ASSUMPTION -> deleteAssumption(id);
+            case EVIDENCE -> deleteEvidence(id);
+        }
+    }
+
     // ---------------------------------------------------------------------
     // Internal cascade steps — assume authorisation already checked.
     // ---------------------------------------------------------------------
@@ -100,6 +135,7 @@ public class TreeNodeCascadeService {
         deleteOpportunitiesInternal(topOpps);
         // Comments hanging off the outcomes themselves.
         deleteCommentsFor("outcome", outcomeIds);
+        deleteHistoryFor(TreeNodeType.OUTCOME, outcomeIds);
         em.createQuery("delete from NodeLink l where l.outcome.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
         em.createQuery("delete from Outcome o where o.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
     }
@@ -146,6 +182,7 @@ public class TreeNodeCascadeService {
         em.createQuery("delete from NodeLink l where l.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
         em.createQuery("delete from OpenQuestion q where q.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
         deleteCommentsFor("opportunity", all);
+        deleteHistoryFor(TreeNodeType.OPPORTUNITY, all);
 
         // Break the self-referential parent link so we can bulk-delete without
         // caring about the deletion order.
@@ -165,6 +202,7 @@ public class TreeNodeCascadeService {
             .getResultList();
         deleteAssumptionsInternal(assumptionIds);
         deleteCommentsFor("solution", solutionIds);
+        deleteHistoryFor(TreeNodeType.SOLUTION, solutionIds);
         em.createQuery("delete from Solution s where s.id in :ids").setParameter("ids", solutionIds).executeUpdate();
     }
 
@@ -179,6 +217,7 @@ public class TreeNodeCascadeService {
         deleteEvidenceInternal(evidenceIds);
         em.createQuery("delete from NodeLink l where l.assumption.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
         deleteCommentsFor("assumption", assumptionIds);
+        deleteHistoryFor(TreeNodeType.ASSUMPTION, assumptionIds);
         em.createQuery("delete from Assumption a where a.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
     }
 
@@ -188,7 +227,20 @@ public class TreeNodeCascadeService {
         }
         em.createQuery("delete from NodeLink l where l.evidence.id in :ids").setParameter("ids", evidenceIds).executeUpdate();
         deleteCommentsFor("evidence", evidenceIds);
+        deleteHistoryFor(TreeNodeType.EVIDENCE, evidenceIds);
         em.createQuery("delete from Evidence e where e.id in :ids").setParameter("ids", evidenceIds).executeUpdate();
+    }
+
+    /** Delete the NodeHistory rows of the given nodes (history has no FKs, so it is matched by type + id). */
+    private void deleteHistoryFor(TreeNodeType type, List<Long> nodeIds) {
+        if (nodeIds.isEmpty()) {
+            return;
+        }
+        em
+            .createQuery("delete from NodeHistory h where h.nodeType = :type and h.nodeId in :ids")
+            .setParameter("type", type)
+            .setParameter("ids", nodeIds)
+            .executeUpdate();
     }
 
     /**
