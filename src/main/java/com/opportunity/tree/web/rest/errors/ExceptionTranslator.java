@@ -248,14 +248,14 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
         }
 
         if (problem.getDetail() == null) {
-            // An ErrorResponse (BadRequestAlertException, ResponseStatusException, ...) without a detail:
-            // its getMessage() is Java's toString of the status and body ("400 BAD_REQUEST,
+            // An ErrorResponseException (BadRequestAlertException, ResponseStatusException, ...) without
+            // a detail: its getMessage() is Java's toString of the status and body ("400 BAD_REQUEST,
             // ProblemDetailWithCause[type=...]"), never a message for a client. Use the human message a
             // BadRequestAlertException was built with (not a bare error key, as the team resources
-            // pass), else no detail at all.
-            if (err instanceof ErrorResponse) {
+            // pass), else the body's own detail (a ResponseStatusException reason), else none.
+            if (err instanceof ErrorResponseException exp) {
                 boolean human = err instanceof BadRequestAlertException bad && ownTitle != null && !ownTitle.equals(bad.getErrorKey());
-                problem.setDetail(human ? ownTitle : null);
+                problem.setDetail(human ? ownTitle : exp.getBody().getDetail());
             } else {
                 // higher precedence to cause
                 problem.setDetail(getCustomizedErrorDetails(err));
