@@ -673,7 +673,7 @@ export const useTreeStore = defineStore('tree', {
     },
     _siblingIndex(type: TreeNodeType, id: number): { idx: number; length: number } {
       if (!this.tree) return { idx: -1, length: 0 };
-      const entry = buildIndex(this.tree).get(key(type, id));
+      const entry = this.nodeIndex.get(key(type, id));
       if (!entry || !entry.parent) return { idx: -1, length: 0 };
       const arr = childrenArrayFor(entry.parent, type);
       if (!arr) return { idx: -1, length: 0 };
@@ -682,7 +682,7 @@ export const useTreeStore = defineStore('tree', {
     },
     parentOf(type: TreeNodeType, id: number): { type: TreeNodeType | 'team'; id: number | null } | null {
       if (!this.tree) return null;
-      const entry = buildIndex(this.tree).get(key(type, id));
+      const entry = this.nodeIndex.get(key(type, id));
       if (!entry || !entry.parent) return null;
       const parent = entry.parent;
       // Team root
