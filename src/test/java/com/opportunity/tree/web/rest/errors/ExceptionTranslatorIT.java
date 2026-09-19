@@ -65,6 +65,30 @@ class ExceptionTranslatorIT {
     }
 
     @Test
+    void uniqueViolationsAreAConflictWithTheirOwnGenericMessage() throws Exception {
+        mockMvc
+            .perform(get("/api/exception-translator-test/unique-violation").with(csrf()))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value(ExceptionTranslator.ERR_DUPLICATE))
+            .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DUPLICATE_DETAIL))
+            .andExpect(content().string(not(containsString("ux_team_member"))))
+            .andExpect(content().string(not(containsString("insert into"))))
+            .andExpect(content().string(not(containsString("referenced"))));
+    }
+
+    @Test
+    void otherDatabaseErrorsNeverReturnTheirSqlAsDetail() throws Exception {
+        for (String path : new String[] { "jdbc-error", "sql-exception" }) {
+            mockMvc
+                .perform(get("/api/exception-translator-test/" + path).with(csrf()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.detail").value(ExceptionTranslator.DATA_ACCESS_DETAIL))
+                .andExpect(content().string(not(containsString("secret"))))
+                .andExpect(content().string(not(containsString("select"))));
+        }
+    }
+
+    @Test
     void lockFailuresAreAConflictWithoutSql() throws Exception {
         for (String path : new String[] { "cannot-acquire-lock", "jpa-pessimistic-lock" }) {
             mockMvc

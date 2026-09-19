@@ -51,6 +51,32 @@ public class ExceptionTranslatorTestController {
         );
     }
 
+    static final String RAW_UNIQUE_SQL =
+        "could not execute statement [ERROR: duplicate key value violates unique constraint \"ux_team_member__team_user\"] [insert into team_member (id) values (?)]";
+
+    @GetMapping("/unique-violation")
+    public void uniqueViolation() {
+        throw new DataIntegrityViolationException(RAW_UNIQUE_SQL, new java.sql.SQLException(RAW_UNIQUE_SQL, "23505"));
+    }
+
+    static final String RAW_SELECT_SQL =
+        "could not prepare statement [Table \"SECRET_TABLE\" not found] [select secret_column from secret_table]";
+
+    /** A non-constraint JDBC failure wrapped in a plain runtime exception (message without a package name). */
+    @GetMapping("/jdbc-error")
+    public void jdbcError() {
+        throw new IllegalStateException(
+            "wrapped",
+            new org.hibernate.exception.SQLGrammarException(RAW_SELECT_SQL, new java.sql.SQLException(RAW_SELECT_SQL, "42P01"))
+        );
+    }
+
+    /** A raw SQLException whose own message is the SQL (the generic handler used to return the cause's message). */
+    @GetMapping("/sql-exception")
+    public void sqlException() throws java.sql.SQLException {
+        throw new java.sql.SQLException(RAW_SELECT_SQL, "42P01");
+    }
+
     @GetMapping("/cannot-acquire-lock")
     public void cannotAcquireLock() {
         throw new CannotAcquireLockException(RAW_SQL);

@@ -61,6 +61,15 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
     static final String DATA_INTEGRITY_DETAIL =
         "This record is still referenced by other data (for example child nodes or links) and cannot be changed or deleted.";
 
+    static final String ERR_DUPLICATE = "error.duplicate";
+    static final String DUPLICATE_DETAIL = "This conflicts with an existing record: a value that must be unique is already in use.";
+
+    /** Detail of any other failed database statement: the driver's message can carry SQL, so it is never returned. */
+    static final String DATA_ACCESS_DETAIL = "Failure during data access";
+
+    /** SQLState of a unique-key violation (PostgreSQL unique_violation, H2 DUPLICATE_KEY_1). */
+    private static final String UNIQUE_VIOLATION_STATE = "23505";
+
     static final String CONCURRENCY_DETAIL = "Someone else changed this at the same time. Please reload and try again.";
 
     private static final Logger LOG = LoggerFactory.getLogger(ExceptionTranslator.class);
@@ -110,10 +119,12 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
      */
     private ResponseEntity<Object> dataIntegrityConflict(Throwable ex, NativeWebRequest request) {
         LOG.warn("Data integrity violation on {}: {}", extractURI(request), mostSpecificMessage(ex));
+        // A unique key clash is not "still referenced by other data": it gets its own generic wording.
+        boolean duplicate = hasSqlState(ex, UNIQUE_VIOLATION_STATE);
         ProblemDetailWithCause problem = ProblemDetailWithCauseBuilder.instance()
             .withStatus(HttpStatus.CONFLICT.value())
-            .withDetail(DATA_INTEGRITY_DETAIL)
-            .withProperty(MESSAGE_KEY, ERR_DATA_INTEGRITY)
+            .withDetail(duplicate ? DUPLICATE_DETAIL : DATA_INTEGRITY_DETAIL)
+            .withProperty(MESSAGE_KEY, duplicate ? ERR_DUPLICATE : ERR_DATA_INTEGRITY)
             .build();
         Exception exception = ex instanceof Exception e ? e : new IllegalStateException(ex);
         return handleExceptionInternal(exception, customizeProblem(problem, ex, request), null, HttpStatus.CONFLICT, request);
@@ -137,6 +148,32 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
             }
             String state = t instanceof JDBCException j ? j.getSQLState() : t instanceof SQLException sql ? sql.getSQLState() : null;
             if (state != null && state.startsWith("23")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Does any exception in the cause chain carry this SQLState? */
+    static boolean hasSqlState(Throwable error, String sqlState) {
+        int depth = 0;
+        for (Throwable t = error; t != null && depth < 32; t = t.getCause() == t ? null : t.getCause(), depth++) {
+            String state = t instanceof JDBCException j ? j.getSQLState() : t instanceof SQLException sql ? sql.getSQLState() : null;
+            if (sqlState.equals(state)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Is a failed database statement anywhere in the cause chain (a Hibernate {@link JDBCException}, a
+     * {@link SQLException} or a Spring {@link DataAccessException})? Their messages can quote the SQL.
+     */
+    static boolean isDatabaseError(Throwable error) {
+        int depth = 0;
+        for (Throwable t = error; t != null && depth < 32; t = t.getCause() == t ? null : t.getCause(), depth++) {
+            if (t instanceof JDBCException || t instanceof SQLException || t instanceof DataAccessException) {
                 return true;
             }
         }
@@ -298,10 +335,14 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
     }
 
     private String getCustomizedErrorDetails(Throwable err) {
+        // In every profile: a database error's message (or its cause's) may carry SQL text.
+        if (isDatabaseError(err)) {
+            LOG.warn("Database error: {}", mostSpecificMessage(err));
+            return DATA_ACCESS_DETAIL;
+        }
         Collection<String> activeProfiles = Arrays.asList(env.getActiveProfiles());
         if (activeProfiles.contains(JHipsterConstants.SPRING_PROFILE_PRODUCTION)) {
             if (err instanceof HttpMessageConversionException) return "Unable to convert http message";
-            if (err instanceof DataAccessException) return "Failure during data access";
             if (containsPackageName(err.getMessage())) return "Unexpected runtime exception";
         }
         return err.getCause() != null ? err.getCause().getMessage() : err.getMessage();
