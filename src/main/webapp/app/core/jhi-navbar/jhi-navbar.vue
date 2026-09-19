@@ -73,6 +73,10 @@
             <font-awesome-icon icon="tasks" />
             <span>Logs</span>
           </b-dropdown-item>
+          <b-dropdown-item to="/admin/backup" active-class="active" data-cy="backupMenu">
+            <font-awesome-icon icon="database" />
+            <span>Backup</span>
+          </b-dropdown-item>
           <b-dropdown-item v-if="openAPIEnabled" to="/admin/docs" active-class="active">
             <font-awesome-icon icon="book" />
             <span>API</span>

@@ -5,8 +5,15 @@ const JhiConfigurationComponent = () => import('@/admin/configuration/configurat
 const JhiHealthComponent = () => import('@/admin/health/health.vue');
 const JhiLogsComponent = () => import('@/admin/logs/logs.vue');
 const JhiMetricsComponent = () => import('@/admin/metrics/metrics.vue');
+const JhiBackupComponent = () => import('@/admin/backup/backup.vue');
 
 export default [
+  {
+    path: '/admin/backup',
+    name: 'JhiBackupComponent',
+    component: JhiBackupComponent,
+    meta: { authorities: [Authority.ADMIN] },
+  },
   {
     path: '/admin/docs',
     name: 'JhiDocsComponent',
