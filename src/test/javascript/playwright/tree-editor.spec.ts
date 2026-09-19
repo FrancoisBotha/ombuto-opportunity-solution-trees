@@ -23,7 +23,7 @@ const throwawayOutcomeTitle = `Doomed ${stamp}`;
 const throwawayOppTitle = `Doomed child ${stamp}`;
 const throwawaySolutionTitle = `Doomed grandchild ${stamp}`;
 const editedOpportunityTitle = `Edited L1 ${stamp}`;
-const editedOpportunityStatus = 'VALIDATED';
+const editedOpportunityStatus = 'PRIORITISED';
 
 let owner: Session;
 let teamId: number;
@@ -102,9 +102,19 @@ async function addChild(
   childType: 'outcome' | 'opportunity' | 'solution',
   title: string,
 ): Promise<void> {
+  // Guard: no lingering modals from previous interactions.
+  await expect(page.getByTestId('treeEditorAddChildModal')).toHaveCount(0);
+  await expect(page.getByTestId('treeEditorAddProductModal')).toHaveCount(0);
+
   // Reveal the hover-only add-child affordance by selecting the parent card first.
-  await page.getByTestId(`treeNode-${parentType}-${parentId}`).click();
-  await page.getByTestId(`treeNodeAddChild-${parentType}-${parentId}-${childType}`).click();
+  const parent = page.getByTestId(`treeNode-${parentType}-${parentId}`);
+  await parent.scrollIntoViewIfNeeded();
+  await parent.click();
+
+  const addBtn = page.getByTestId(`treeNodeAddChild-${parentType}-${parentId}-${childType}`);
+  await addBtn.waitFor({ state: 'visible' });
+  await addBtn.click();
+
   await expect(page.getByTestId('treeEditorAddChildModal')).toBeVisible();
   await page.getByTestId('addChildTitle').fill(title);
   await page.getByTestId('addChildDescription').fill('e2e');

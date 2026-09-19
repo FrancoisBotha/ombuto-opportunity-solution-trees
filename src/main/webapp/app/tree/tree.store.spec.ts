@@ -345,6 +345,34 @@ describe('tree.store', () => {
     });
   });
 
+  describe('updateNode', () => {
+    it('patches title and status on the local node when the service succeeds', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = {
+        updateNode: vi.fn().mockResolvedValue({ id: 300, title: 'Opp A edited', status: OpportunityStatus.PRIORITISED }),
+      } as any;
+      const result = await store.updateNode('opportunity', 300, { title: 'Opp A edited', status: OpportunityStatus.PRIORITISED }, svc);
+      expect(result).not.toBeNull();
+      expect(svc.updateNode).toHaveBeenCalledWith('opportunity', 300, { title: 'Opp A edited', status: OpportunityStatus.PRIORITISED });
+      const node = store.findNode('opportunity', 300) as IOpportunityTreeNode;
+      expect(node.title).toBe('Opp A edited');
+      expect(node.status).toBe(OpportunityStatus.PRIORITISED);
+      // Descendants are preserved.
+      expect(node.children.map(c => c.id)).toEqual([301]);
+    });
+    it('returns null and records a write error when the service rejects', async () => {
+      const store = useTreeStore();
+      store.setTree(sampleTree());
+      const svc = { updateNode: vi.fn().mockRejectedValue({ response: { status: 403 } }) } as any;
+      const result = await store.updateNode('opportunity', 300, { title: 'x' }, svc);
+      expect(result).toBeNull();
+      expect(store.writeError).toBe('forbidden');
+      const node = store.findNode('opportunity', 300) as IOpportunityTreeNode;
+      expect(node.title).toBe('Opp A');
+    });
+  });
+
   describe('deleteNode', () => {
     it('deletes the node via the API and removes it and its descendants from the store', async () => {
       const store = useTreeStore();

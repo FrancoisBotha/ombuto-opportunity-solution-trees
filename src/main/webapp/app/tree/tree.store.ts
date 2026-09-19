@@ -255,6 +255,22 @@ export const useTreeStore = defineStore('tree', {
       arr.splice(idx, 1);
       return true;
     },
+    /** Patch a node's editable fields via the API and apply the patch locally on success. */
+    async updateNode(type: TreeNodeType, id: number, patch: Record<string, unknown>, service?: TreeService): Promise<TreeNode | null> {
+      if (!this.tree) return null;
+      const svc = service ?? new TreeService();
+      this.clearWriteError();
+      try {
+        await svc.updateNode(type, id, patch);
+      } catch (err: any) {
+        this.recordWriteError(err);
+        return null;
+      }
+      const entry = buildIndex(this.tree).get(key(type, id));
+      if (!entry) return null;
+      Object.assign(entry.node as Record<string, unknown>, patch);
+      return entry.node;
+    },
     /** Create a new top-level product via the API and append it to the tree. */
     async addProduct(input: CreateProductInput, service?: TreeService): Promise<IProductTreeNode | null> {
       if (!this.tree || this.teamId == null) return null;
