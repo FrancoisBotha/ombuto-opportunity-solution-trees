@@ -6,33 +6,37 @@
  * Edit: `:root` and `html, body, #app` / `body` / `:focus-visible` / `::selection` are rewritten to
  * `.ost-root` so the dark ground never leaks into the rest of the app (this CSS stays loaded
  * after navigating away from the lazy OST chunk). NO global selectors in this file.
+ *
+ * The hex lives once, in content/css/theme.css (imported above this file from ost-styles.ts and
+ * from main.ts). OST reads only the FIXED palette there — the `--ost-nocturne-*` constants and the
+ * two ramps — never the theme roles, so the canvas stays dark in the light theme too.
  */
 .ost-root {
-  --color-bg: #161826;
-  --color-surface: #232532;
-  --color-text: #e9e9ed;
-  --color-accent: #9184d9;
-  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+  --color-bg: var(--ost-nocturne-ground);
+  --color-surface: var(--ost-nocturne-surface);
+  --color-text: var(--ost-nocturne-text);
+  --color-accent: var(--ost-nocturne-accent);
+  --color-divider: color-mix(in srgb, var(--ost-nocturne-text) 16%, transparent);
 
-  --color-neutral-100: #f3f5fe;
-  --color-neutral-200: #e4e7f5;
-  --color-neutral-300: #cfd3e5;
-  --color-neutral-400: #b2b6ca;
-  --color-neutral-500: #9397ab;
-  --color-neutral-600: #75798c;
-  --color-neutral-700: #595d6c;
-  --color-neutral-800: #3f424d;
-  --color-neutral-900: #292b31;
+  --color-neutral-100: var(--ost-neutral-100);
+  --color-neutral-200: var(--ost-neutral-200);
+  --color-neutral-300: var(--ost-neutral-300);
+  --color-neutral-400: var(--ost-neutral-400);
+  --color-neutral-500: var(--ost-neutral-500);
+  --color-neutral-600: var(--ost-neutral-600);
+  --color-neutral-700: var(--ost-neutral-700);
+  --color-neutral-800: var(--ost-neutral-800);
+  --color-neutral-900: var(--ost-neutral-900);
 
-  --color-accent-100: #f5f4ff;
-  --color-accent-200: #e7e5fe;
-  --color-accent-300: #d2cefd;
-  --color-accent-400: #b5abfc;
-  --color-accent-500: #968ae0;
-  --color-accent-600: #796cbf;
-  --color-accent-700: #5d5294;
-  --color-accent-800: #423a6a;
-  --color-accent-900: #2b2741;
+  --color-accent-100: var(--ost-accent-100);
+  --color-accent-200: var(--ost-accent-200);
+  --color-accent-300: var(--ost-accent-300);
+  --color-accent-400: var(--ost-accent-400);
+  --color-accent-500: var(--ost-accent-500);
+  --color-accent-600: var(--ost-accent-600);
+  --color-accent-700: var(--ost-accent-700);
+  --color-accent-800: var(--ost-accent-800);
+  --color-accent-900: var(--ost-accent-900);
 
   --font-heading: 'Inter', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
@@ -50,9 +54,9 @@
   --radius-md: 8px;
   --radius-lg: 14px;
 
-  --shadow-sm: 0 0 0 1px #3f424d;
-  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
-  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+  --shadow-sm: 0 0 0 1px var(--ost-neutral-800);
+  --shadow-md: 0 0 0 1px var(--ost-neutral-700), 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 0 0 1px var(--ost-neutral-500), 0 16px 40px rgba(0, 0, 0, 0.65);
 
   height: 100%;
   margin: 0;
