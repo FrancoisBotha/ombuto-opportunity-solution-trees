@@ -266,6 +266,24 @@ describe('TreeDetailPanel', () => {
     expect(store.selectedNodeId).toBe(100);
   });
 
+  it('keeps unsaved edits when "Keep editing" is chosen on the unsaved prompt', async () => {
+    const { wrapper, store } = mountPanel(svc);
+    store.selectNode('outcome', 10);
+    await flush(wrapper);
+    await wrapper.find('[data-cy="detailTitle"]').setValue('Dirty edit');
+    // Attempt to switch selection: intercepted by the prompt.
+    store.selectNode('opportunity', 100);
+    await flush(wrapper);
+    expect(wrapper.find('[data-cy="detailUnsavedPrompt"]').exists()).toBe(true);
+    // Choose "Keep editing" — should revert store selection and preserve the edit.
+    await wrapper.find('[data-cy="detailUnsavedKeep"]').trigger('click');
+    await flush(wrapper);
+    expect(wrapper.find('[data-cy="detailUnsavedPrompt"]').exists()).toBe(false);
+    expect(store.selectedNodeType).toBe('outcome');
+    expect(store.selectedNodeId).toBe(10);
+    expect((wrapper.find('[data-cy="detailTitle"]').element as HTMLInputElement).value).toBe('Dirty edit');
+  });
+
   it('renders read-only fields with no save, status or delete controls when canEdit is false', async () => {
     const { wrapper, store } = mountPanel(svc);
     const t = populatedTree();

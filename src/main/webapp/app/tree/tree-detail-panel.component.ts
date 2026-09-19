@@ -51,6 +51,9 @@ export default defineComponent({
     }
     const pendingSwitch = ref<Pending | null>(null);
     const showUnsavedPrompt = computed(() => pendingSwitch.value !== null);
+    // Set when keepEditing reverts the store's selection back to what we're editing:
+    // the resulting selection watcher must NOT reset the form or the user's edits vanish.
+    let suppressNextReset = false;
 
     const currentNode = computed<TreeNode | null>(() => {
       if (editingType.value == null || editingId.value == null) return null;
@@ -170,8 +173,13 @@ export default defineComponent({
           adoptStoreSelection();
           return;
         }
-        // Same node — reset form to fresh values (e.g. after a save).
+        // Same node — reset form to fresh values (e.g. after a save), unless we're
+        // just bouncing back from a "keep editing" choice.
         if (type === editingType.value && id === editingId.value) {
+          if (suppressNextReset) {
+            suppressNextReset = false;
+            return;
+          }
           resetForm(editingType.value, currentNode.value);
           return;
         }
@@ -196,7 +204,8 @@ export default defineComponent({
       const t = editingType.value;
       const i = editingId.value;
       pendingSwitch.value = null;
-      if (t && i != null) {
+      if (t && i != null && (store.selectedNodeType !== t || store.selectedNodeId !== i)) {
+        suppressNextReset = true;
         store.selectNode(t, i);
       }
     };
