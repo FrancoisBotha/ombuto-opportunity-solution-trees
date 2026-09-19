@@ -126,7 +126,9 @@ onMounted(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  /* clip, not hidden: a hidden-overflow box can still be scrolled by focus/scrollIntoView,
+     which would push the 54px nav off screen. */
+  overflow: clip;
 }
 
 .ost-nav {
@@ -214,7 +216,7 @@ onMounted(() => {
   flex: 1;
   min-height: 0;
   position: relative;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .ost-shell__loading {
