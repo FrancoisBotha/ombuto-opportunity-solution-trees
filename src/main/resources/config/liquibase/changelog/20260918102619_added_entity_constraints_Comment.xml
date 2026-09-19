@@ -17,13 +17,6 @@
                                  referencedTableName="jhi_user"
                                  />
 
-        <addForeignKeyConstraint baseColumnNames="parent_id"
-                                 baseTableName="comment"
-                                 constraintName="fk_comment__parent_id"
-                                 referencedColumnNames="id"
-                                 referencedTableName="comment"
-                                 />
-
         <addForeignKeyConstraint baseColumnNames="outcome_id"
                                  baseTableName="comment"
                                  constraintName="fk_comment__outcome_id"

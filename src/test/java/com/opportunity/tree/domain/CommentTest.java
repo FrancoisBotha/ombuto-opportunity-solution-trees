@@ -2,7 +2,6 @@ package com.opportunity.tree.domain;
 
 import static com.opportunity.tree.domain.AssumptionTestSamples.*;
 import static com.opportunity.tree.domain.CommentTestSamples.*;
-import static com.opportunity.tree.domain.CommentTestSamples.*;
 import static com.opportunity.tree.domain.EvidenceTestSamples.*;
 import static com.opportunity.tree.domain.OpportunityTestSamples.*;
 import static com.opportunity.tree.domain.OutcomeTestSamples.*;
@@ -26,18 +25,6 @@ class CommentTest {
 
         comment2 = getCommentSample2();
         assertThat(comment1).isNotEqualTo(comment2);
-    }
-
-    @Test
-    void parentTest() {
-        Comment comment = getCommentRandomSampleGenerator();
-        Comment commentBack = getCommentRandomSampleGenerator();
-
-        comment.setParent(commentBack);
-        assertThat(comment.getParent()).isEqualTo(commentBack);
-
-        comment.parent(null);
-        assertThat(comment.getParent()).isNull();
     }
 
     @Test

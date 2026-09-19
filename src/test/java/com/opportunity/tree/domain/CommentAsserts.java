@@ -61,7 +61,6 @@ public class CommentAsserts {
     public static void assertCommentUpdatableRelationshipsEquals(Comment expected, Comment actual) {
         assertThat(actual)
             .as("Verify Comment relationships")
-            .satisfies(a -> assertThat(a.getParent()).as("check parent").isEqualTo(expected.getParent()))
             .satisfies(a -> assertThat(a.getOutcome()).as("check outcome").isEqualTo(expected.getOutcome()))
             .satisfies(a -> assertThat(a.getOpportunity()).as("check opportunity").isEqualTo(expected.getOpportunity()))
             .satisfies(a -> assertThat(a.getSolution()).as("check solution").isEqualTo(expected.getSolution()))

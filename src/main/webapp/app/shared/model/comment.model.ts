@@ -11,7 +11,6 @@ export interface IComment {
   createdDate?: Date;
   editedDate?: Date | null;
   author?: IUser;
-  parent?: IComment | null;
   outcome?: IOutcome | null;
   opportunity?: IOpportunity | null;
   solution?: ISolution | null;
@@ -26,7 +25,6 @@ export class Comment implements IComment {
     public createdDate?: Date,
     public editedDate?: Date | null,
     public author?: IUser,
-    public parent?: IComment | null,
     public outcome?: IOutcome | null,
     public opportunity?: IOpportunity | null,
     public solution?: ISolution | null,

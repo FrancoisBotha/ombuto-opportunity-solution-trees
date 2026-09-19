@@ -10,7 +10,7 @@ import java.util.Objects;
 /**
  * A DTO for the {@link com.opportunity.tree.domain.Comment} entity.
  */
-@Schema(description = "Threaded comment on any tree node. Exactly one of the node relationships is set.")
+@Schema(description = "Flat, chat-style comment on a tree node: no replies, no threading. Exactly one of the node relationships is set.")
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class CommentDTO implements Serializable {
 
@@ -26,8 +26,6 @@ public class CommentDTO implements Serializable {
 
     @NotNull
     private UserDTO author;
-
-    private CommentDTO parent;
 
     private OutcomeDTO outcome;
 
@@ -77,14 +75,6 @@ public class CommentDTO implements Serializable {
 
     public void setAuthor(UserDTO author) {
         this.author = author;
-    }
-
-    public CommentDTO getParent() {
-        return parent;
-    }
-
-    public void setParent(CommentDTO parent) {
-        this.parent = parent;
     }
 
     public OutcomeDTO getOutcome() {
@@ -157,7 +147,6 @@ public class CommentDTO implements Serializable {
             ", createdDate='" + getCreatedDate() + "'" +
             ", editedDate='" + getEditedDate() + "'" +
             ", author=" + getAuthor() +
-            ", parent=" + getParent() +
             ", outcome=" + getOutcome() +
             ", opportunity=" + getOpportunity() +
             ", solution=" + getSolution() +

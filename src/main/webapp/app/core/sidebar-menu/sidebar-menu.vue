@@ -97,13 +97,6 @@
               </router-link>
               <span class="menu-tooltip">Logs</span>
             </li>
-            <li :class="{ active: currentPath === '/admin/tracker' }">
-              <router-link to="/admin/tracker" class="menu-item menu-item-child">
-                <font-awesome-icon class="va-icon" icon="users" />
-                <span class="nav-item">User tracker</span>
-              </router-link>
-              <span class="menu-tooltip">User tracker</span>
-            </li>
             <li v-if="openAPIEnabled" :class="{ active: currentPath === '/admin/docs' }">
               <router-link to="/admin/docs" class="menu-item menu-item-child">
                 <font-awesome-icon class="va-icon" icon="book" />

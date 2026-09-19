@@ -10,7 +10,7 @@
         Added the entity Comment.
     -->
     <changeSet id="20260918102619-1" author="jhipster">
-        <createTable tableName="comment" remarks="Threaded comment on any tree node. Exactly one of the node relationships is set.">
+        <createTable tableName="comment" remarks="Flat, chat-style comment on a tree node: no replies, no threading. Exactly one of the node relationships is set.">
             <column name="id" type="bigint">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
@@ -25,9 +25,6 @@
             </column>
             <column name="author_id" type="varchar(100)">
                 <constraints nullable="false" />
-            </column>
-            <column name="parent_id" type="bigint">
-                <constraints nullable="true" />
             </column>
             <column name="outcome_id" type="bigint">
                 <constraints nullable="true" />

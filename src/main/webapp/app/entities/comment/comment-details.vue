@@ -29,14 +29,6 @@
             {{ comment.author ? comment.author.login : '' }}
           </dd>
           <dt>
-            <span>Parent</span>
-          </dt>
-          <dd>
-            <div v-if="comment.parent">
-              <router-link :to="{ name: 'CommentView', params: { commentId: comment.parent.id } }">{{ comment.parent.id }}</router-link>
-            </div>
-          </dd>
-          <dt>
             <span>Outcome</span>
           </dt>
           <dd>
