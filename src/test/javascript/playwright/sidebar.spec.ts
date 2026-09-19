@@ -68,7 +68,12 @@ test.describe('sidebar navigation', () => {
     expect(items).not.toContain('Tree');
     // The former Discovery group now lives inside Static Data.
     expect(items).not.toContain('Discovery');
-    expect(items).toEqual(expect.arrayContaining(['Opportunities', 'Assumptions', 'Tags']));
+    expect(items).toEqual(
+      expect.arrayContaining(['Opportunities', 'Assumptions', 'Evidence', 'Links', 'Open Questions', 'History', 'Tags']),
+    );
+    expect(items).not.toContain('Experiments');
+    expect(items).not.toContain('Opportunity Links');
+    expect(items).not.toContain('Solution Links');
   });
 
   test('hides Static Data from a user who is not an admin', async ({ browser }) => {

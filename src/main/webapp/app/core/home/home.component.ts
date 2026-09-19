@@ -15,7 +15,7 @@ const links = [
   { path: '/opportunity', icon: 'lightbulb', label: 'Opportunities', text: 'Customer needs and pains' },
   { path: '/solution', icon: 'puzzle-piece', label: 'Solutions', text: 'Ideas worth testing' },
   { path: '/assumption', icon: 'question-circle', label: 'Assumptions', text: 'What has to be true' },
-  { path: '/experiment', icon: 'vial', label: 'Experiments', text: 'How you find out' },
+  { path: '/evidence', icon: 'vial', label: 'Evidence', text: 'How you find out' },
   { path: '/interview', icon: 'comments', label: 'Interviews', text: 'What customers told you' },
   { path: '/team', icon: 'users', label: 'Teams', text: 'Who is doing the discovery' },
 ];

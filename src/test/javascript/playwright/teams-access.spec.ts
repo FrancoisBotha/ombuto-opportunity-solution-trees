@@ -121,8 +121,11 @@ test.describe('Epic 1 — team-scoped access control', () => {
       'opportunities',
       'solutions',
       'assumptions',
-      'experiments',
+      'evidences',
       'comments',
+      'node-links',
+      'open-questions',
+      'node-histories',
       'tags',
     ]) {
       const response = await user.api('get', `/api/${path}`);

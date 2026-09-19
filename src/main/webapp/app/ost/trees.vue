@@ -19,7 +19,7 @@
     <div v-else class="row g-3" data-cy="treesList">
       <div v-for="team in teams" :key="team.id" class="col-md-6 col-lg-4">
         <router-link
-          :to="{ name: 'TreeEditor', params: { teamId: team.id } }"
+          :to="{ name: 'OstTree', params: { teamId: team.id } }"
           class="text-decoration-none text-body"
           :data-cy="`treeCard-${team.id}`"
         >
