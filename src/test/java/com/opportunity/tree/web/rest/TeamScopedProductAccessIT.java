@@ -526,6 +526,58 @@ class TeamScopedProductAccessIT {
         assertThat(reloaded.getTeam().getId()).isEqualTo(team.getId());
     }
 
+    @Test
+    @Transactional
+    void editorOfBothTeamsCanMoveAProductWhichIsAppendedToTheNewTeam() throws Exception {
+        persistMembership(otherTeam, ownerUser, TeamRole.EDITOR);
+        Product existing = new Product()
+            .name("Already there")
+            .archived(Boolean.FALSE)
+            .sortOrder(4)
+            .createdDate(Instant.now())
+            .team(otherTeam);
+        em.persist(existing);
+        em.flush();
+
+        // PUT sends the product's old sortOrder back; a team change appends it after the new team's products instead.
+        ProductDTO dto = toDto(product);
+        dto.setSortOrder(0);
+        TeamDTO otherTeamDto = new TeamDTO();
+        otherTeamDto.setId(otherTeam.getId());
+        otherTeamDto.setName(otherTeam.getName());
+        dto.setTeam(otherTeamDto);
+        mvc
+            .perform(
+                put("/api/products/{id}", dto.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(dto))
+            )
+            .andExpect(status().isOk());
+        em.flush();
+        em.clear();
+        Product reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getTeam().getId()).isEqualTo(otherTeam.getId());
+        assertThat(reloaded.getSortOrder()).isEqualTo(5);
+
+        // PATCH back to the first team: appended after its remaining (archived) product.
+        mvc
+            .perform(
+                patch("/api/products/{id}", product.getId())
+                    .with(user(OWNER_LOGIN))
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content("{\"id\": " + product.getId() + ", \"team\": {\"id\": " + team.getId() + "}}")
+            )
+            .andExpect(status().isOk());
+        em.flush();
+        em.clear();
+        reloaded = productRepository.findById(product.getId()).orElseThrow();
+        assertThat(reloaded.getTeam().getId()).isEqualTo(team.getId());
+        assertThat(reloaded.getSortOrder()).isEqualTo(2);
+    }
+
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------

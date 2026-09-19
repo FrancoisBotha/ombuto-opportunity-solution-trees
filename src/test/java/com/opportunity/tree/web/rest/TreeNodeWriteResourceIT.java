@@ -283,6 +283,34 @@ class TreeNodeWriteResourceIT {
     }
 
     @Test
+    void createRejectsAFractionalParentIdInsteadOfTruncatingIt() throws Exception {
+        long before = count("Solution");
+        for (String parentId : List.of(opportunity.getId() + ".7", opportunity.getId() + ".5", "1e300", "18446744073709551666")) {
+            mvc
+                .perform(
+                    post("/api/tree/nodes")
+                        .with(csrf())
+                        .with(user(OWNER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\": \"solution\", \"parentType\": \"opportunity\", \"parentId\": " + parentId + "}")
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("error.parentmissing"));
+        }
+        assertThat(count("Solution")).isEqualTo(before);
+        // A whole number written as a decimal is still that id.
+        mvc
+            .perform(
+                post("/api/tree/nodes")
+                    .with(csrf())
+                    .with(user(OWNER))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"type\": \"solution\", \"parentType\": \"opportunity\", \"parentId\": " + opportunity.getId() + ".0}")
+            )
+            .andExpect(status().isCreated());
+    }
+
+    @Test
     void createIsAcceptedWithLowerCaseTypesAndReturnsLocation() throws Exception {
         mvc
             .perform(

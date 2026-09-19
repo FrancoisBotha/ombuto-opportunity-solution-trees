@@ -56,7 +56,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
-import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -369,17 +368,22 @@ public class DevDataSeeder implements ApplicationRunner {
     }
 
     /**
-     * True for the errors a not-yet-migrated schema produces: a missing table or column
-     * (SQLState class 42, e.g. PostgreSQL {@code 42P01} / {@code 42703}, H2 {@code 42S02}), which
-     * Spring reports as {@link InvalidDataAccessResourceUsageException} /
-     * {@link org.springframework.jdbc.BadSqlGrammarException}. Anything else is a genuine failure.
+     * SQLStates of a missing table or column — the only errors a not-yet-migrated schema produces.
+     * PostgreSQL: {@code 42P01} undefined_table, {@code 42703} undefined_column. H2 (verified on
+     * 2.4): {@code 42S02} table not found, {@code 42S03} not found but a differently-cased
+     * candidate exists, {@code 42S04} not found in an empty database, {@code 42S22} column not found.
+     */
+    static final Set<String> SCHEMA_NOT_READY_STATES = Set.of("42P01", "42703", "42S02", "42S03", "42S04", "42S22");
+
+    /**
+     * True only when the cause chain holds a {@link SQLException} whose SQLState is in
+     * {@link #SCHEMA_NOT_READY_STATES}. Other class-42 errors (syntax errors, {@code 42501}
+     * insufficient privilege, …) and Spring's {@code InvalidDataAccessResourceUsageException}
+     * on its own are genuine failures that a retry would not fix.
      */
     static boolean isSchemaNotReady(Throwable error) {
         for (Throwable t = error; t != null; t = t.getCause() == t ? null : t.getCause()) {
-            if (t instanceof InvalidDataAccessResourceUsageException) {
-                return true;
-            }
-            if (t instanceof SQLException sql && sql.getSQLState() != null && sql.getSQLState().startsWith("42")) {
+            if (t instanceof SQLException sql && sql.getSQLState() != null && SCHEMA_NOT_READY_STATES.contains(sql.getSQLState())) {
                 return true;
             }
         }

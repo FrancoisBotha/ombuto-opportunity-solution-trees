@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -487,6 +488,21 @@ class DevDataSeederIT {
         assertThat(DevDataSeeder.isSchemaNotReady(new DataIntegrityViolationException("dup", new SQLException("dup", "23505")))).isFalse();
         assertThat(DevDataSeeder.isSchemaNotReady(new IllegalStateException("Missing authority ROLE_X"))).isFalse();
         assertThat(DevDataSeeder.isSchemaNotReady(new RuntimeException("no state", new SQLException("no state")))).isFalse();
+        // H2's missing-table/column states.
+        assertThat(DevDataSeeder.isSchemaNotReady(new RuntimeException(new SQLException("no table", "42S02")))).isTrue();
+        assertThat(DevDataSeeder.isSchemaNotReady(new RuntimeException(new SQLException("empty db", "42S04")))).isTrue();
+        assertThat(DevDataSeeder.isSchemaNotReady(new RuntimeException(new SQLException("no column", "42S22")))).isTrue();
+    }
+
+    @Test
+    void otherClass42ErrorsAreNotRetried() {
+        // Insufficient privilege is class 42 too, but no amount of waiting for Liquibase fixes it.
+        assertThat(
+            DevDataSeeder.isSchemaNotReady(new BadSqlGrammarException("seed", "select 1", new SQLException("permission denied", "42501")))
+        ).isFalse();
+        assertThat(DevDataSeeder.isSchemaNotReady(new RuntimeException(new SQLException("syntax error", "42601")))).isFalse();
+        // Spring's resource-usage exception without a missing-table/column cause is not enough either.
+        assertThat(DevDataSeeder.isSchemaNotReady(new InvalidDataAccessResourceUsageException("bad usage"))).isFalse();
     }
 
     private long teamsNamed(String name) {

@@ -320,6 +320,67 @@ class TreeNodeMoveResourceIT {
     }
 
     @Test
+    void fractionalNumbersAreRejectedInsteadOfTruncated() throws Exception {
+        String[][] cases = {
+            // body fields (nodeId, parentId, position) → expected error key
+            { sol1.getId() + ".5", String.valueOf(opp1.getId()), "0", "error.nodemissing" },
+            { String.valueOf(sol1.getId()), opp1.getId() + ".7", "0", "error.parentmissing" },
+            { String.valueOf(sol1.getId()), String.valueOf(opp1.getId()), "1.5", "error.invalidposition" },
+            { String.valueOf(sol1.getId()), String.valueOf(opp1.getId()), "4294967296", "error.invalidposition" },
+            { "1e300", String.valueOf(opp1.getId()), "0", "error.nodemissing" },
+        };
+        for (String[] c : cases) {
+            mvc
+                .perform(
+                    post("/api/tree/nodes/move")
+                        .with(user(OWNER))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            "{\"nodeType\": \"SOLUTION\", \"nodeId\": " +
+                                c[0] +
+                                ", \"parentType\": \"OPPORTUNITY\", \"parentId\": " +
+                                c[1] +
+                                ", \"position\": " +
+                                c[2] +
+                                "}"
+                        )
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(c[3]));
+        }
+        mvc
+            .perform(
+                post("/api/tree/nodes/move")
+                    .with(user(OWNER))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"nodeType\": \"PRODUCT\", \"nodeId\": " + productA2.getId() + ", \"position\": 0.5}")
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("error.invalidposition"));
+        assertThat(em.find(Solution.class, sol1.getId()).getOpportunity().getId()).isEqualTo(opp3.getId());
+        assertThat(em.find(Product.class, productA2.getId()).getSortOrder()).isEqualTo(1);
+        // Whole numbers written as decimals are still accepted.
+        mvc
+            .perform(
+                post("/api/tree/nodes/move")
+                    .with(user(OWNER))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"nodeType\": \"SOLUTION\", \"nodeId\": " +
+                            sol1.getId() +
+                            ".0, \"parentType\": \"OPPORTUNITY\", \"parentId\": " +
+                            opp1.getId() +
+                            ", \"position\": 0.0}"
+                    )
+            )
+            .andExpect(status().isOk());
+        assertThat(em.find(Solution.class, sol1.getId()).getOpportunity().getId()).isEqualTo(opp1.getId());
+    }
+
+    @Test
     void opportunityCannotMoveUnderItselfOrADescendant() throws Exception {
         move(OWNER, "OPPORTUNITY", opp1.getId(), "OPPORTUNITY", opp1.getId(), 0)
             .andExpect(status().isBadRequest())
