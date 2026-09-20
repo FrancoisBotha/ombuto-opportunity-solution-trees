@@ -255,6 +255,27 @@ describe('NodeDetailPage', () => {
     expect(link.find('svg').exists()).toBe(true); // arrow-up-right
   });
 
+  it('goes back to the canvas in the product scope the user left it in', async () => {
+    // The canvas reads its scope from ?product= and falls back to "All products" when it is
+    // absent, so a back link without it silently widened the scope and re-fitted the whole tree
+    // (FR-N2 / US-13).
+    const ctx = await setupStores(PANEL_TREE);
+    ctx.ui.setProduct('product-1');
+    const router: Router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/trees/:teamId/canvas', name: 'OstCanvas', component: Stub('canvas') },
+        { path: '/trees/:teamId/nodes/:nodeKey', name: 'OstNodeDetail', component: NodeDetailPage },
+      ],
+    });
+    await router.push('/trees/7/nodes/solution-1');
+    const wrapper = mount({ template: '<router-view />' }, { attachTo: document.body, global: { plugins: [router, ctx.pinia] } });
+    await flushPromises();
+    expect(wrapper.get('[data-cy="ost-node-detail-open-canvas"]').attributes('href')).toBe(
+      '/trees/7/canvas?node=solution-1&product=product-1',
+    );
+  });
+
   it('says "← Back to canvas" when opened from the canvas, and forgets it when leaving the node pages', async () => {
     const ctx = await setupStores(PANEL_TREE);
     ctx.ui.setDetailFromCanvas(true);

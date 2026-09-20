@@ -145,10 +145,98 @@ describe('OstShell', () => {
 
   it('clears team-scoped UI state when switching team', async () => {
     const wrapper = await mountAt('/trees/7');
-    useOstUiStore(pinia).select('product-1');
+    const ui = useOstUiStore(pinia);
+    const tree = useOstTreeStore(pinia);
+    ui.select('product-1');
+    ui.setProduct('product-1');
+    ui.setQuery('outcome');
+    ui.toggleType('solution');
+    ui.setCollapsed('product-1', true);
     await router.push('/trees/8');
     await flushPromises();
-    expect(useOstUiStore(pinia).selectedId).toBeNull();
+    // Everything tied to team 7 has to go, not just the selection: the old assertion checked only
+    // `selectedId`, so it passed while the rest of the team's state (and its nodes) survived.
+    expect(ui.selectedId).toBeNull();
+    expect(ui.productId).toBe('all');
+    expect(ui.query).toBe('');
+    expect(ui.hiddenTypes).toEqual({});
+    expect(ui.collapsed).toEqual({});
+    expect(tree.nodes).toEqual([]);
+    expect(tree.team?.id).toBe(8);
+    wrapper.unmount();
+  });
+
+  it('keeps the newest team when a slow socket teardown delays an older switch', async () => {
+    // `closeTeam` awaits the socket actually closing. The first call sets `activated = false`
+    // synchronously, so a second switch skips the await and loads ITS team first. Without a guard
+    // after the await, the OLDER call then ran `loadTree` last, won the store's loadSeq race, and
+    // left the shell on "Loading tree…" for a team whose tree was never fetched.
+    let releaseDeactivate: () => void = () => undefined;
+    const wrapper = await mountAt('/trees/7');
+    stomp.deactivate.mockImplementation(() => new Promise<void>(resolve => (releaseDeactivate = resolve)));
+
+    await router.push('/trees/8');
+    await flushPromises();
+    await router.push('/trees/9');
+    await flushPromises();
+    releaseDeactivate();
+    await flushPromises();
+    await flushPromises();
+
+    const tree = useOstTreeStore(pinia);
+    expect(tree.teamId).toBe(9);
+    expect(tree.team?.id).toBe(9);
+    expect(wrapper.find('[data-cy="ostLoading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-cy="dash"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('keeps the page mounted while a realtime resync re-reads the same tree', async () => {
+    // A reconnect / gap / epoch reload used to go through the same `loadTree` as a team switch, so
+    // `loading` went up, the shell swapped the page for "Loading tree…" and the canvas remounted:
+    // viewport, open `+` menu and armed palette all lost (FR-C2 also says Fit runs on first mount
+    // and product switch, not on every reconnect).
+    let releaseTree: (dto: ReturnType<typeof treeDto>) => void = () => undefined;
+    const wrapper = await mountAt('/trees/7/canvas');
+    expect(wrapper.find('[data-cy="canvas"]').exists()).toBe(true);
+
+    service.getTree.callsFake(
+      async () => await new Promise<ReturnType<typeof treeDto>>(resolve => (releaseTree = resolve as typeof releaseTree)),
+    );
+    // Reconnect: OPEN, drop, OPEN again -> one authoritative re-read of the team on screen.
+    stomp.connectionState$.next(1 /* OPEN */);
+    await flushPromises();
+    stomp.connectionState$.next(3 /* CLOSED */);
+    stomp.connectionState$.next(1 /* OPEN */);
+    await flushPromises();
+
+    expect(service.getTree.callCount).toBeGreaterThan(1);
+    expect(wrapper.find('[data-cy="ostLoading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-cy="canvas"]').exists()).toBe(true);
+
+    releaseTree(treeDto([dto('product-1', null), dto('outcome-1', 'product-1')]));
+    await flushPromises();
+    expect(wrapper.find('[data-cy="canvas"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('disables the delete confirmation when a demotion arrives while it is open', async () => {
+    // FR-037: a MEMBERSHIP_CHANGED that demotes the user takes every edit affordance away. The
+    // open dialog used to be the one survivor, firing a write the server would refuse.
+    const wrapper = await mountAt('/trees/7');
+    const tree = useOstTreeStore(pinia);
+    useOstUiStore(pinia).askDelete('outcome-1');
+    await flushPromises();
+    expect(wrapper.find('[data-cy="ostConfirmDeleteConfirm"]').attributes('disabled')).toBeUndefined();
+
+    tree.applyEvents([{ type: 'MEMBERSHIP_CHANGED', actingUserLogin: 'admin', login: 'user', role: 'VIEWER', removed: false }]);
+    await flushPromises();
+
+    expect(tree.canEdit).toBe(false);
+    expect(wrapper.find('[data-cy="ostConfirmDeleteConfirm"]').attributes('disabled')).toBeDefined();
+    await wrapper.find('[data-cy="ostConfirmDeleteConfirm"]').trigger('click');
+    await flushPromises();
+    expect(service.deleteNode.called).toBe(false);
     wrapper.unmount();
   });
 

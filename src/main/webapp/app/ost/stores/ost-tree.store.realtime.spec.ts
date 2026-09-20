@@ -142,6 +142,26 @@ describe('OST tree store — realtime event application (RTC-005)', () => {
     expect(tree.comments['solution-1']).toEqual([]);
   });
 
+  it('keeps the chip in step with the thread when the event carries no count', async () => {
+    // The fallback used the loaded thread's length from BEFORE the message went in, so the chip
+    // sat one behind the bubbles on screen.
+    service.listComments.resolves([]);
+    await tree.loadComments('solution-1');
+    const comment: CommentDTO = {
+      id: 12,
+      body: 'no count on this one',
+      authorLogin: 'admin',
+      authorInitials: 'A',
+      authorName: 'Admin',
+      createdDate: '2026-09-20T10:00:00Z',
+      editedDate: null,
+      mine: false,
+    };
+    tree.applyEvents([{ type: 'COMMENT_ADDED', actingUserLogin: 'admin', key: 'solution-1', comment } as OstTreeEvent]);
+    expect(tree.comments['solution-1']).toHaveLength(1);
+    expect(tree.byId('solution-1')?.commentCount).toBe(1);
+  });
+
   // ---- criterion 5: request id echo suppression (FR-032) ---------------------------------------
   it('threads a request id through every REST write', async () => {
     service.patchNode.resolves(dto('opportunity-1', 'outcome-1', { priority: 60 }));

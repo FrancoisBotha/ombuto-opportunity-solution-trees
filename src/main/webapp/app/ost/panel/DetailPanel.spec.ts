@@ -162,6 +162,18 @@ describe('DetailPanel', () => {
       expect((input.element as HTMLInputElement).value).toBe('Weekly interviews');
     });
 
+    it('says why an emptied title snapped back instead of reverting in silence', async () => {
+      const { wrapper, service, tree } = await mountPanel('outcome-1');
+      const input = wrapper.get('[data-cy="ost-panel-title"]');
+      await input.setValue('');
+      await input.trigger('blur');
+      await flushPromises();
+      expect(wrapper.get('[data-cy="ost-panel-error"]').text()).toBe('A title is required.');
+      expect(tree.byId('outcome-1')?.title).toBe('Weekly interviews');
+      expect((input.element as HTMLInputElement).value).toBe('Weekly interviews');
+      expect(service.patchNode.called).toBe(false);
+    });
+
     it('hiding keeps the selection and leaves a Details tab that reopens the panel', async () => {
       const { wrapper, ui } = await mountPanel('solution-1');
       await wrapper.get('[data-cy="ost-panel-hide"]').trigger('click');

@@ -57,16 +57,21 @@ export function usePanelAction(own?: PanelErrors) {
   async function run<T>(action: () => Promise<T>, fallback = 'Something went wrong. Your change was not saved.'): Promise<T> {
     const key = ui.selectedId;
     errors.report(null);
+    // Whatever is already on the toast belongs to something else (a failed history read, an error
+    // about another node). Only a message the store wrote WHILE this action ran describes it —
+    // several store actions bail out returning false without recording a reason at all.
+    const before = tree.error;
     const result = await action();
     if (result === false || result === null) {
-      const message = tree.error ?? fallback;
+      const reported = tree.error !== before ? tree.error : null;
+      const message = reported ?? fallback;
       if (ui.selectedId === key) {
         errors.report(message, key);
-        tree.clearError();
-      } else {
+        if (reported) tree.clearError();
+      } else if (reported) {
         // The user moved on: leave it on the toast, saying which node it was about.
         const title = tree.byId(key)?.title;
-        tree.error = title ? `“${title}”: ${message}` : message;
+        tree.error = title ? `“${title}”: ${reported}` : reported;
       }
     }
     return result;

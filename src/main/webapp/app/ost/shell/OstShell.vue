@@ -109,12 +109,19 @@ const memberTitle = (m: TeamMemberDTO) => {
 async function load() {
   const id = teamId.value;
   await realtime.closeTeam();
+  // `closeTeam` awaits the socket actually closing, which can take a while; a second switch made
+  // meanwhile has already started loading ITS team. Without this guard the older call would run
+  // `loadTree` last, win the store's loadSeq race, and leave the shell showing "Loading tree…"
+  // for a team whose tree is never fetched.
+  if (teamId.value !== id) return;
   if (id === null) return;
   const loaded = await tree.loadTree(id);
   if (!loaded || teamId.value !== id) return;
   realtime.openTeam(id, {
     applyEvents: events => tree.applyEvents(events),
-    reloadTree: () => tree.loadTree(id),
+    // A resync of the team already on screen must not blank the page (FR-C2: Fit runs on first
+    // mount and on product switch, not on every reconnect).
+    reloadTree: () => tree.loadTree(id, { background: true }),
   });
 }
 

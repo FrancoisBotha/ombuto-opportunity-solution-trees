@@ -243,7 +243,13 @@ describe('OstNode', () => {
       const open = mountNode(node('outcome-1', 'product-1'), { childCount: 3 }).get('[data-cy="ost-collapse-outcome-1"]');
       expect(open.attributes('aria-label')).toBe('Collapse');
       const shut = mountNode(node('outcome-1', 'product-1'), { childCount: 3, collapsed: true }).get('[data-cy="ost-collapse-outcome-1"]');
-      expect(shut.attributes('aria-label')).toBe('Expand, 3 hidden');
+      // `childCount` is the node's DIRECT children (as in the prototype), while collapsing hides
+      // the whole subtree. The name used to say "3 hidden", which is false whenever any of those
+      // three has children of its own.
+      expect(shut.attributes('aria-label')).toBe('Expand, 3 children');
+      expect(shut.attributes('title')).toBe('Expand (3 children)');
+      const one = mountNode(node('outcome-2', 'product-1'), { childCount: 1, collapsed: true }).get('[data-cy="ost-collapse-outcome-2"]');
+      expect(one.attributes('aria-label')).toBe('Expand, 1 child');
     });
   });
 

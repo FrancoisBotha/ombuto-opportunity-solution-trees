@@ -62,6 +62,22 @@ describe('OST UI store', () => {
       expect(() => writeLastTeam('user', 7)).not.toThrow();
     });
 
+    it('keeps the collapsed map on a re-read of the same user and team when the write never landed', () => {
+      // Every tree read calls restoreCollapsed, including a same-team reload (a realtime resync,
+      // a retry). Re-reading storage that cannot be written to would expand every branch the user
+      // just collapsed, with nothing to say why (FR-C3).
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+      ui.restoreCollapsed('user', 7);
+      ui.setCollapsed('outcome-1', true);
+      ui.restoreCollapsed('user', 7);
+      expect(ui.collapsed).toEqual({ 'outcome-1': true });
+      // A different team still reads its own map.
+      ui.restoreCollapsed('user', 8);
+      expect(ui.collapsed).toEqual({});
+    });
+
     it('ignores persisted values that are not an object map', () => {
       localStorage.setItem(collapsedStorageKey('user', 7), JSON.stringify(['outcome-1']));
       ui.restoreCollapsed('user', 7);

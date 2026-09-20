@@ -131,7 +131,12 @@ export const useOstUiStore = defineStore('ostUi', {
 
     // ---- collapse (persisted per user + team) ------------------------------------------------
     restoreCollapsed(login: string, teamId: number) {
-      this.collapsedKey = collapsedStorageKey(login, teamId);
+      const key = collapsedStorageKey(login, teamId);
+      // Already on this user+team (a reload or a realtime resync of the same tree): keep what is on
+      // screen. Re-reading would silently expand every branch whenever storage is unavailable
+      // (private window, blocked site data), because persistCollapsed swallows the failed write.
+      if (this.collapsedKey === key) return;
+      this.collapsedKey = key;
       let restored: Record<string, boolean> = {};
       try {
         const raw = localStorage.getItem(this.collapsedKey);
