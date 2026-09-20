@@ -22,6 +22,7 @@ import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.service.dto.AssumptionDTO;
 import com.opportunity.tree.service.dto.CommentDTO;
 import com.opportunity.tree.service.dto.EvidenceDTO;
+import com.opportunity.tree.service.dto.InterviewDTO;
 import com.opportunity.tree.service.dto.NodeHistoryDTO;
 import com.opportunity.tree.service.dto.NodeLinkDTO;
 import com.opportunity.tree.service.dto.OpenQuestionDTO;
@@ -29,11 +30,13 @@ import com.opportunity.tree.service.dto.OpportunityDTO;
 import com.opportunity.tree.service.dto.OutcomeDTO;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.SolutionDTO;
+import com.opportunity.tree.service.dto.TagDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.dto.TeamMemberDTO;
 import com.opportunity.tree.service.dto.UserDTO;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -390,6 +393,37 @@ class GeneratedEndpointsSecurityIT {
         body.setCreatedDate(Instant.now());
         body.setAuthor(authorRef);
         assertAdminOnlyOnEveryVerb("/api/comments", body);
+    }
+
+    // InterviewResource carries the same class-level ROLE_ADMIN as the resources above but was not
+    // covered here, so a dropped annotation would have gone unnoticed.
+    @Test
+    @Transactional
+    void interviewEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        ProductDTO productRef = new ProductDTO();
+        productRef.setId(1L);
+        InterviewDTO body = new InterviewDTO();
+        body.setId(1L);
+        body.setTitle("Kickoff interview");
+        body.setParticipant("Ada");
+        body.setInterviewDate(LocalDate.of(2026, 1, 15));
+        body.setCreatedDate(Instant.now());
+        body.setProduct(productRef);
+        assertAdminOnlyOnEveryVerb("/api/interviews", body);
+    }
+
+    // TagResource likewise carries class-level ROLE_ADMIN and was not covered here.
+    @Test
+    @Transactional
+    void tagEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        TeamDTO teamRef = new TeamDTO();
+        teamRef.setId(1L);
+        TagDTO body = new TagDTO();
+        body.setId(1L);
+        body.setName("discovery");
+        body.setColour("#112233");
+        body.setTeam(teamRef);
+        assertAdminOnlyOnEveryVerb("/api/tags", body);
     }
 
     /** Every verb on a generated CRUD resource must 403 for a plain ROLE_USER. The body is valid so validation cannot mask it. */

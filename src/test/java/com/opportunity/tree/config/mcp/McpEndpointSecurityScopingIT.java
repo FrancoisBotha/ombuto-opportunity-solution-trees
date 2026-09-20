@@ -36,6 +36,7 @@ import com.opportunity.tree.service.mcp.GetNodeTool;
 import com.opportunity.tree.service.mcp.ListInterviewsTool;
 import com.opportunity.tree.service.mcp.ProbeTool;
 import com.opportunity.tree.service.mcp.TreeTool;
+import com.opportunity.tree.web.rest.OstTreeTestCleanup;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
@@ -47,6 +48,7 @@ import java.net.http.HttpRequest;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -216,9 +218,20 @@ class McpEndpointSecurityScopingIT {
 
     @AfterEach
     void cleanUp() {
-        // No cross-test cleanup: unique per-run suffixes on every entity name prevent collisions,
-        // and DirtiesContext.AFTER_CLASS refreshes the context (and the embedded DB) between
-        // test classes.
+        // Unique per-run suffixes stop this class colliding with itself, but they do not stop the
+        // seeded rows leaking: this IT is not @Transactional, @DirtiesContext refreshes the Spring
+        // context but NOT the Testcontainers Postgres instance, which is shared by every IT in the
+        // JVM. The committed users, teams, products, outcomes and opportunities were therefore
+        // visible to later tests and broke them — UserResourceIT and AccountResourceIT with
+        // "fk_team_member__user_id" when they deleted their users, and the generated
+        // Outcome/Opportunity/Solution/Interview resource ITs with wrong row counts. Remove exactly
+        // what was seeded, in FK-safe order.
+        OstTreeTestCleanup.removeTeamsAndUsers(
+            txManager,
+            em,
+            Arrays.asList(teamAId, teamBId),
+            Arrays.asList(aliceLogin, bobLogin, carolLogin)
+        );
     }
 
     private void seed() {

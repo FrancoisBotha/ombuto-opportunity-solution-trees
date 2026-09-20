@@ -22,7 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>Deletes run as native statements in FK-safe order — join tables and leaf rows first, then the
  * node tree from the leaves up, then products, memberships, teams and finally the users.
  */
-final class OstTreeTestCleanup {
+public final class OstTreeTestCleanup {
 
     private static final String PRODUCTS = "select id from product where team_id in (:teamIds)";
     private static final String OUTCOMES = "select id from outcome where product_id in (" + PRODUCTS + ")";
@@ -89,7 +89,7 @@ final class OstTreeTestCleanup {
      * transaction. Ids/logins that no longer exist are simply no-ops, so it is safe to call after a
      * test that failed half way through its fixture.
      */
-    static void removeTeamsAndUsers(
+    public static void removeTeamsAndUsers(
         PlatformTransactionManager txMgr,
         EntityManager em,
         Collection<Long> teamIds,

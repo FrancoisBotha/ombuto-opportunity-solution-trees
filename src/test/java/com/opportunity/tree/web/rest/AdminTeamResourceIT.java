@@ -146,7 +146,9 @@ class AdminTeamResourceIT {
 
         mockMvc
             .perform(
-                get(API + "?sort=name,asc").with(
+                // An explicit large page size: the default page of 20 would silently push this
+                // test's two teams off page 0 as soon as any other team exists in the database.
+                get(API + "?sort=name,asc&size=2000").with(
                     user(ADMIN_LOGIN).authorities(
                         new org.springframework.security.core.authority.SimpleGrantedAuthority(AuthoritiesConstants.ADMIN)
                     )
@@ -195,9 +197,18 @@ class AdminTeamResourceIT {
             .andExpect(jsonPath("$.name").value("OnBehalf"))
             .andExpect(jsonPath("$.ownerLogins[0]").value(newOwner.getLogin()));
 
-        List<Team> teams = teamRepository.findAll();
-        assertThat(teams).hasSize(1);
-        List<TeamMember> members = teamMemberRepository.findAllByTeamId(teams.get(0).getId());
+        // Scope the lookup to the team this test created rather than asserting on the size of the
+        // whole table, which fails for reasons unrelated to this test whenever another IT leaves a
+        // team behind.
+        Team created = teamRepository
+            .findAll()
+            .stream()
+            .filter(t -> "OnBehalf".equals(t.getName()))
+            .reduce((a, b) -> {
+                throw new AssertionError("More than one team named OnBehalf");
+            })
+            .orElseThrow(() -> new AssertionError("The created team was not persisted"));
+        List<TeamMember> members = teamMemberRepository.findAllByTeamId(created.getId());
         assertThat(members)
             .singleElement()
             .satisfies(m -> {
@@ -205,7 +216,7 @@ class AdminTeamResourceIT {
                 assertThat(m.getRole()).isEqualTo(TeamRole.OWNER);
                 assertThat(m.getJoinedDate()).isNotNull();
             });
-        assertThat(teams.get(0).getCreatedDate()).isNotNull();
+        assertThat(created.getCreatedDate()).isNotNull();
     }
 
     // AC 4 — unknown ownerUserId → 4xx with usernotfound key (not 500)
