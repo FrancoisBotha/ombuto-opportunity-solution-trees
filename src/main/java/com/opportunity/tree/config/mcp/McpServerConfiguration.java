@@ -1,5 +1,7 @@
 package com.opportunity.tree.config.mcp;
 
+import com.opportunity.tree.service.mcp.GetNodeTool;
+import com.opportunity.tree.service.mcp.ListInterviewsTool;
 import com.opportunity.tree.service.mcp.ProbeTool;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -17,5 +19,15 @@ public class McpServerConfiguration {
     @Bean
     public ToolCallbackProvider probeToolCallbackProvider(ProbeTool probeTool) {
         return MethodToolCallbackProvider.builder().toolObjects(probeTool).build();
+    }
+
+    @Bean
+    public ToolCallbackProvider getNodeToolCallbackProvider(GetNodeTool getNodeTool) {
+        return MethodToolCallbackProvider.builder().toolObjects(getNodeTool).build();
+    }
+
+    @Bean
+    public ToolCallbackProvider listInterviewsToolCallbackProvider(ListInterviewsTool listInterviewsTool) {
+        return MethodToolCallbackProvider.builder().toolObjects(listInterviewsTool).build();
     }
 }
