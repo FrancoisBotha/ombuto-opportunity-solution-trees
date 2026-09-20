@@ -69,12 +69,16 @@ public class McpSessionPrincipalFilter extends OncePerRequestFilter {
 
     private final McpSessionRegistry registry;
     private final String ssePath;
-    private final String messagePath;
 
     public McpSessionPrincipalFilter(McpSessionRegistry registry, String ssePath, String messagePath) {
+        // messagePath is accepted for symmetry with the configured endpoints but is deliberately
+        // NOT used to detect a message: the transport routes a JSON-RPC message by its sessionId
+        // query parameter alone, so we key the owner check off that parameter (see below) rather
+        // than off an exact path string. Matching a decoded literal against the raw request URI
+        // let a percent-encoded path (e.g. /mcp/messag%65) that the dispatcher still resolves to
+        // /mcp/message slip past the check entirely.
         this.registry = registry;
         this.ssePath = ssePath;
-        this.messagePath = messagePath;
     }
 
     @Override
@@ -83,8 +87,13 @@ public class McpSessionPrincipalFilter extends OncePerRequestFilter {
         String path = pathWithinApplication(request);
         String principal = currentPrincipal();
 
-        if (messagePath.equals(path)) {
-            String sessionId = request.getParameter(SESSION_ID_PARAM);
+        // Any request that carries a sessionId query parameter is a JSON-RPC message the transport
+        // will route by that id, no matter how the path is spelled (percent-encoding, matrix
+        // parameters, trailing slash). It must belong to the caller. The SSE open (GET /mcp) never
+        // carries a sessionId — the id is minted inside the transport — so this branch cannot
+        // swallow it.
+        String sessionId = request.getParameter(SESSION_ID_PARAM);
+        if (sessionId != null) {
             if (!registry.isOwnedBy(sessionId, principal)) {
                 // Same answer as an unknown session: never confirm that the id belongs to someone else.
                 LOG.warn("Refused MCP message for a session the caller did not open (principal={})", principal);
