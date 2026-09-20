@@ -201,6 +201,32 @@ class McpSessionHijackIT {
     }
 
     @Test
+    void crossPrincipalMessage_withPercentEncodedPath_isRefused_andNothingReachesTheVictimStream() throws Exception {
+        try (SseSession victim = openSse(victimLogin)) {
+            victim.handshake();
+
+            // The dispatcher resolves /mcp/messag%65 to the same handler as /mcp/message, so the
+            // transport would route this to the victim's session. The owner check must still fire.
+            // Reverting the filter's sessionId-based detection (matching the raw path instead) lets
+            // this answer 200 and leaks the poster's result into the victim's stream.
+            HttpResponse<String> hijack = postMessageToPath(
+                attackerLogin,
+                "/mcp/messag%65?sessionId=" + victim.sessionId,
+                "{\"jsonrpc\":\"2.0\",\"id\":4343,\"method\":\"tools/call\"," + "\"params\":{\"name\":\"list_products\",\"arguments\":{}}}"
+            );
+
+            assertThat(hijack.statusCode())
+                .as("a percent-encoded message path that resolves to /mcp/message must not bypass the owner check")
+                .isEqualTo(404);
+
+            List<String> delivered = victim.drainFor(SILENCE_WINDOW);
+            String stream = String.join("\n", delivered);
+            assertThat(stream).as("no response to the encoded-path hijack may reach the victim's stream").doesNotContain("4343");
+            assertThat(stream).as("no data from the attacker's team may reach the victim's stream").doesNotContain(attackerSecretMarker);
+        }
+    }
+
+    @Test
     void unknownSessionId_isRefusedTheSameWay() throws Exception {
         HttpResponse<String> response = postMessage(
             attackerLogin,
@@ -208,6 +234,34 @@ class McpSessionHijackIT {
             "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"ping\",\"arguments\":{}}}"
         );
         assertThat(response.statusCode()).isEqualTo(404);
+    }
+
+    @Test
+    void outOfRangeNumericIdDoesNotLeakParserInternals() throws Exception {
+        try (SseSession victim = openSse(victimLogin)) {
+            victim.handshake();
+
+            // A JSON integer literal one beyond Long.MAX_VALUE fails Spring AI argument binding.
+            // On the old code the raw Jackson message ("out of range of `long`",
+            // "StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION") is copied straight into the tool
+            // result; McpToolErrorSanitizer rewrites it to a generic hint.
+            HttpResponse<String> response = postMessage(
+                victimLogin,
+                victim.sessionId,
+                "{\"jsonrpc\":\"2.0\",\"id\":515,\"method\":\"tools/call\"," +
+                    "\"params\":{\"name\":\"get_node\",\"arguments\":{\"type\":\"PRODUCT\",\"id\":9223372036854776000}}}"
+            );
+            assertThat(response.statusCode()).isEqualTo(200);
+
+            String result = victim.awaitLineContaining("\"id\":515");
+            assertThat(result).as("the out-of-range id is reported as a tool error").contains("isError");
+            assertThat(result)
+                .as("no parser internals may leak in the tool error")
+                .doesNotContain("StreamReadFeature")
+                .doesNotContain("byte offset")
+                .doesNotContainIgnoringCase("jackson")
+                .doesNotContain("`long`");
+        }
     }
 
     @Test
@@ -258,7 +312,11 @@ class McpSessionHijackIT {
     }
 
     private HttpResponse<String> postMessage(String login, String sessionId, String jsonRpc) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp/message?sessionId=" + sessionId))
+        return postMessageToPath(login, "/mcp/message?sessionId=" + sessionId, jsonRpc);
+    }
+
+    private HttpResponse<String> postMessageToPath(String login, String pathAndQuery, String jsonRpc) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + pathAndQuery))
             .header("Authorization", "Bearer " + TOKEN_PREFIX + login)
             .header("Content-Type", "application/json")
             .timeout(WAIT)

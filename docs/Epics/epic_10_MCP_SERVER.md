@@ -109,3 +109,67 @@ Suggested ticket breakdown (complexity: medium-high):
 4. Backend: `get_node` and `list_interviews` tools (FR-057, FR-058).
 5. Frontend + docs: "Connect an agent" page; verified connection from a real MCP client (FR-059).
 6. Closeout: regenerate the code map.
+
+## 14. Stress-pass findings (S4, 2026-09-21)
+
+Verified against the running instance and the code. Two were **fixed in this pass** (with
+regression tests in `McpSessionHijackIT` that fail on the pre-fix code); the rest are written up
+because they need a Keycloak realm change or a repository refactor that should not land blind.
+
+### Fixed
+- **F1 (blocker) — session-hijack fix was bypassable by URL-encoding the message path.**
+  `McpSessionPrincipalFilter` matched the message endpoint with
+  `request.getRequestURI().equals("/mcp/message")`, but `getRequestURI()` is **not** percent-decoded.
+  A POST to `/mcp/messag%65?sessionId=<victim>` is routed by the dispatcher to the same
+  `/mcp/message` handler, so the owner check was skipped: the cross-principal call answered 200 and
+  the poster's result (a team the victim is not a member of) was delivered into the victim's SSE
+  stream — the exact MCPSRV-002 vulnerability, reopened. Repro (running app): open SSE as `user`,
+  then `POST /mcp/messag%65?sessionId=<user's id>` with an `admin` bearer token → 200, and admin's
+  `list_products` (incl. teams `user` cannot see) arrives on user's stream. **Fix:** the owner check
+  now keys off the presence of the `sessionId` query parameter (how the transport actually routes a
+  message) rather than an exact path string, closing every path-spelling variant. The SSE open
+  carries no `sessionId`, so it is unaffected.
+- **F2 (minor) — Jackson parser internals leaked in tool errors.** An out-of-range or wrong-type id
+  (e.g. `get_node id=9223372036854776000`) fails Spring AI argument binding and the MCP adapter
+  copies the raw exception message into the tool result: `… out of range of `long` … at [Source:
+  REDACTED (StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION disabled) …]`. Contrary to NFR-021 /
+  error-hygiene. **Fix:** `McpToolErrorSanitizer` (a `BeanPostProcessor` wrapping every
+  `ToolCallbackProvider`) rewrites binding/deserialization failures to a generic, actionable hint
+  while passing the tools' own validation messages ("Unknown node type…", "Access denied") through
+  unchanged.
+
+### Written up (not landed here)
+- **W1 (major) — audience validation is a no-op for the MCP chain (NFR-020).** The MCP filter chain
+  reuses the session `jwtDecoder`, whose `AudienceValidator` accepts `account`. Every Keycloak realm
+  client emits `account` in `aud`, so any realm token (including a web token) is accepted on `/mcp`,
+  and an `mcp_client` token is accepted on the session API. **To fix:** (a) add a hardcoded-audience
+  protocol mapper to the `mcp_client` client in `src/main/docker/realm-config/jhipster-realm.json`
+  emitting a dedicated value (e.g. `ombuto-mcp`); (b) give the MCP chain its **own** `JwtDecoder`
+  bean whose `AudienceValidator` requires that value (not `account`). Landing (b) without (a) breaks
+  the currently-working `mcp_client` tokens, and the running Keycloak only imports a realm that does
+  not already exist — so this needs a documented realm re-import (or a manual mapper add) and must
+  be applied as a pair. Hence not landed blind.
+- **W2 (minor) — token holder with no `jhi_user` row sees a silent empty world.** A valid Keycloak
+  token whose subject has no application user resolves to authorities but no team memberships:
+  `list_products` returns `{total:0}` and every scoped call returns "Access denied", with no
+  explanation. Fail-closed and safe, but confusing. Consider surfacing a clear "no Ombuto account
+  linked to this identity" message. Access-control call; coordinate with S3.
+- **W3 (minor) — `list_interviews` and `get_tree` bound the *response* but not the *DB read*
+  (NFR-021).** `findInterviewsByProductId/ByTeamId` fetch **all** matching interviews (eagerly
+  joining product + interviewer) and paginate in memory; `get_tree` assembles the entire team tree
+  before applying `NODE_CEILING`. Output is capped (page ≤50; tree ceiling 1000), so a caller cannot
+  pull the whole DB over the wire, but a large team still materialises everything server-side.
+  Recommend DB-level `LIMIT/OFFSET` (with a separate count) for interviews and a product-scoped tree
+  query. Left as a follow-up ticket to avoid a blind repository refactor.
+
+### Verified sound (no change needed)
+- Per-tool scoping holds for a second identity across all id shapes: cross-team, wrong-type,
+  nonexistent, negative, and huge ids all return "Access denied" or a clear validation error with
+  **no existence leak** (missing and cross-team ids return the identical `TeamAccessDeniedException`).
+- Read-only guarantee: exactly five `@Tool` methods (`ping`, `list_products`, `get_tree`,
+  `get_node`, `list_interviews`), none mutating; each is registered explicitly via a
+  `MethodToolCallbackProvider` — Spring AI 2.x has no blanket `@Tool` scanner, so a stray annotated
+  bean cannot auto-register.
+- MCPSRV-006 "Connect an agent" page: the documented direct-grant token flow
+  (`mcp_client` @ `:9080`) succeeds against the **running** Keycloak and all four tools answer; the
+  endpoint URL is derived from the origin as `${origin}/mcp`.
