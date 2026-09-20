@@ -189,6 +189,11 @@ class BackupRestoreResourceIT {
             .andExpect(jsonPath("$.counts.products").value(productCount))
             .andExpect(jsonPath("$.counts.treeNodes").value(treeNodeCount));
 
+        // Those three numbers only mean something because the tables really hold them: the summary
+        // is counted from the database, not copied out of the upload.
+        assertThat(rowCount("team")).isEqualTo(teamCount);
+        assertThat(rowCount("product")).isEqualTo(productCount);
+
         em.clear();
         assertThat(em.find(Team.class, seededTeam.getId()).getName()).isEqualTo("BKRST-002 exported team");
         assertThat(em.find(Product.class, seededProduct.getId()).getName()).isEqualTo("BKRST-002 exported product");
@@ -326,6 +331,126 @@ class BackupRestoreResourceIT {
 
         em.clear();
         assertThat(em.find(Team.class, seededTeam.getId())).isNotNull();
+    }
+
+    /**
+     * The populated-database case: the other restore tests exercise one team with a four-node tree,
+     * which is small enough to hide anything that depends on scale or on the exporter's reach.
+     *
+     * <p>Two properties are pinned here, both of which held only by luck on a tiny data set:
+     *
+     * <ul>
+     *   <li><b>the export covers every row</b>, not a page of them and not a slice scoped to the
+     *       caller — the archive's team list has to match {@code select count(*) from team},
+     *       including the many teams the exporting admin has nothing to do with;</li>
+     *   <li><b>the summary counts are read back from the tables.</b> Every number in the response
+     *       is compared with the table's actual row count after the restore, so a summary can never
+     *       report a full restore the database did not receive.</li>
+     * </ul>
+     *
+     * <p>The restored archive is also a strict subset of what the database holds at restore time
+     * (extra teams and a whole extra product tree are added after the export), so it doubles as a
+     * check that the replacement is total rather than a merge.
+     */
+    @Test
+    void restoreOfAPopulatedDatabaseReplacesEveryRowAndCountsWhatItWrote() throws Exception {
+        int extraTeams = 40;
+        for (int i = 0; i < extraTeams; i++) {
+            persistSmallTree("BKRST populated " + i);
+        }
+        em.flush();
+
+        long teamsInDatabase = rowCount("team");
+        byte[] archiveBytes = exportArchive();
+        JsonNode archive = objectMapper.readTree(archiveBytes);
+        assertThat((long) archive.path("teams").size())
+            .as("the export must carry every team in the installation, not a page or a scoped slice")
+            .isEqualTo(teamsInDatabase);
+        assertThat(archive.path("teams").size()).isGreaterThan(extraTeams);
+
+        // Rows created after the export: the restore has to remove them again.
+        Team afterTheExport = persistSmallTree("BKRST created after the export");
+        Team lonely = new Team().name("BKRST not in the archive").createdDate(Instant.now());
+        em.persist(lonely);
+        em.flush();
+        assertThat(rowCount("team")).isEqualTo(teamsInDatabase + 2);
+
+        MvcResult restored = mockMvc.perform(adminRestore(archiveBytes)).andExpect(status().isOk()).andReturn();
+        JsonNode counts = objectMapper.readTree(restored.getResponse().getContentAsString()).path("counts");
+
+        assertThat(counts.path("teams").asLong()).isEqualTo(teamsInDatabase);
+        for (var entry : COUNT_KEY_TABLES.entrySet()) {
+            assertThat(counts.path(entry.getKey()).asLong())
+                .as("summary count '%s' must be the row count of %s, not the size of the uploaded list", entry.getKey(), entry.getValue())
+                .isEqualTo(rowCount(entry.getValue()));
+        }
+        assertThat(counts.path("treeNodes").asLong()).isEqualTo(
+            rowCount("outcome") + rowCount("opportunity") + rowCount("solution") + rowCount("assumption") + rowCount("evidence")
+        );
+
+        em.clear();
+        assertThat(em.find(Team.class, afterTheExport.getId())).as("a team created after the export must not survive a restore").isNull();
+        assertThat(em.find(Team.class, lonely.getId())).isNull();
+        assertThat(em.find(Team.class, seededTeam.getId())).isNotNull();
+        assertThat(rowCount("team")).isEqualTo(teamsInDatabase);
+    }
+
+    /** Summary key to the table whose rows it claims to count. */
+    private static final java.util.Map<String, String> COUNT_KEY_TABLES = java.util.Map.ofEntries(
+        java.util.Map.entry("teams", "team"),
+        java.util.Map.entry("teamMembers", "team_member"),
+        java.util.Map.entry("products", "product"),
+        java.util.Map.entry("outcomes", "outcome"),
+        java.util.Map.entry("opportunities", "opportunity"),
+        java.util.Map.entry("solutions", "solution"),
+        java.util.Map.entry("assumptions", "assumption"),
+        java.util.Map.entry("evidences", "evidence"),
+        java.util.Map.entry("interviews", "interview"),
+        java.util.Map.entry("tags", "tag"),
+        java.util.Map.entry("comments", "comment"),
+        java.util.Map.entry("nodeLinks", "node_link"),
+        java.util.Map.entry("openQuestions", "open_question"),
+        java.util.Map.entry("nodeHistories", "node_history"),
+        java.util.Map.entry("opportunityInterviews", "rel_opportunity__interview"),
+        java.util.Map.entry("opportunityTags", "rel_opportunity__tag"),
+        java.util.Map.entry("solutionTags", "rel_solution__tag")
+    );
+
+    /** A team with a product and a four-node tree, so the populated case has real rows, not just teams. */
+    private Team persistSmallTree(String label) {
+        Team team = new Team().name(label).description(label).createdDate(Instant.now());
+        em.persist(team);
+        Product product = new Product()
+            .name(label + " product")
+            .archived(Boolean.FALSE)
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .team(team);
+        em.persist(product);
+        Outcome outcome = new Outcome().title(label + " outcome").sortOrder(0).createdDate(Instant.now()).product(product);
+        em.persist(outcome);
+        Opportunity opportunity = new Opportunity()
+            .title(label + " opportunity")
+            .status(OpportunityStatus.UNEXPLORED)
+            .valuerating(3)
+            .priority(50)
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .outcome(outcome);
+        em.persist(opportunity);
+        Solution solution = new Solution()
+            .title(label + " solution")
+            .status(SolutionStatus.CANDIDATE)
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .opportunity(opportunity);
+        em.persist(solution);
+        return team;
+    }
+
+    private long rowCount(String table) {
+        em.flush();
+        return ((Number) em.createNativeQuery("select count(*) from " + table).getSingleResult()).longValue();
     }
 
     /** Reads (and consumes) sequence_generator's next value the same way the service does. */
