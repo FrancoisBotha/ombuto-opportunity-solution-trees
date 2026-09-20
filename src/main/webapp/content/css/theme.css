@@ -94,6 +94,14 @@
   --ost-status-bad-fg: var(--ost-neutral-300); /* 8.8:1 */
   --ost-status-bad-border: transparent;
 
+  /* Non-production marker (the dev-profile pill). The system has no danger hue, so this borrows
+   * the warm end of the priority spectrum — same hue and chroma, a lightness that carries on the
+   * ground it sits on. Nothing else may use it: it has to stay unmistakable. */
+  --ost-warn: #ff7e76; /* = oklch(0.74 0.16 25), the spectrum's "critical" end, in sRGB */
+  --ost-warn-fg: #ff9188; /* = oklch(0.8 0.16 25) — 8.1:1 on --ost-navbar-bg */
+  --ost-warn-bg: color-mix(in srgb, var(--ost-warn) 16%, transparent);
+  --ost-warn-border: color-mix(in srgb, var(--ost-warn) 55%, transparent);
+
   /* ---- app chrome ---- */
   --ost-navbar-bg: var(--ost-bg);
   --ost-navbar-fg: var(--ost-text);
@@ -101,16 +109,32 @@
   --ost-navbar-border: var(--ost-border);
   --ost-navbar-hover-bg: color-mix(in srgb, var(--ost-nocturne-text) 8%, transparent);
 
-  --ost-sidebar-bg: var(--ost-bg);
+  /* ---- the sidebar rail: DELIBERATELY NOCTURNE DARK IN BOTH THEMES ----------------------
+   * A product decision, not an oversight. The rail is the app's spine and shares the tree
+   * canvas's artboard ground, so navigation reads the same wherever you are. These roles are
+   * therefore built from the FIXED palette and are NOT repeated in the light block below —
+   * do not "fix" the light theme by adding overrides here. Both the Playwright spec
+   * (theme.spec.ts, "the sidebar rail stays Nocturne dark in both themes") and the theming
+   * section of docs/Architecture/Architecture.md pin this down.
+   * Contrast below is quoted against the rail's own dark ground, in either theme.
+   */
+  --ost-sidebar-bg: var(--ost-nocturne-ground);
   --ost-sidebar-fg: var(--ost-neutral-300); /* 11.8:1 on --ost-sidebar-bg */
   --ost-sidebar-muted: var(--ost-neutral-500); /* 6.1:1 on --ost-sidebar-bg */
-  --ost-sidebar-border: var(--ost-border);
+  --ost-sidebar-strong-fg: var(--ost-nocturne-text); /* 14.5:1 — hovered row, hamburger */
+  --ost-sidebar-border: color-mix(in srgb, var(--ost-nocturne-text) 16%, transparent);
+  --ost-sidebar-scrollbar: color-mix(in srgb, var(--ost-nocturne-text) 15%, transparent);
   --ost-sidebar-hover-bg: color-mix(in srgb, var(--ost-nocturne-text) 7%, transparent);
-  --ost-sidebar-active-bg: var(--ost-accent-soft);
-  --ost-sidebar-active-fg: var(--ost-accent-200);
+  --ost-sidebar-active-bg: color-mix(in srgb, var(--ost-nocturne-accent) 18%, transparent);
+  --ost-sidebar-active-fg: var(--ost-accent-200); /* 12.2:1 on the tinted row */
   --ost-sidebar-active-border: color-mix(in srgb, var(--ost-nocturne-accent) 45%, transparent);
+  --ost-sidebar-tooltip-bg: var(--ost-nocturne-surface);
+  --ost-sidebar-tooltip-fg: var(--ost-nocturne-text);
+  --ost-sidebar-shadow: 0 4px 14px rgb(0 0 0 / 45%);
 
   --ost-content-bg: var(--ost-bg);
+  /* A themed hover wash for page content (tables, dropdowns) — the rail has its own, above. */
+  --ost-hover-bg: color-mix(in srgb, var(--ost-nocturne-text) 7%, transparent);
   --ost-tooltip-bg: var(--ost-surface-2);
   --ost-tooltip-fg: var(--ost-text);
   --ost-shadow: 0 6px 18px rgb(0 0 0 / 55%);
@@ -148,20 +172,20 @@
   --ost-status-bad-bg: var(--ost-neutral-200);
   --ost-status-bad-fg: var(--ost-neutral-800); /* 8.1:1 */
 
+  --ost-warn: #d55853; /* = oklch(0.62 0.16 25) */
+  --ost-warn-fg: #971a20; /* = oklch(0.44 0.16 25) — 8.4:1 on the white navbar */
+  --ost-warn-bg: color-mix(in srgb, var(--ost-warn) 14%, transparent);
+  --ost-warn-border: color-mix(in srgb, #bd413f 55%, transparent); /* = oklch(0.55 0.16 25) */
+
   --ost-navbar-bg: var(--ost-surface);
   --ost-navbar-fg: var(--ost-text);
   --ost-navbar-muted: var(--ost-text-muted);
   --ost-navbar-border: var(--ost-border);
   --ost-navbar-hover-bg: color-mix(in srgb, var(--ost-neutral-900) 8%, transparent);
 
-  --ost-sidebar-bg: var(--ost-bg);
-  --ost-sidebar-fg: var(--ost-neutral-800); /* 9.2:1 on --ost-sidebar-bg */
-  --ost-sidebar-muted: var(--ost-neutral-700); /* 6.0:1 on --ost-sidebar-bg */
-  --ost-sidebar-hover-bg: color-mix(in srgb, var(--ost-neutral-900) 7%, transparent);
-  --ost-sidebar-active-bg: var(--ost-accent-soft);
-  --ost-sidebar-active-fg: var(--ost-accent-700);
-  --ost-sidebar-active-border: color-mix(in srgb, var(--ost-accent-600) 55%, transparent);
+  /* No --ost-sidebar-* here on purpose: the rail stays Nocturne dark (see the dark block). */
 
+  --ost-hover-bg: color-mix(in srgb, var(--ost-neutral-900) 7%, transparent);
   --ost-tooltip-bg: var(--ost-neutral-900);
   --ost-tooltip-fg: var(--ost-neutral-100);
   --ost-shadow: 0 6px 18px rgb(41 43 49 / 18%);

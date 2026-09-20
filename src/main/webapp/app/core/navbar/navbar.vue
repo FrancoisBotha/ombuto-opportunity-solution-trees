@@ -6,6 +6,9 @@
       <span class="navbar-version">{{ version }}</span>
     </b-navbar-brand>
 
+    <!-- Non-production marker. Was a diagonal banner over the sidebar's top-left corner. -->
+    <ribbon></ribbon>
+
     <div class="navbar-actions">
       <theme-toggle></theme-toggle>
       <span class="navbar-user" v-if="authenticated && username" data-cy="navbarUser">

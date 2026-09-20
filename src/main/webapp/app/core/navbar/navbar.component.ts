@@ -4,11 +4,13 @@ import { useRouter } from 'vue-router';
 import type LoginService from '@/account/login.service';
 import { useStore } from '@/store';
 
+import Ribbon from '@/core/ribbon/ribbon.vue';
+
 import ThemeToggle from './theme-toggle.vue';
 
 export default defineComponent({
   name: 'Navbar',
-  components: { ThemeToggle },
+  components: { Ribbon, ThemeToggle },
   setup() {
     const loginService = inject<LoginService>('loginService');
     const { login } = loginService;

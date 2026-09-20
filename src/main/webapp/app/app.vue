@@ -1,7 +1,7 @@
 <template>
   <BToastOrchestrator />
   <div id="app">
-    <ribbon></ribbon>
+    <!-- The dev-profile marker used to live here as a diagonal banner; it is a pill in the navbar now. -->
     <navbar></navbar>
     <sidebar-menu v-if="authenticated" v-model:expanded="sidebarExpanded"></sidebar-menu>
     <div class="main-content" :class="{ expanded: authenticated && sidebarExpanded, 'no-sidebar': !authenticated }">

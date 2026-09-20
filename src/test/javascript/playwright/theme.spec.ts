@@ -7,6 +7,8 @@ import { type Page, expect, test } from '@playwright/test';
  *   - dark is the default on a first visit; the OS preference is never consulted;
  *   - the navbar toggle flips `data-theme` on <html> and the choice survives reload and navigation;
  *   - navbar and sidebar take their colours from content/css/theme.css in BOTH themes;
+ *   - the sidebar RAIL is deliberately Nocturne dark in both themes (a product decision — see the
+ *     theming section of docs/Architecture/Architecture.md), while the page content follows;
  *   - the OST tree canvas is an artboard: byte-identical computed colours in both themes;
  *   - ordinary pages stay readable in light AND dark (no white-on-white, no black-on-black).
  *
@@ -212,6 +214,14 @@ test.describe('theme', () => {
       expect(sidebar['background-color'], `sidebar in ${theme}`).toBe(t['--ost-sidebar-bg']);
       expect(container['background-color'], `.va-container in ${theme}`).toBe(t['--ost-bg']);
 
+      // The navbar and the page content DO follow the theme (the rail does not — next test).
+      expect(navbar['background-color'], `navbar must differ per theme (${theme})`).toBe(
+        theme === 'dark' ? 'rgb(22, 24, 38)' : 'rgb(255, 255, 255)',
+      );
+      expect(container['background-color'], `content must differ per theme (${theme})`).toBe(
+        theme === 'dark' ? 'rgb(22, 24, 38)' : 'rgb(243, 245, 254)',
+      );
+
       // Chrome text is legible on the chrome ground (AA body text).
       const title = (await styles(page, '.va-navbar .navbar-title', ['color']))!;
       expect(contrast(title.color, navbar['background-color']), `navbar title in ${theme}`).toBeGreaterThanOrEqual(4.5);
@@ -232,6 +242,73 @@ test.describe('theme', () => {
     const sidebar = (await styles(page, '[data-cy="sidebar"]', ['background-color']))!;
     expect([navbar['background-color'], sidebar['background-color']]).not.toContain('rgb(44, 53, 49)');
     expect([navbar['background-color'], sidebar['background-color']]).not.toContain('rgb(38, 48, 41)');
+  });
+
+  /**
+   * A product decision, not an oversight: the rail is the app's spine and shares the tree canvas's
+   * artboard ground, so navigation reads the same wherever you are. If this test starts failing
+   * because someone added `--ost-sidebar-*` overrides to `:root[data-theme='light']`, the fix is to
+   * remove those overrides, not to relax this test. See docs/Architecture/Architecture.md §7.
+   */
+  test('the sidebar rail stays Nocturne dark in both themes', async ({ page }) => {
+    await forgetTheme(page);
+    await expect(page.getByTestId('sidebar')).toBeVisible();
+
+    const GROUND = 'rgb(22, 24, 38)'; // --ost-nocturne-ground, #161826
+
+    const seen: Record<string, Record<string, string>> = {};
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(page, theme);
+      const sidebar = (await styles(page, '[data-cy="sidebar"]', ['background-color']))!;
+      expect(sidebar['background-color'], `the rail in ${theme}`).toBe(GROUND);
+
+      // Its text is the dark-rail text, and legible on that ground, in either theme.
+      const row = (await styles(page, '[data-cy="sidebar"] .menu-item', ['color']))!;
+      const label = (await styles(page, '[data-cy="sidebar"] .menu-section-label', ['color']))!;
+      expect(contrast(row.color, GROUND), `rail row in ${theme}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(label.color, GROUND), `rail NAVIGATION label in ${theme}`).toBeGreaterThanOrEqual(4.5);
+      seen[theme] = { rail: sidebar['background-color'], row: row.color, label: label.color };
+    }
+
+    // Not merely "dark enough" in each theme — the very same colours.
+    expect(seen.light).toEqual(seen.dark);
+  });
+
+  test('the dev-profile marker is a navbar pill, not a banner over the sidebar', async ({ page }) => {
+    await forgetTheme(page);
+    const marker = page.getByTestId('ribbon');
+    await expect(marker, 'the dev profile must be marked').toBeVisible();
+    await expect(marker).toHaveText(/dev/i);
+
+    const navbar = page.locator('.va-navbar');
+    const sidebar = page.getByTestId('sidebar');
+    await expect(sidebar).toBeVisible();
+
+    // It lives inside the navbar…
+    expect(await marker.evaluate(el => !!el.closest('.va-navbar'))).toBe(true);
+    // …and cannot overlap the rail: it ends above the sidebar and right of it.
+    const [pill, bar, rail] = await Promise.all([marker.boundingBox(), navbar.boundingBox(), sidebar.boundingBox()]);
+    expect(pill!.y + pill!.height).toBeLessThanOrEqual(bar!.y + bar!.height + 1);
+    expect(pill!.y + pill!.height).toBeLessThanOrEqual(rail!.y + 1);
+
+    // Readable in both themes, and never the same as the neutral version badge beside it.
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(page, theme);
+      const seen = await marker.evaluate(el => {
+        const style = getComputedStyle(el);
+        const bar2 = getComputedStyle(el.closest('.va-navbar')!);
+        return { color: style.color, background: bar2.backgroundColor, border: style.borderTopColor };
+      });
+      expect(contrast(seen.color, seen.background), `dev pill in ${theme}: ${seen.color} on ${seen.background}`).toBeGreaterThanOrEqual(
+        4.5,
+      );
+      const version = (await styles(page, '.va-navbar .navbar-version', ['color']))!;
+      expect(seen.color, `dev pill must stand out in ${theme}`).not.toBe(version.color);
+    }
+
+    // The old diagonal banner is gone.
+    expect(await page.locator('.ribbon').evaluate(el => getComputedStyle(el).transform)).toBe('none');
+    expect(await page.locator('.ribbon').evaluate(el => getComputedStyle(el).position)).not.toBe('absolute');
   });
 
   test('the active sidebar row is accent-tinted', async ({ page }) => {

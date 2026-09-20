@@ -46,14 +46,14 @@ html[data-theme] {
   --bs-dropdown-color: var(--ost-text);
   --bs-dropdown-border-color: var(--ost-border);
   --bs-dropdown-link-color: var(--ost-text);
-  --bs-dropdown-link-hover-bg: var(--ost-sidebar-hover-bg);
+  --bs-dropdown-link-hover-bg: var(--ost-hover-bg);
   --bs-dropdown-link-hover-color: var(--ost-text);
   --bs-table-bg: transparent;
   --bs-table-color: var(--ost-text);
   --bs-table-border-color: var(--ost-border);
-  --bs-table-striped-bg: var(--ost-sidebar-hover-bg);
+  --bs-table-striped-bg: var(--ost-hover-bg);
   --bs-table-striped-color: var(--ost-text);
-  --bs-table-hover-bg: var(--ost-sidebar-hover-bg);
+  --bs-table-hover-bg: var(--ost-hover-bg);
   --bs-table-hover-color: var(--ost-text);
   --bs-pagination-bg: var(--ost-surface);
   --bs-pagination-color: var(--ost-link);
