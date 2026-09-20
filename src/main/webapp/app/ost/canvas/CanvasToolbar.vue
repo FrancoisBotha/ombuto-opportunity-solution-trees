@@ -38,6 +38,7 @@
     </div>
 
     <div class="ost-toolbar__zoom">
+      <ConnectionIndicator />
       <button
         type="button"
         class="ost-btn ost-toolbar__zoom-btn"
@@ -68,7 +69,7 @@
 
 <script setup lang="ts">
 /**
- * Canvas toolbar row: product scope · search · type-filter chips · zoom −/%/+ · Fit.
+ * Canvas toolbar row: product scope · search · type-filter chips · connection state · zoom −/%/+ · Fit.
  *
  * The search box is also the keyboard way to any node (NFR-3): the canvas only renders the nodes in
  * view, so Tab cannot reach the rest. Enter emits `jump` with the next match (Shift+Enter the
@@ -85,6 +86,7 @@ import { useOstTreeStore } from '../stores/ost-tree.store';
 import { useOstUiStore } from '../stores/ost-ui.store';
 
 import CanvasProductCombo from './CanvasProductCombo.vue';
+import ConnectionIndicator from './ConnectionIndicator.vue';
 import { searchMatches } from './canvas-model';
 
 defineProps<{ zoom: number }>();
@@ -211,6 +213,11 @@ const chips = computed(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* The connection state leads the zoom group (epic §7: "next to the zoom controls"). */
+.ost-toolbar__zoom > .ost-connection {
+  margin-right: 6px;
 }
 
 .ost-root .ost-toolbar__zoom-btn {

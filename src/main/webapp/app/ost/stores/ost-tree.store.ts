@@ -7,8 +7,18 @@ import { layoutTree } from '../domain/layout';
 import { type NodePatch, fromDto, parseKey, toApiType, toPatchBody } from '../domain/mapping';
 import { ALLOWED, canReparent, defaultLinks } from '../domain/rules';
 import type { NodeType, OstNode } from '../domain/types';
-import { DELETED_ELSEWHERE, DEMOTED_TO_VIEWER, type LoadFailure, describeError, httpStatus, loadFailure, messageKey } from '../ost-errors';
+import {
+  DELETED_ELSEWHERE,
+  DEMOTED_TO_VIEWER,
+  type LoadFailure,
+  REMOVED_FROM_TEAM,
+  describeError,
+  httpStatus,
+  loadFailure,
+  messageKey,
+} from '../ost-errors';
 import type {
+  ApiTeamRole,
   CommentDTO,
   HistoryEntryDTO,
   MyTeamDTO,
@@ -64,6 +74,14 @@ export type OstTreeEvent =
       key: string;
       commentId: number;
       commentCount?: number;
+    }
+  | {
+      type: 'MEMBERSHIP_CHANGED';
+      actingUserLogin?: string | null;
+      requestId?: string;
+      login: string;
+      role: ApiTeamRole | null;
+      removed: boolean;
     };
 
 /** Wire-shape event as broadcast by TreeChangePublisher / TreeChangeBroadcaster. */
@@ -84,6 +102,9 @@ interface WireTreeEvent {
   commentCount?: number;
   siblings?: { key: string; sortOrder: number }[];
   descendantKeys?: string[];
+  login?: string;
+  role?: ApiTeamRole | null;
+  removed?: boolean;
 }
 
 /**
@@ -145,6 +166,12 @@ function normalizeEvent(raw: WireTreeEvent): OstTreeEvent | null {
       const commentCount = raw.commentCount ?? (typeof p.commentCount === 'number' ? p.commentCount : undefined);
       return key && commentId != null ? ({ type: 'COMMENT_DELETED', ...meta, key, commentId, commentCount } as OstTreeEvent) : null;
     }
+    case 'MEMBERSHIP_CHANGED': {
+      const login = raw.login ?? (p.login as string);
+      const role = (raw.role ?? (p.role as ApiTeamRole | null) ?? null) as ApiTeamRole | null;
+      const removed = raw.removed ?? !!p.removed;
+      return login ? ({ type: 'MEMBERSHIP_CHANGED', ...meta, login, role, removed } as OstTreeEvent) : null;
+    }
     default:
       return null;
   }
@@ -171,6 +198,21 @@ interface NodeTrack {
   /** seq of the newest patch response applied to this node */
   appliedSeq: number;
   inflight: number;
+}
+
+/** How long a remote-change pulse lasts (FR-036 / epic §7: 1–2 s). */
+export const PULSE_MS = 1600;
+
+/** One node another member just changed, and who changed it (FR-036). */
+export interface RemotePulse {
+  key: string;
+  /** login of the member who made the change */
+  by: string;
+  /** their full name, or the login when the team meta does not know them */
+  name: string;
+  initials: string;
+  /** bumped on every (re)start, so a repeat of the same node restarts the animation */
+  id: number;
 }
 
 export interface TeamMeta {
@@ -296,6 +338,49 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     droppedRemote.value = next;
   }
   const droppedRemoteFor = (key: string): Partial<Record<PatchField, unknown>> => droppedRemote.value[key] ?? {};
+
+  /**
+   * FR-036 — nodes another member just changed, with who changed them. The canvas turns an entry
+   * into a ~1.6 s pulse badge; the entry (not the node component) owns the lifetime, so a node that
+   * is culled out of view, or scrolled into view mid-pulse, needs no mounted component to keep it.
+   * Repeats of the same node restart the window (a new `id` makes a restart observable).
+   */
+  const pulses = ref<Record<string, RemotePulse>>({});
+  let pulseId = 0;
+  const pulseTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function notePulse(key: string, login: string | null | undefined) {
+    if (!key || !login || !byId(key)) return;
+    if (login === team.value?.currentUserLogin) return; // own write (another tab of mine): FR-036 is about someone else
+    const member = memberByLogin(login);
+    const name = [member?.firstName, member?.lastName].filter(Boolean).join(' ') || login;
+    const initials = member?.initials || login.slice(0, 2).toUpperCase();
+    pulses.value = { ...pulses.value, [key]: { key, by: login, name, initials, id: ++pulseId } };
+    const existing = pulseTimers.get(key);
+    if (existing) clearTimeout(existing);
+    pulseTimers.set(
+      key,
+      setTimeout(() => endPulse(key), PULSE_MS),
+    );
+  }
+
+  function endPulse(key: string) {
+    const timer = pulseTimers.get(key);
+    if (timer) clearTimeout(timer);
+    pulseTimers.delete(key);
+    if (!(key in pulses.value)) return;
+    const next = { ...pulses.value };
+    delete next[key];
+    pulses.value = next;
+  }
+
+  function clearPulses() {
+    for (const timer of pulseTimers.values()) clearTimeout(timer);
+    pulseTimers.clear();
+    pulses.value = {};
+  }
+
+  const pulseFor = (key: string): RemotePulse | null => pulses.value[key] ?? null;
 
   // ---- getters -----------------------------------------------------------------------------------
   const index = computed(() => new Map(nodes.value.map(n => [n.id, n])));
@@ -460,6 +545,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     historyGen.clear();
     typingFields.clear();
     droppedRemote.value = {};
+    clearPulses();
     recentRequestIds.length = 0;
     recentRequestIdSet.clear();
   }
@@ -1022,8 +1108,51 @@ export const useOstTreeStore = defineStore('ostTree', () => {
         case 'COMMENT_DELETED':
           applyCommentDeleted(event.key, event.commentId, event.commentCount);
           break;
+        case 'MEMBERSHIP_CHANGED':
+          applyMembershipChanged(event.login, event.role, event.removed);
+          break;
       }
+      // FR-036: the node someone else just touched pulses. A delete has nothing left to pulse, and
+      // a membership change is about a person, not a node.
+      const touched = touchedKey(event);
+      if (touched) notePulse(touched, event.actingUserLogin);
     }
+  }
+
+  /** The node a change event is about, or null when it leaves nothing on the canvas to pulse. */
+  function touchedKey(event: OstTreeEvent): string | null {
+    switch (event.type) {
+      case 'NODE_CREATED':
+      case 'NODE_UPDATED':
+      case 'NODE_MOVED':
+        return event.node.key;
+      case 'NODE_DELETED':
+      case 'MEMBERSHIP_CHANGED':
+        return null;
+      default:
+        return event.key;
+    }
+  }
+
+  /**
+   * FR-037 — a member's role changed (or they were removed). Every subscriber keeps the member list
+   * honest; the affected client also recomputes `canEdit` / `currentUserRole`, so edit affordances
+   * appear or disappear without a reload, and is told why with the message a rejected write uses.
+   */
+  function applyMembershipChanged(login: string, role: ApiTeamRole | null, removed: boolean) {
+    const current = team.value;
+    if (!current) return;
+    const members = removed
+      ? current.members.filter(m => m.login !== login)
+      : current.members.map(m => (m.login === login && role ? { ...m, role } : m));
+    if (login !== current.currentUserLogin) {
+      team.value = { ...current, members };
+      return;
+    }
+    const nextRole: ApiTeamRole = removed ? 'VIEWER' : (role ?? current.currentUserRole);
+    const nextCanEdit = !removed && (nextRole === 'OWNER' || nextRole === 'EDITOR');
+    team.value = { ...current, members, currentUserRole: nextRole, canEdit: nextCanEdit };
+    if (current.canEdit && !nextCanEdit) error.value = removed ? REMOVED_FROM_TEAM : DEMOTED_TO_VIEWER;
   }
 
   function applyNodeUpsert(dtoNode: TreeNodeDTO, isCreate: boolean) {
@@ -1074,8 +1203,13 @@ export const useOstTreeStore = defineStore('ostTree', () => {
   function applyNodeDeleted(key: string) {
     if (!byId(key)) return;
     const hadLocalEdit = patchTracks.has(key) || moveSeqs.has(key) || (typingFields.get(key)?.size ?? 0) > 0;
+    // FR-036: a node open in the detail panel is closed by removeSubtree (it clears the selection);
+    // the user is told why with the same toast a rejected write shows. The whole subtree counts —
+    // the open node may be a descendant of the deleted one.
+    const open = useOstUiStore().selectedId;
+    const wasOpen = !!open && (open === key || descendantIds(key, nodes.value).includes(open));
     removeSubtree(key);
-    if (hadLocalEdit) error.value = DELETED_ELSEWHERE;
+    if (hadLocalEdit || wasOpen) error.value = DELETED_ELSEWHERE;
   }
 
   function applyLinkUpsert(key: string, link: NodeLinkDTO, isAdd: boolean) {
@@ -1156,8 +1290,10 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     history,
     loadSeq,
     droppedRemote,
+    pulses,
     // getters
     droppedRemoteFor,
+    pulseFor,
     byId,
     childrenOf,
     canEdit,
@@ -1192,6 +1328,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     deleteComment,
     loadHistory,
     applyEvents,
+    endPulse,
+    clearPulses,
     markTyping,
     clearTyping,
     acknowledgeDroppedRemote,

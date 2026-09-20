@@ -12,6 +12,7 @@
         'is-drop': dropTarget,
         'is-editing': editing,
         'has-priority': isOpportunity,
+        'is-pulsing': !!pulse,
       },
     ]"
     :style="{ width: `${box.w}px`, minHeight: `${box.h}px` }"
@@ -27,6 +28,22 @@
     @keydown="onKeydown"
   >
     <Handle type="target" :position="Position.Top" class="ost-node__handle" :connectable="false" />
+
+    <!-- FR-036: someone else just changed this node. Both layers are out of flow and inert, so the
+         pulse cannot shift the layout, take the pointer or take focus. `key` restarts the animation
+         when the same node is changed again. -->
+    <template v-if="pulse">
+      <span :key="`ring-${pulse.id}`" class="ost-node__pulse-ring" aria-hidden="true"></span>
+      <span
+        :key="`by-${pulse.id}`"
+        class="ost-node__pulse-by"
+        :title="`${pulse.name} just changed this`"
+        :data-cy="`ost-node-pulse-${node.id}`"
+        :data-by="pulse.by"
+        aria-hidden="true"
+        >{{ pulse.initials }}</span
+      >
+    </template>
 
     <div class="ost-node__kicker">{{ box.label }}</div>
     <!-- The + comes first in tab order (it is absolutely positioned top-right). -->
@@ -140,6 +157,7 @@ import { Handle, Position } from '@vue-flow/core';
 import { statusTone } from '../domain/derive';
 import { TYPE_BOX, priorityColor, priorityLabel } from '../domain/rules';
 import type { NodeType, OstNode } from '../domain/types';
+import type { RemotePulse } from '../stores/ost-tree.store';
 
 import AddChildMenu from './AddChildMenu.vue';
 import NodeTitleEditor from './NodeTitleEditor.vue';
@@ -170,6 +188,8 @@ const props = withDefaults(
     evidenceScore?: number | null;
     /** solutions: how many assumptions (tests) the strength is rolled up from */
     evidenceTests?: number;
+    /** FR-036: set while another member's change to this node is pulsing (ost-tree.store pulseFor) */
+    pulse?: RemotePulse | null;
   }>(),
   {
     selected: false,
@@ -187,6 +207,7 @@ const props = withDefaults(
     editError: null,
     evidenceScore: null,
     evidenceTests: 0,
+    pulse: null,
   },
 );
 
@@ -213,7 +234,15 @@ const value = computed(() => Math.min(5, Math.max(0, Math.round(props.node.value
 
 /** "Opportunity: Faster onboarding, exploring, selected" — type + title + status (+ state). */
 const accessibleName = computed(() =>
-  [`${box.value.label}: ${props.node.title}`, props.node.status, props.selected ? 'selected' : '', props.collapsed ? 'collapsed' : '']
+  [
+    `${box.value.label}: ${props.node.title}`,
+    props.node.status,
+    props.selected ? 'selected' : '',
+    props.collapsed ? 'collapsed' : '',
+    // Part of the name rather than a live region: a burst of remote changes must not chatter, and
+    // FR-036 forbids stealing focus. A user who reaches the node hears who just changed it.
+    props.pulse ? `changed by ${props.pulse.name}` : '',
+  ]
     .filter(Boolean)
     .join(', '),
 );
@@ -349,6 +378,76 @@ const priorityDots = computed(() =>
 }
 .ost-node.is-dimmed {
   opacity: 0.24;
+}
+
+/* ---- remote-change pulse (FR-036) ------------------------------------------------------------
+ * Both layers are absolutely positioned and inert: nothing here changes the node's box, so the
+ * layout and the viewport stay exactly where they were. Accent tokens only — a remote change is
+ * news, not an error. */
+.ost-node__pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: calc(var(--radius-md) + 3px);
+  border: 2px solid var(--color-accent-400);
+  pointer-events: none;
+  animation: ost-node-pulse 1.6s ease-out 1 both;
+}
+
+.ost-node__pulse-by {
+  position: absolute;
+  left: -6px;
+  top: -10px;
+  z-index: 21;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-family: var(--font-heading);
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-800);
+  border: 1px solid var(--color-accent-600);
+  color: var(--color-accent-100);
+  pointer-events: none;
+  animation: ost-node-pulse-by 1.6s ease-out 1 both;
+}
+
+@keyframes ost-node-pulse {
+  0% {
+    opacity: 0;
+    box-shadow: 0 0 0 0 var(--color-accent-800);
+  }
+  12% {
+    opacity: 1;
+    box-shadow: 0 0 0 5px var(--color-accent-900);
+  }
+  100% {
+    opacity: 0;
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+
+@keyframes ost-node-pulse-by {
+  0% {
+    opacity: 0;
+  }
+  10%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: the ring and the badge still say who changed what, they just do not animate. */
+@media (prefers-reduced-motion: reduce) {
+  .ost-node__pulse-ring,
+  .ost-node__pulse-by {
+    animation: none;
+  }
 }
 
 /* ---- content --------------------------------------------------------------------------------- */
