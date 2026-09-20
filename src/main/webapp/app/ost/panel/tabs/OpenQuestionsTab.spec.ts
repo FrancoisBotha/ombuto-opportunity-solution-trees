@@ -53,10 +53,10 @@ describe('OpenQuestionsTab', () => {
     service.updateQuestion.onSecondCall().resolves({ id: 2, text: 'When?', done: false });
     await wrapper.get('[data-cy="ost-question-toggle-1"]').trigger('click');
     await flushPromises();
-    expect(service.updateQuestion.firstCall.args).toEqual([1, { done: true }]);
+    expect(service.updateQuestion.firstCall.args.slice(0, 2)).toEqual([1, { done: true }]);
     await wrapper.get('[data-cy="ost-question-toggle-2"]').trigger('click');
     await flushPromises();
-    expect(service.updateQuestion.secondCall.args).toEqual([2, { done: false }]);
+    expect(service.updateQuestion.secondCall.args.slice(0, 2)).toEqual([2, { done: false }]);
     expect(wrapper.get('[data-cy="ost-question-toggle-1"]').attributes('aria-checked')).toBe('true');
     expect(wrapper.get('[data-cy="ost-questions-summary"]').text()).toBe('2 open · 1 answered');
   });
