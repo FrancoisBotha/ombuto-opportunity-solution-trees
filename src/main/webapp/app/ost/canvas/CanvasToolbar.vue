@@ -139,8 +139,14 @@ function jump(step: 1 | -1) {
   emit('jump', key);
 }
 
+/**
+ * The chips dim what is on the canvas, so their counts describe the canvas: the product in scope,
+ * not the whole team tree (FR-C8 with FR-N2). The same scope the search jump uses.
+ */
 const chips = computed(() => {
-  const counts = countByType(tree.nodes);
+  const inScope = new Set(tree.roots.map(r => r.id));
+  const rootOf = (key: string) => tree.ancestors(key)[0]?.id ?? key;
+  const counts = countByType(tree.nodes.filter(n => inScope.has(rootOf(n.id))));
   return CHIP_TYPES.map(type => ({ type, label: TYPE_BOX[type].label, count: counts[type], on: !ui.hiddenTypes[type] }));
 });
 </script>

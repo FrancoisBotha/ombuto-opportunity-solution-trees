@@ -6,7 +6,13 @@
     </p>
     <template #actions>
       <button type="button" class="ost-btn" data-cy="ostConfirmDeleteCancel" autofocus :disabled="busy" @click="cancel">Cancel</button>
-      <button type="button" class="ost-btn ost-btn--destructive" data-cy="ostConfirmDeleteConfirm" :disabled="busy" @click="confirm">
+      <button
+        type="button"
+        class="ost-btn ost-btn--destructive"
+        data-cy="ostConfirmDeleteConfirm"
+        :disabled="busy || !tree.canEdit"
+        @click="confirm"
+      >
         Delete
       </button>
     </template>
@@ -36,7 +42,9 @@ function cancel() {
 }
 
 async function confirm() {
-  if (!node.value || busy.value) return;
+  // A demotion that arrives while the dialog is open (MEMBERSHIP_CHANGED, FR-037) takes every other
+  // edit affordance away; this one has to go too, rather than fire a write the server will refuse.
+  if (!node.value || busy.value || !tree.canEdit) return;
   busy.value = true;
   try {
     await tree.deleteNode(node.value.id);

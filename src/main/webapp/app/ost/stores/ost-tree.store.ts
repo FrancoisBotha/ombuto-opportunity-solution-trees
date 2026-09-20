@@ -563,15 +563,22 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     return teams.value;
   }
 
-  async function loadTree(id: number) {
+  /**
+   * Reads the team's tree. `background: true` (a realtime resync: reconnect, gap or epoch change)
+   * refreshes the team already on screen WITHOUT raising `loading`, so the shell keeps the page
+   * mounted: the viewport, an open `+` menu and a rename draft survive the resync. A failure is
+   * still reported the usual way (a member removed mid-session must land on the forbidden state).
+   */
+  async function loadTree(id: number, options: { background?: boolean } = {}) {
     const seq = ++loadSeq.value;
     const ui = useOstUiStore();
-    if (teamId.value !== id) {
+    const switching = teamId.value !== id;
+    if (switching) {
       reset();
       ui.reset();
     }
     teamId.value = id;
-    loading.value = true;
+    if (!options.background || switching) loading.value = true;
     loadError.value = null;
     try {
       const dto = await api().getTree(id);
@@ -878,7 +885,10 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       recordWrite(key);
       return true;
     } catch (err) {
-      node.links.splice(i, 0, removed);
+      // Put it back on the CURRENT list (a remote event may have replaced the array meanwhile), and
+      // only when it is not already there — never at a stale index, never twice.
+      const list = byId(key)?.links;
+      if (list && !list.some(l => l.id === linkId)) list.splice(Math.min(i, list.length), 0, removed);
       await failOnNodes(err, [key], 'The link could not be removed.');
       return false;
     }
@@ -942,7 +952,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       await api().deleteQuestion(questionId, requestId);
       return true;
     } catch (err) {
-      node.questions.splice(i, 0, removed);
+      const list = byId(key)?.questions;
+      if (list && !list.some(q => q.id === questionId)) list.splice(Math.min(i, list.length), 0, removed);
       await failOnNodes(err, [key], 'The question could not be removed.');
       return false;
     }
@@ -1250,15 +1261,18 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     const node = byId(key);
     if (!node) return;
     const list = comments.value[key];
+    let length: number | null = null;
     if (list) {
       const i = list.findIndex(c => c.id === dto.id);
       const next = list.slice();
       if (i >= 0) next.splice(i, 1, dto);
-      else if (isAdd) next.push(dto);
       else next.push(dto);
       comments.value = { ...comments.value, [key]: next };
+      length = next.length;
     }
-    node.commentCount = count !== undefined ? count : list ? list.length : node.commentCount + (isAdd ? 1 : 0);
+    // Without a count on the event, fall back to the thread AFTER this message went in — `list` is
+    // the array from before the add, so its length would leave the chip one behind the bubbles.
+    node.commentCount = count !== undefined ? count : (length ?? node.commentCount + (isAdd ? 1 : 0));
   }
 
   function applyCommentDeleted(key: string, commentId: number, count: number | undefined) {

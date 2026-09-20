@@ -30,6 +30,35 @@ describe('CanvasToolbar', () => {
     w.unmount();
   });
 
+  it('counts on the type chips describe the product on the canvas, not the whole team tree', async () => {
+    // The chips dim what is laid out, so their numbers have to agree with what is on screen
+    // (FR-C8 with FR-N2). They used to count every node in the team, so scoping the canvas to one
+    // product left the chips reporting the other products' nodes too.
+    const { setupStores } = await import('../panel/panel.test-util');
+    const { dto } = await import('../domain/fixtures.test-util');
+    const ctx = await setupStores([
+      dto('product-1', null),
+      dto('outcome-1', 'product-1'),
+      dto('opportunity-1', 'outcome-1'),
+      dto('opportunity-2', 'outcome-1'),
+      dto('product-2', null, { sortOrder: 1 }),
+      dto('outcome-2', 'product-2'),
+      dto('opportunity-3', 'outcome-2'),
+    ]);
+    const w = mount(CanvasToolbar, { props: { zoom: 1 }, attachTo: document.body, global: { plugins: [ctx.pinia] } });
+    const count = (type: string) => w.get(`[data-cy="ost-filter-${type}"]`).text();
+
+    expect(count('opportunity')).toContain('3');
+    ctx.ui.setProduct('product-2');
+    await w.vm.$nextTick();
+    expect(count('opportunity')).toContain('1');
+    expect(count('outcome')).toContain('1');
+    ctx.ui.setProduct('all');
+    await w.vm.$nextTick();
+    expect(count('opportunity')).toContain('3');
+    w.unmount();
+  });
+
   it('the product combo carets and check use the Phosphor regular weight (prototype paths)', async () => {
     const w = mountToolbar();
     const caret = w.get('[data-cy="ost-product-combo"] svg path').attributes('d') ?? '';

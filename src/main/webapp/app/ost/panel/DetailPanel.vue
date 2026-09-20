@@ -207,7 +207,9 @@ function commitTitle() {
   const next = title.value.trim();
   if (next.length < 2) {
     title.value = current.title;
-    if (next.length) errors.report('Titles need at least 2 characters.', current.id);
+    // Say why the title snapped back — an empty title used to revert in silence, which reads as a
+    // glitch rather than a rule (FR-D1).
+    errors.report(next.length ? 'Titles need at least 2 characters.' : 'A title is required.', current.id);
     return;
   }
   if (next === current.title) {

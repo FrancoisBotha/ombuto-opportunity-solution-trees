@@ -146,6 +146,20 @@ describe('DetailTab', () => {
       await flushPromises();
       expect(service.patchNode.calledOnceWith('opportunity', 1, { valueRating: 5 })).toBe(true);
     });
+
+    it('shows an unset value as “—”, not as a value nobody chose', async () => {
+      // A row written outside TreeNodeWriteService (a restore, the MCP server) can arrive with no
+      // valueRating; the label used to substitute 3 and read "Solid" over zero filled $ glyphs.
+      const ctx = await setupStores([
+        dto('product-1', null),
+        dto('outcome-1', 'product-1'),
+        dto('opportunity-1', 'outcome-1', { status: 'EXPLORING', priority: 50, valueRating: null }),
+      ]);
+      ctx.ui.select('opportunity-1');
+      const wrapper = await mountWith(DetailTab, ctx.pinia, { nodeKey: 'opportunity-1' });
+      expect(wrapper.get('[data-cy="ost-value-label"]').text()).toBe('—');
+      expect(wrapper.findAll('.ost-value__step.is-on')).toHaveLength(0);
+    });
   });
 
   describe('priority slider', () => {

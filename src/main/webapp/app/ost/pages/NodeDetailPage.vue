@@ -175,7 +175,15 @@ const shownError = computed(() => {
 });
 
 const detailRoute = (key: string) => ({ name: 'OstNodeDetail', params: { teamId: teamId.value, nodeKey: key } });
-const canvasRoute = computed(() => ({ name: 'OstCanvas', params: { teamId: teamId.value }, query: { node: nodeKey.value } }));
+/**
+ * Back to the canvas, on the node AND in the product scope the user left it in: the canvas reads
+ * its scope from `?product=` and falls back to "All products" when it is absent (FR-N2 / US-13).
+ */
+const canvasRoute = computed(() => ({
+  name: 'OstCanvas',
+  params: { teamId: teamId.value },
+  query: { node: nodeKey.value, ...(ui.productId !== 'all' ? { product: ui.productId } : {}) },
+}));
 
 // ---- the page's node is the selection -----------------------------------------------------------
 watch(

@@ -501,6 +501,57 @@ describe('OST tree store', () => {
       expect(tree.byId('outcome-1')?.links).toHaveLength(1);
     });
 
+    it('rolls a failed link removal back by identity, not by a stale index', async () => {
+      // The index was captured before the request. A remote LINK_ADDED (or the user adding a link)
+      // while the DELETE was in flight shifted the list, so the restored row reappeared in the
+      // wrong place — and a remote event that replaced the array could duplicate it.
+      service.addLink.onFirstCall().resolves({ id: 5, name: 'A', url: 'https://a.test' });
+      service.addLink.onSecondCall().resolves({ id: 6, name: 'B', url: 'https://b.test' });
+      await tree.addLink('outcome-1', { name: 'A', url: 'https://a.test' });
+      await tree.addLink('outcome-1', { name: 'B', url: 'https://b.test' });
+
+      let refuse!: (e: unknown) => void;
+      service.deleteLink.returns(new Promise((_, r) => (refuse = r)) as any);
+      const pending = tree.removeLink('outcome-1', 6);
+      // Someone else re-sends the node while the delete is in flight: a fresh links array.
+      tree.applyEvents([
+        {
+          type: 'NODE_UPDATED',
+          actingUserLogin: 'someone-else',
+          node: dto('outcome-1', 'product-1', {
+            links: [
+              { id: 5, name: 'A', url: 'https://a.test' },
+              { id: 6, name: 'B', url: 'https://b.test' },
+            ],
+          }),
+        },
+      ]);
+      refuse(apiError(500));
+      expect(await pending).toBe(false);
+
+      expect(tree.byId('outcome-1')?.links.map(l => l.id)).toEqual([5, 6]);
+    });
+
+    it('rolls a failed question removal back without duplicating one that is already back', async () => {
+      service.addQuestion.onFirstCall().resolves({ id: 11, text: 'Who?', done: false });
+      await tree.addQuestion('opportunity-1', 'Who?');
+
+      let refuse!: (e: unknown) => void;
+      service.deleteQuestion.returns(new Promise((_, r) => (refuse = r)) as any);
+      const pending = tree.removeQuestion('opportunity-1', 11);
+      tree.applyEvents([
+        {
+          type: 'NODE_UPDATED',
+          actingUserLogin: 'someone-else',
+          node: dto('opportunity-1', 'outcome-1', { questions: [{ id: 11, text: 'Who?', done: false }] }),
+        },
+      ]);
+      refuse(apiError(500));
+      expect(await pending).toBe(false);
+
+      expect(tree.byId('opportunity-1')?.questions.map(q => q.id)).toEqual([11]);
+    });
+
     it('restores only missing default links', async () => {
       service.addLink.callsFake(async (_t, _id, link) => ({ id: Math.random(), ...link }));
       await tree.restoreDefaultLinks('opportunity-1');
