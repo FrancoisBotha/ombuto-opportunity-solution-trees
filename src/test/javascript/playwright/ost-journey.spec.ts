@@ -1,4 +1,4 @@
-import { type Browser, type Locator, type Page, type Response, expect, test } from '@playwright/test';
+import { type Browser, type Locator, type Page, type Response, type WebSocket, expect, test } from '@playwright/test';
 
 import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
@@ -62,6 +62,28 @@ const takeErrors = (page: Page) => {
   const list = errorsOf.get(page) ?? [];
   return list.splice(0, list.length);
 };
+
+/**
+ * Resolves once this page has sent the STOMP SUBSCRIBE for the team's tree topic — the point from
+ * which it is guaranteed to receive events. Nothing replays what was published before that, so any
+ * scenario that publishes an event *at* an open page has to wait for it rather than for the canvas
+ * to render. Same gate as `ost-realtime.spec.ts`.
+ */
+function subscribedToTree(page: Page, teamId: number): Promise<void> {
+  return new Promise<void>(resolve => {
+    const onSocket = (ws: WebSocket) => {
+      if (!ws.url().includes('/websocket/tracker')) return;
+      ws.on('framesent', frame => {
+        const body = String(frame.payload);
+        if (body.includes('SUBSCRIBE') && body.includes(`/topic/teams/${teamId}/tree`)) {
+          page.off('websocket', onSocket);
+          resolve();
+        }
+      });
+    };
+    page.on('websocket', onSocket);
+  });
+}
 
 const node = (page: Page, key: string) => page.getByTestId(`ost-node-${key}`);
 const title = (page: Page, key: string) => node(page, key).getByTestId('ost-node-title');
@@ -747,9 +769,16 @@ test.describe('OST journey (editor, then viewer)', () => {
     test.setTimeout(150_000);
     // The editor's page is open (loaded as an EDITOR) when the owner demotes them.
     const stale = user.page;
+    // Nothing replays events published before a client's SUBSCRIBE reaches the broker, so the
+    // demotion below must not be issued until this page is genuinely subscribed. A visible canvas
+    // is not that guarantee: the tree read and the STOMP handshake race, and when the PUT won the
+    // page simply never received MEMBERSHIP_CHANGED and this test hung on `ostError` (S2 — seen on
+    // 3 of 6 full suite runs before this gate).
+    const ready = subscribedToTree(stale, teamId);
     await stale.goto(`/trees/${teamId}/canvas`);
     await expect(node(stale, k.op2)).toBeVisible();
     await expect(stale.getByTestId(`ost-node-add-${k.op2}`)).toBeVisible();
+    await ready;
     const demoted = await admin.api('put', `/api/team-management/teams/${teamId}/members/${userId}`, { role: 'VIEWER' });
     expect(demoted.status()).toBe(200);
 

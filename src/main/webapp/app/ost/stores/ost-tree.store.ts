@@ -254,6 +254,14 @@ export const useOstTreeStore = defineStore('ostTree', () => {
   const loadError = ref<LoadFailure | null>(null);
   /** Last failed action, surfaced to the user; cleared by clearError(). */
   const error = ref<string | null>(null);
+  /**
+   * FR-034/FR-037 — set when a MEMBERSHIP_CHANGED event says the signed-in user was removed from
+   * the team that is open. The shell watches it and closes the realtime subscription: a removal
+   * does not end the STOMP session, so without this the client keeps a subscription it is no
+   * longer entitled to. The server drops those frames too (TreeTopicOutboundInterceptor); doing
+   * both means neither side is the only thing standing between a former member and the tree.
+   */
+  const removedFromCurrentTeam = ref(false);
   /** Chat threads by node key, oldest first (loaded on demand). */
   const comments = ref<Record<string, CommentDTO[]>>({});
   /** History by node key, newest first (loaded on demand, invalidated by writes). */
@@ -538,6 +546,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     loading.value = false;
     loadError.value = null;
     error.value = null;
+    removedFromCurrentTeam.value = false;
     comments.value = {};
     history.value = {};
     patchTracks.clear();
@@ -580,6 +589,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     teamId.value = id;
     if (!options.background || switching) loading.value = true;
     loadError.value = null;
+    removedFromCurrentTeam.value = false;
     try {
       const dto = await api().getTree(id);
       if (seq !== loadSeq.value) return false;
@@ -1163,7 +1173,14 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     const nextRole: ApiTeamRole = removed ? 'VIEWER' : (role ?? current.currentUserRole);
     const nextCanEdit = !removed && (nextRole === 'OWNER' || nextRole === 'EDITOR');
     team.value = { ...current, members, currentUserRole: nextRole, canEdit: nextCanEdit };
-    if (current.canEdit && !nextCanEdit) error.value = removed ? REMOVED_FROM_TEAM : DEMOTED_TO_VIEWER;
+    // A removal is always worth saying, including to a VIEWER, who had no edit affordances to lose
+    // and would otherwise sit in front of a tree they are no longer a member of with no explanation.
+    if (removed) {
+      error.value = REMOVED_FROM_TEAM;
+      removedFromCurrentTeam.value = true;
+    } else if (current.canEdit && !nextCanEdit) {
+      error.value = DEMOTED_TO_VIEWER;
+    }
   }
 
   function applyNodeUpsert(dtoNode: TreeNodeDTO, isCreate: boolean) {
@@ -1300,6 +1317,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     loading,
     loadError,
     error,
+    removedFromCurrentTeam,
     comments,
     history,
     loadSeq,

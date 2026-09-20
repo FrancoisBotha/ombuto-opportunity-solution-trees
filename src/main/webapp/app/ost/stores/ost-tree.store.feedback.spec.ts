@@ -176,6 +176,39 @@ describe('OST tree store — remote-change feedback (RTC-006)', () => {
     expect(tree.team?.members.some(m => m.login === 'user')).toBe(false);
   });
 
+  /**
+   * S2 / FR-034 — being removed does not end the STOMP session, and the SUBSCRIBE was authorised
+   * once. The store raises this flag so the shell can drop the subscription; without it the former
+   * member's socket kept carrying the team's tree.
+   */
+  it('a removal of this user raises the signal the shell unsubscribes on', () => {
+    expect(tree.removedFromCurrentTeam).toBe(false);
+    tree.applyEvents([wire('MEMBERSHIP_CHANGED', 'admin', { login: 'user', role: null, removed: true })]);
+    expect(tree.removedFromCurrentTeam).toBe(true);
+  });
+
+  it('another member being removed leaves this session subscribed', () => {
+    tree.applyEvents([wire('MEMBERSHIP_CHANGED', 'user', { login: 'admin', role: null, removed: true })]);
+    expect(tree.removedFromCurrentTeam).toBe(false);
+    expect(tree.error).toBeNull();
+  });
+
+  /**
+   * S2 — a VIEWER has no edit affordances to lose, so the old `canEdit && !canEdit` guard said
+   * nothing at all when they were removed: they sat in front of a team they no longer belonged to
+   * with no explanation, and (before the signal above) still subscribed to it.
+   */
+  it('a removal is announced to a viewer too, who had no edit affordances to lose', () => {
+    tree.applyEvents([wire('MEMBERSHIP_CHANGED', 'admin', { login: 'user', role: 'VIEWER', removed: false })]);
+    tree.clearError();
+    expect(tree.canEdit).toBe(false);
+
+    tree.applyEvents([wire('MEMBERSHIP_CHANGED', 'admin', { login: 'user', role: null, removed: true })]);
+
+    expect(tree.error).toBe(REMOVED_FROM_TEAM);
+    expect(tree.removedFromCurrentTeam).toBe(true);
+  });
+
   it('another member’s role change updates the member list but not this user’s own permissions', () => {
     tree.applyEvents([wire('MEMBERSHIP_CHANGED', 'user', { login: 'admin', role: 'OWNER', removed: false })]);
     expect(tree.team?.members.find(m => m.login === 'admin')?.role).toBe('OWNER');

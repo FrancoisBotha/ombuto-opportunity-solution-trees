@@ -33,6 +33,7 @@ import com.opportunity.tree.service.broadcast.MembershipChangedPayload;
 import com.opportunity.tree.service.broadcast.QuestionChangedPayload;
 import com.opportunity.tree.service.broadcast.QuestionRemovedPayload;
 import com.opportunity.tree.service.broadcast.TreeChangeEvent;
+import com.opportunity.tree.service.broadcast.TreeTopicRevocationRegistry;
 import com.opportunity.tree.service.broadcast.TreeChangePublisher;
 import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.AddTeamMemberRequest;
@@ -82,6 +83,9 @@ class TreeCollaborationBroadcastIT {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private TreeTopicRevocationRegistry revocations;
 
     @Autowired
     private ObjectMapper om;
@@ -319,6 +323,50 @@ class TreeCollaborationBroadcastIT {
         assertThat(payload.role()).isNull();
     }
 
+    /**
+     * S2 / FR-034, NFR-011 — a removal must also silence the subscription the removed member
+     * already holds. The SUBSCRIBE was authorised once; without this the socket kept delivering
+     * the team's full node payloads to a non-member for as long as the tab stayed open. The
+     * revocation is recorded before the frame goes out (the outbound channel is asynchronous, so
+     * "send then revoke" would race), and the notice itself carries the header that lets it
+     * through to the session it just cut off.
+     */
+    @Test
+    void removeMemberRevokesTheOpenSubscriptionAndStampsTheNotice() throws Exception {
+        addMember(outsider.getId(), TeamRole.EDITOR);
+        revocations.clear();
+        org.mockito.Mockito.reset(messagingTemplate);
+
+        mvc
+            .perform(
+                delete("/api/team-management/teams/{id}/members/{userId}", team.getId(), outsider.getId()).with(user(OWNER)).with(csrf())
+            )
+            .andExpect(status().isNoContent());
+
+        assertThat(revocations.isRevoked(team.getId(), OUTSIDER)).as("the removed member's subscription is revoked").isTrue();
+        assertThat(revocations.isRevoked(team.getId(), OWNER)).as("nobody else is").isFalse();
+
+        ArgumentCaptor<java.util.Map<String, Object>> headers = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(messagingTemplate).convertAndSend(any(String.class), any(Object.class), headers.capture());
+        assertThat(headers.getValue()).containsEntry(TreeTopicRevocationRegistry.REVOKED_LOGIN_HEADER, OUTSIDER);
+    }
+
+    /** …and adding them back lets their frames flow again. */
+    @Test
+    void addingAMemberBackRestoresDelivery() throws Exception {
+        addMember(outsider.getId(), TeamRole.EDITOR);
+        mvc
+            .perform(
+                delete("/api/team-management/teams/{id}/members/{userId}", team.getId(), outsider.getId()).with(user(OWNER)).with(csrf())
+            )
+            .andExpect(status().isNoContent());
+        assertThat(revocations.isRevoked(team.getId(), OUTSIDER)).isTrue();
+
+        addMember(outsider.getId(), TeamRole.VIEWER);
+
+        assertThat(revocations.isRevoked(team.getId(), OUTSIDER)).isFalse();
+    }
+
     // ADHOC-001 — adding a member publishes MEMBERSHIP_CHANGED too, so a user granted access sees
     // it without a reload.
     @Test
@@ -512,10 +560,24 @@ class TreeCollaborationBroadcastIT {
         return em.createQuery("select c from Comment c order by c.id desc", Comment.class).setMaxResults(1).getSingleResult();
     }
 
+    /**
+     * Collects what was broadcast, over both {@code convertAndSend} overloads: a removal notice
+     * carries the {@link com.opportunity.tree.service.broadcast.TreeTopicRevocationRegistry#REVOKED_LOGIN_HEADER}
+     * header and therefore goes out through the three-argument form.
+     */
     private TreeChangeEvent capturedEvent() {
-        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(any(String.class), payload.capture());
-        List<Object> values = payload.getAllValues();
+        List<Object> values = new java.util.ArrayList<>();
+        ArgumentCaptor<Object> plain = ArgumentCaptor.forClass(Object.class);
+        verify(messagingTemplate, org.mockito.Mockito.atLeast(0)).convertAndSend(any(String.class), plain.capture());
+        values.addAll(plain.getAllValues());
+        ArgumentCaptor<Object> withHeaders = ArgumentCaptor.forClass(Object.class);
+        verify(messagingTemplate, org.mockito.Mockito.atLeast(0)).convertAndSend(
+            any(String.class),
+            withHeaders.capture(),
+            org.mockito.ArgumentMatchers.<java.util.Map<String, Object>>any()
+        );
+        values.addAll(withHeaders.getAllValues());
+        assertThat(values).as("something was broadcast").isNotEmpty();
         return (TreeChangeEvent) values.get(values.size() - 1);
     }
 }

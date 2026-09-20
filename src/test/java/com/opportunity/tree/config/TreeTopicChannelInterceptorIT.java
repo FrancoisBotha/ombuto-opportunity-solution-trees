@@ -10,6 +10,7 @@ import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.TeamRole;
 import com.opportunity.tree.repository.TeamMemberRepository;
 import com.opportunity.tree.repository.UserRepository;
+import com.opportunity.tree.service.broadcast.TreeTopicRevocationRegistry;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
@@ -92,6 +93,9 @@ class TreeTopicChannelInterceptorIT {
 
     @Autowired
     private SimpleBrokerMessageHandler broker;
+
+    @Autowired
+    private TreeTopicRevocationRegistry revocations;
 
     private Team team;
     private User ownerUser;
@@ -225,6 +229,79 @@ class TreeTopicChannelInterceptorIT {
         }
     }
 
+    /**
+     * S2 / FR-034, NFR-011 — a member removed mid-session, on a socket that deliberately never
+     * unsubscribes.
+     *
+     * <p>SUBSCRIBE was authorised once, when the frame arrived, and the subscription then lives for
+     * as long as the socket. Asking the client to unsubscribe (which RTC-006 does) is not
+     * authorisation: a client that ignores the request, or an attacker holding the socket open, kept
+     * receiving the team's full tree events for as long as the tab stayed open. Here the viewer's
+     * session subscribes legitimately, is confirmed to be receiving, is then revoked — and never
+     * sends an UNSUBSCRIBE or a DISCONNECT. From that point the broker still fans out to its
+     * subscription, and {@link TreeTopicOutboundInterceptor} is the only thing that stops the frames
+     * reaching it; the owner's session is the positive control that the broadcasts really happened.
+     *
+     * <p>That the revocation is recorded by a real removal through the membership API is pinned
+     * separately, in {@code TreeCollaborationBroadcastIT}.
+     */
+    @Test
+    @Transactional
+    void aRemovedMemberWhoNeverUnsubscribesStopsReceiving() throws Exception {
+        String revokedSession = "session-revoked-" + UUID.randomUUID();
+        String memberSession = "session-member-" + UUID.randomUUID();
+        List<Message<?>> delivered = new CopyOnWriteArrayList<>();
+        ChannelInterceptor capture = new ChannelInterceptor() {
+            @Override
+            public Message<?> preSend(Message<?> message, MessageChannel channel) {
+                delivered.add(message);
+                return message;
+            }
+        };
+        clientOutboundChannel.addInterceptor(capture);
+        try {
+            authenticateAs(VIEWER_LOGIN);
+            broker.handleMessage(connectFrame(revokedSession));
+            assertThat(clientInboundChannel.send(subscribeFrame(treeTopic(), revokedSession))).isTrue();
+            authenticateAs(OWNER_LOGIN);
+            broker.handleMessage(connectFrame(memberSession));
+            assertThat(clientInboundChannel.send(subscribeFrame(treeTopic(), memberSession))).isTrue();
+
+            // Both sessions are genuinely being served before anything is revoked. Without this the
+            // "receives nothing" assertion below would pass on a subscription that never worked.
+            assertThat(broadcastUntilBothServed(delivered, revokedSession, memberSession))
+                .as("both sessions are receiving to begin with")
+                .isTrue();
+
+            revocations.revoke(team.getId(), VIEWER_LOGIN);
+
+            // The frame that tells them they were removed is the one exception, and it is delivered.
+            delivered.clear();
+            messagingTemplate.convertAndSend(
+                treeTopic(),
+                "membership-removed",
+                java.util.Map.of(TreeTopicRevocationRegistry.REVOKED_LOGIN_HEADER, VIEWER_LOGIN)
+            );
+            assertThat(awaitServed(delivered, revokedSession))
+                .as("the removal notice still reaches the session it cuts off")
+                .isTrue();
+
+            // Everything after it is dropped, although the socket is still subscribed.
+            delivered.clear();
+            assertThat(broadcastUntilBothServed(delivered, memberSession, memberSession))
+                .as("the team is really being broadcast to")
+                .isTrue();
+            assertThat(sessionsOf(delivered))
+                .as("nothing further reaches the removed member's still-open subscription")
+                .doesNotContain(revokedSession);
+        } finally {
+            revocations.clear();
+            clientOutboundChannel.removeInterceptor(capture);
+            disconnectQuietly(revokedSession);
+            disconnectQuietly(memberSession);
+        }
+    }
+
     // AC 8 — a client SEND to a tree topic is rejected. Either the message-level
     // AuthorizationManager throws AccessDeniedException (denyAll rule) or the
     // interceptor refuses the frame; either way the send does not reach
@@ -255,6 +332,31 @@ class TreeTopicChannelInterceptorIT {
      * repeated until the member's session is served (or the deadline passes). Once it is, a short
      * grace period gives any wrongly-delivered copy time to show up before the assertions run.
      */
+    /** Broadcasts until both sessions have been served, then leaves a short grace for stragglers. */
+    private boolean broadcastUntilBothServed(List<Message<?>> delivered, String first, String second) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 4_000;
+        while (System.currentTimeMillis() < deadline) {
+            messagingTemplate.convertAndSend(treeTopic(), "tree-event-for-members-only");
+            List<String> served = sessionsOf(delivered);
+            if (served.contains(first) && served.contains(second)) {
+                Thread.sleep(250);
+                return true;
+            }
+            Thread.sleep(25);
+        }
+        return false;
+    }
+
+    /** Waits for one already-sent broadcast to reach `sessionId`. */
+    private boolean awaitServed(List<Message<?>> delivered, String sessionId) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 4_000;
+        while (System.currentTimeMillis() < deadline) {
+            if (sessionsOf(delivered).contains(sessionId)) return true;
+            Thread.sleep(25);
+        }
+        return false;
+    }
+
     private boolean broadcastUntilDelivered(List<Message<?>> delivered, String sessionId) throws InterruptedException {
         long deadline = System.currentTimeMillis() + 15_000;
         while (System.currentTimeMillis() < deadline) {

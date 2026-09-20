@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.domain.Team;
+import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.service.DefaultNodeLinks;
@@ -18,9 +19,13 @@ import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
 import com.opportunity.tree.service.TreeNodeCascadeService;
+import com.opportunity.tree.service.TreeNodeDtoAssembler;
 import com.opportunity.tree.service.TreeStructureLock;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
+import com.opportunity.tree.service.dto.tree.TreeNodeDTO;
 import com.opportunity.tree.service.mapper.ProductMapper;
 import java.time.Instant;
 import java.util.Optional;
@@ -52,11 +57,23 @@ class ProductServiceImplTest {
 
     private ProductServiceImpl service;
 
+    private TreeChangePublisher changePublisher;
+
     private Team team;
 
     @BeforeEach
     void setUp() {
         productMapper = mock(ProductMapper.class);
+        changePublisher = mock(TreeChangePublisher.class);
+        TreeNodeDtoAssembler dtoAssembler = mock(TreeNodeDtoAssembler.class);
+        lenient()
+            .when(dtoAssembler.toDto(eq(TreeNodeType.PRODUCT), any()))
+            .thenAnswer(inv -> {
+                TreeNodeDTO dto = new TreeNodeDTO();
+                dto.setType(TreeNodeType.PRODUCT);
+                dto.setId(inv.getArgument(1));
+                return dto;
+            });
         service = new ProductServiceImpl(
             productRepository,
             productMapper,
@@ -64,7 +81,9 @@ class ProductServiceImplTest {
             mock(DefaultNodeLinks.class),
             mock(TreeNodeCascadeService.class),
             mock(TreeStructureLock.class),
-            mock(TeamRepository.class)
+            mock(TeamRepository.class),
+            changePublisher,
+            dtoAssembler
         );
 
         team = new Team();
@@ -84,7 +103,13 @@ class ProductServiceImplTest {
             });
         lenient()
             .when(productRepository.save(any(Product.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+            .thenAnswer(inv -> {
+                // The real repository assigns an id on insert; the broadcast needs one to read the
+                // node back, so the stub has to be honest about it.
+                Product p = inv.getArgument(0);
+                if (p.getId() == null) p.setId(PRODUCT_ID);
+                return p;
+            });
         lenient()
             .when(productMapper.toDto(any(Product.class)))
             .thenAnswer(inv -> {
@@ -150,6 +175,44 @@ class ProductServiceImplTest {
         org.mockito.Mockito.verify(productRepository).save(captor.capture());
         assertThat(captor.getValue().getCreatedDate()).isEqualTo(originalCreated);
         assertThat(captor.getValue().getArchived()).isTrue();
+    }
+
+    /**
+     * S2/FR-029: a product is a tree node, but it is created through the generated
+     * {@code /api/products} CRUD rather than {@code /api/tree/nodes}. Before this test the write
+     * committed silently, so another member's open canvas never showed the new product.
+     */
+    @Test
+    void createBroadcastsANodeCreatedEvent() {
+        ProductDTO input = createDto();
+
+        ProductDTO saved = service.save(input);
+
+        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+        org.mockito.Mockito.verify(changePublisher).publish(eq(TreeChangeType.NODE_CREATED), eq(TEAM_ID), payload.capture());
+        assertThat(payload.getValue()).isInstanceOf(TreeNodeDTO.class);
+        assertThat(((TreeNodeDTO) payload.getValue()).getType()).isEqualTo(TreeNodeType.PRODUCT);
+        assertThat(saved).isNotNull();
+    }
+
+    /** S2/FR-029: the same for a rename or an archive toggle through PUT /api/products. */
+    @Test
+    void updateBroadcastsANodeUpdatedEvent() {
+        Product existing = new Product();
+        existing.setId(PRODUCT_ID);
+        existing.setName("Original");
+        existing.setArchived(Boolean.FALSE);
+        existing.setCreatedDate(Instant.parse("2020-01-01T00:00:00Z"));
+        existing.setTeam(team);
+        when(productRepository.findById(eq(PRODUCT_ID))).thenReturn(Optional.of(existing));
+
+        ProductDTO input = createDto();
+        input.setId(PRODUCT_ID);
+        input.setName("Renamed");
+
+        service.update(input);
+
+        org.mockito.Mockito.verify(changePublisher).publish(eq(TreeChangeType.NODE_UPDATED), eq(TEAM_ID), any());
     }
 
     private ProductDTO createDto() {

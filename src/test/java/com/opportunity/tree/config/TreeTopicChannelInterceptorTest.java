@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.opportunity.tree.service.TeamAccessService;
+import com.opportunity.tree.service.broadcast.TreeTopicRevocationRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -51,7 +52,7 @@ class TreeTopicChannelInterceptorTest {
     @Test
     void memberSubscribeIsAllowed() {
         when(teamAccessService.canReadTeam(eq(TEAM_ID))).thenReturn(true);
-        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService);
+        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService, new TreeTopicRevocationRegistry());
 
         Message<byte[]> message = subscribeMessage(TREE_TOPIC);
         Message<?> result = interceptor.preSend(message, channel);
@@ -63,7 +64,7 @@ class TreeTopicChannelInterceptorTest {
     @Test
     void viewerSubscribeIsAllowed() {
         when(teamAccessService.canReadTeam(eq(TEAM_ID))).thenReturn(true);
-        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService);
+        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService, new TreeTopicRevocationRegistry());
 
         Message<?> result = interceptor.preSend(subscribeMessage(TREE_TOPIC), channel);
 
@@ -76,7 +77,7 @@ class TreeTopicChannelInterceptorTest {
     @Test
     void nonMemberSubscribeIsRefused() {
         when(teamAccessService.canReadTeam(eq(TEAM_ID))).thenReturn(false);
-        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService);
+        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService, new TreeTopicRevocationRegistry());
 
         assertThatThrownBy(() -> interceptor.preSend(subscribeMessage(TREE_TOPIC), channel)).isInstanceOf(AccessDeniedException.class);
     }
@@ -84,7 +85,7 @@ class TreeTopicChannelInterceptorTest {
     // AC 4 — a client SEND to a tree topic is rejected (belt and braces with the AuthorizationManager)
     @Test
     void clientSendToTreeTopicIsRejected() {
-        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService);
+        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService, new TreeTopicRevocationRegistry());
 
         assertThatThrownBy(() -> interceptor.preSend(sendMessage(TREE_TOPIC), channel)).isInstanceOf(AccessDeniedException.class);
     }
@@ -92,7 +93,7 @@ class TreeTopicChannelInterceptorTest {
     // Any client SEND under /topic is rejected, not just a tree topic — /topic is server-to-client only.
     @Test
     void clientSendToAnyTopicIsRejected() {
-        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService);
+        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService, new TreeTopicRevocationRegistry());
 
         assertThatThrownBy(() -> interceptor.preSend(sendMessage("/topic/whatever"), channel)).isInstanceOf(AccessDeniedException.class);
     }
@@ -128,7 +129,7 @@ class TreeTopicChannelInterceptorTest {
         }
     )
     void everyOtherTopicSubscribeIsRefused(String destination) {
-        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService);
+        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService, new TreeTopicRevocationRegistry());
 
         assertThatThrownBy(() -> interceptor.preSend(subscribeMessage(destination), channel)).isInstanceOf(AccessDeniedException.class);
         verify(teamAccessService, never()).canReadTeam(any());
@@ -138,7 +139,7 @@ class TreeTopicChannelInterceptorTest {
     // AuthorizationManager (which denies everything that is not /topic/** anyway).
     @Test
     void subscribeOutsideTheTopicNamespaceIsPassedThrough() {
-        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService);
+        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService, new TreeTopicRevocationRegistry());
 
         Message<?> result = interceptor.preSend(subscribeMessage("/user/queue/errors"), channel);
 
@@ -148,7 +149,7 @@ class TreeTopicChannelInterceptorTest {
     // A frame that is neither SUBSCRIBE nor SEND (CONNECT, DISCONNECT, UNSUBSCRIBE, …) is untouched.
     @Test
     void nonSubscribeCommandIsPassedThrough() {
-        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService);
+        TreeTopicChannelInterceptor interceptor = new TreeTopicChannelInterceptor(teamAccessService, new TreeTopicRevocationRegistry());
 
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.DISCONNECT);
         accessor.setLeaveMutable(true);

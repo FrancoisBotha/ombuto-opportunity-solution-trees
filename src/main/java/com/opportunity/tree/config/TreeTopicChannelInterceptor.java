@@ -1,6 +1,8 @@
 package com.opportunity.tree.config;
 
 import com.opportunity.tree.service.TeamAccessService;
+import com.opportunity.tree.service.broadcast.TreeTopicRevocationRegistry;
+import java.security.Principal;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -63,14 +65,23 @@ public class TreeTopicChannelInterceptor implements ChannelInterceptor {
 
     private final TeamAccessService teamAccessService;
 
-    public TreeTopicChannelInterceptor(TeamAccessService teamAccessService) {
+    private final TreeTopicRevocationRegistry revocations;
+
+    public TreeTopicChannelInterceptor(TeamAccessService teamAccessService, TreeTopicRevocationRegistry revocations) {
         this.teamAccessService = teamAccessService;
+        this.revocations = revocations;
     }
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
         StompCommand command = accessor.getCommand();
+        if (command == StompCommand.DISCONNECT) {
+            // Stop tracking the session, so the outbound check's session map does not grow with
+            // the process's uptime.
+            revocations.forgetSession(accessor.getSessionId());
+            return message;
+        }
         if (command != StompCommand.SUBSCRIBE && command != StompCommand.SEND) {
             return message;
         }
@@ -100,6 +111,10 @@ public class TreeTopicChannelInterceptor implements ChannelInterceptor {
             LOG.debug("Refusing SUBSCRIBE to {} — user is not a member of team {}", destination, teamId);
             throw new AccessDeniedException("Not a member of team " + teamId);
         }
+        // Remember who this session belongs to: TreeTopicOutboundInterceptor needs it to re-check
+        // authorisation on every frame the broker fans out to this subscription.
+        Principal user = accessor.getUser();
+        revocations.noteSession(accessor.getSessionId(), user != null ? user.getName() : null);
         return message;
     }
 }

@@ -21,10 +21,16 @@ public class WebsocketConfiguration implements WebSocketMessageBrokerConfigurer 
 
     private final JHipsterProperties jHipsterProperties;
     private final TreeTopicChannelInterceptor treeTopicChannelInterceptor;
+    private final TreeTopicOutboundInterceptor treeTopicOutboundInterceptor;
 
-    public WebsocketConfiguration(JHipsterProperties jHipsterProperties, TreeTopicChannelInterceptor treeTopicChannelInterceptor) {
+    public WebsocketConfiguration(
+        JHipsterProperties jHipsterProperties,
+        TreeTopicChannelInterceptor treeTopicChannelInterceptor,
+        TreeTopicOutboundInterceptor treeTopicOutboundInterceptor
+    ) {
         this.jHipsterProperties = jHipsterProperties;
         this.treeTopicChannelInterceptor = treeTopicChannelInterceptor;
+        this.treeTopicOutboundInterceptor = treeTopicOutboundInterceptor;
     }
 
     @Override
@@ -37,6 +43,13 @@ public class WebsocketConfiguration implements WebSocketMessageBrokerConfigurer 
         // Runs after Spring Security's SecurityContextChannelInterceptor so the current user's
         // authentication is available when the interceptor calls TeamAccessService.
         registration.interceptors(treeTopicChannelInterceptor);
+    }
+
+    @Override
+    public void configureClientOutboundChannel(ChannelRegistration registration) {
+        // FR-034/NFR-011: a SUBSCRIBE is authorised once, but membership changes while the socket
+        // stays open. This interceptor re-checks every outgoing team tree frame.
+        registration.interceptors(treeTopicOutboundInterceptor);
     }
 
     @Override

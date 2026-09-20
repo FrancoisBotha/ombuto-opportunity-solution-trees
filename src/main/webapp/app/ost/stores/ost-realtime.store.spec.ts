@@ -194,6 +194,62 @@ describe('OST realtime store', () => {
     expect(store.lastSeqByTeam[7]).toBe(11);
   });
 
+  /**
+   * S2 — the reload window used to be a hole a write could fall into.
+   *
+   * A reconnect clears the seq baseline and starts a full tree read. Anything that arrived while
+   * that read was in flight was discarded outright, and because the baseline had just been cleared
+   * the miss never surfaced as a gap. A write committed after the server built the read's snapshot
+   * was therefore lost silently: the session stayed behind, believing itself live, until something
+   * else forced another read. FR-035 says a reconnect brings the client up to date.
+   */
+  it('replays what arrived during a reload instead of losing it (FR-035)', async () => {
+    let finishReload: () => void = () => undefined;
+    reloadTree = vi.fn(() => new Promise<void>(resolve => (finishReload = () => resolve())));
+    open();
+    client.connectionState$.next(RxStompState.OPEN);
+    client.connectionState$.next(RxStompState.CLOSED);
+    client.connectionState$.next(RxStompState.OPEN);
+    expect(reloadTree).toHaveBeenCalledExactlyOnceWith('reconnect');
+
+    // Committed after the read's snapshot, delivered before the read resolved.
+    client.emit(event(7, 40));
+    client.emit(event(7, 41));
+    expect(applyEvents).not.toHaveBeenCalled();
+
+    finishReload();
+    await Promise.resolve();
+    await Promise.resolve();
+    flushFrame();
+
+    expect(applyEvents).toHaveBeenCalledOnce();
+    expect(applyEvents.mock.calls[0][0].map((item: OstRealtimeEvent) => item.seq)).toEqual([40, 41]);
+    expect(store.lastSeqByTeam[7]).toBe(41);
+    // One read, not a cascade of them: the replay is not mistaken for a gap.
+    expect(reloadTree).toHaveBeenCalledOnce();
+  });
+
+  /** The replayed events must still seed the baseline, so a real gap after them is still caught. */
+  it('detects a gap in the events that follow a reload replay', async () => {
+    let finishReload: () => void = () => undefined;
+    reloadTree = vi.fn(() => new Promise<void>(resolve => (finishReload = () => resolve())));
+    open();
+    client.connectionState$.next(RxStompState.OPEN);
+    client.connectionState$.next(RxStompState.CLOSED);
+    client.connectionState$.next(RxStompState.OPEN);
+    client.emit(event(7, 40));
+    finishReload();
+    await Promise.resolve();
+    await Promise.resolve();
+    flushFrame();
+    expect(applyEvents).toHaveBeenCalledOnce();
+
+    client.emit(event(7, 42));
+
+    expect(store.gapSignal).toEqual({ teamId: 7, expected: 41, actual: 42 });
+    expect(reloadTree).toHaveBeenCalledTimes(2);
+  });
+
   it('still drops an event whose actingUserLogin is neither a string nor null', () => {
     open();
     client.emit({ ...event(7, 10), actingUserLogin: 42 } as unknown as OstRealtimeEvent);

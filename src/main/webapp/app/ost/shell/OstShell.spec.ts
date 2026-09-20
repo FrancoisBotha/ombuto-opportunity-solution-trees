@@ -143,6 +143,41 @@ describe('OstShell', () => {
     wrapper.unmount();
   });
 
+  /**
+   * S2 / FR-034 — a SUBSCRIBE is authorised once, when it is made, and being removed from a team
+   * does not end the STOMP session. The shell has to drop the subscription itself the moment the
+   * removal event arrives; otherwise a former member's socket keeps carrying the team's tree.
+   */
+  it('drops the realtime subscription when this user is removed from the open team', async () => {
+    const realtime = useOstRealtimeStore(pinia);
+    const frames: FrameRequestCallback[] = [];
+    realtime.setFrameScheduler(callback => frames.push(callback), vi.fn());
+    const messages = new Subject<{ body: string }>();
+    stomp.watch.mockReturnValue(messages);
+
+    const wrapper = await mountAt('/trees/7');
+    expect(stomp.deactivate).not.toHaveBeenCalled();
+
+    messages.next({
+      body: JSON.stringify({
+        type: 'MEMBERSHIP_CHANGED',
+        teamId: 7,
+        seq: 1,
+        epoch: 'e1',
+        actingUserLogin: 'admin',
+        at: '2026-09-20T00:00:00Z',
+        payload: { login: useOstTreeStore(pinia).team?.currentUserLogin, role: null, removed: true },
+      }),
+    });
+    frames.shift()?.(performance.now());
+    await flushPromises();
+
+    expect(useOstTreeStore(pinia).removedFromCurrentTeam).toBe(true);
+    expect(stomp.deactivate).toHaveBeenCalled();
+    expect(realtime.activeTeamId).toBeNull();
+    wrapper.unmount();
+  });
+
   it('clears team-scoped UI state when switching team', async () => {
     const wrapper = await mountAt('/trees/7');
     const ui = useOstUiStore(pinia);

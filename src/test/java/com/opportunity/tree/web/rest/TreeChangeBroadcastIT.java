@@ -380,6 +380,127 @@ class TreeChangeBroadcastIT {
             .andExpect(status().isCreated());
     }
 
+    /**
+     * S2 / FR-029, AC "events cover all six node types and every write API".
+     *
+     * <p>A product is a node on the canvas, but it is not created, renamed or archived through
+     * {@code /api/tree/nodes} — the Team Products page uses the generated {@code /api/products}
+     * CRUD. Those three writes published nothing at all, so a second member with the tree open
+     * never saw a new product appear, a rename, or a product being archived out of the canvas.
+     * {@code allSixNodeTypesEmitEvents} above only ever exercised a product PATCH through the tree
+     * API, which is why the gap survived: the criterion was ticked without the property holding.
+     */
+    @Test
+    void productCreateThroughTheGeneratedCrudPublishesNodeCreated() throws Exception {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", "Broadcast product");
+        body.put("archived", Boolean.FALSE);
+        body.put("createdDate", "2026-01-01T00:00:00Z");
+        body.put("team", Map.of("id", team.getId()));
+
+        mvc
+            .perform(
+                post("/api/products")
+                    .with(user(OWNER))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsString(body))
+            )
+            .andExpect(status().isCreated());
+
+        TreeChangeEvent event = capturedEvent();
+        assertThat(event.type()).isEqualTo(TreeChangeType.NODE_CREATED);
+        assertThat(event.teamId()).isEqualTo(team.getId());
+        assertThat(event.payload()).isInstanceOf(TreeNodeDTO.class);
+        TreeNodeDTO dto = (TreeNodeDTO) event.payload();
+        assertThat(dto.getType()).isEqualTo(TreeNodeType.PRODUCT);
+        assertThat(dto.getTitle()).isEqualTo("Broadcast product");
+        assertThat(dto.getParentKey()).isNull();
+    }
+
+    /** S2 / FR-029 — the archive toggle the Team Products page sends is a PATCH on /api/products. */
+    @Test
+    void productArchiveThroughTheGeneratedCrudPublishesNodeUpdated() throws Exception {
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", product.getId());
+        body.put("archived", Boolean.TRUE);
+
+        mvc
+            .perform(
+                patch("/api/products/{id}", product.getId())
+                    .with(user(OWNER))
+                    .with(csrf())
+                    .contentType("application/merge-patch+json")
+                    .content(om.writeValueAsString(body))
+            )
+            .andExpect(status().isOk());
+
+        TreeChangeEvent event = capturedEvent();
+        assertThat(event.type()).isEqualTo(TreeChangeType.NODE_UPDATED);
+        assertThat(event.teamId()).isEqualTo(team.getId());
+        assertThat(event.payload()).isInstanceOf(TreeNodeDTO.class);
+        assertThat(((TreeNodeDTO) event.payload()).getArchived()).isTrue();
+    }
+
+    /** S2 / FR-029 — and the rename the same page sends as a full PUT. */
+    @Test
+    void productRenameThroughTheGeneratedCrudPublishesNodeUpdated() throws Exception {
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", product.getId());
+        body.put("name", "Renamed through CRUD");
+        body.put("archived", Boolean.FALSE);
+        body.put("createdDate", "2026-01-01T00:00:00Z");
+        body.put("team", Map.of("id", team.getId()));
+
+        mvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/products/{id}", product.getId())
+                    .with(user(OWNER))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsString(body))
+            )
+            .andExpect(status().isOk());
+
+        TreeChangeEvent event = capturedEvent();
+        assertThat(event.type()).isEqualTo(TreeChangeType.NODE_UPDATED);
+        assertThat(((TreeNodeDTO) event.payload()).getTitle()).isEqualTo("Renamed through CRUD");
+    }
+
+    /**
+     * S2 — a product moved to another team leaves one tree and joins another, so each team's topic
+     * gets the event its own members need: the old team must drop the subtree, the new one add it.
+     */
+    @Test
+    void productChangingTeamPublishesToBothTeams() throws Exception {
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", product.getId());
+        body.put("name", "Moved product");
+        body.put("archived", Boolean.FALSE);
+        body.put("createdDate", "2026-01-01T00:00:00Z");
+        body.put("team", Map.of("id", otherTeam.getId()));
+
+        mvc
+            .perform(
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/products/{id}", product.getId())
+                    .with(user(OWNER))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsString(body))
+            )
+            .andExpect(status().isOk());
+
+        List<TreeChangeEvent> events = capturedEvents();
+        assertThat(events)
+            .filteredOn(e -> e.type() == TreeChangeType.NODE_DELETED && e.teamId().equals(team.getId()))
+            .singleElement()
+            .satisfies(e -> assertThat(((NodeDeletedPayload) e.payload()).key()).isEqualTo("product-" + product.getId()));
+        assertThat(events)
+            .filteredOn(e -> e.type() == TreeChangeType.NODE_CREATED && e.teamId().equals(otherTeam.getId()))
+            .singleElement()
+            .satisfies(e -> assertThat(((TreeNodeDTO) e.payload()).getId()).isEqualTo(product.getId()));
+    }
+
     // Helpers ---------------------------------------------------------------
 
     private void authenticate(String login) {

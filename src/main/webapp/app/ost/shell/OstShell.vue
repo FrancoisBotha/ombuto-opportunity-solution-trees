@@ -132,6 +132,16 @@ function switchTeam(id: number) {
 
 watch(teamId, load, { immediate: true });
 
+// FR-034/FR-037: being removed from a team does not end the STOMP session, and the SUBSCRIBE was
+// authorised once, when it was made. Drop the subscription as soon as the removal event says so,
+// so a former member's socket stops carrying this team's tree.
+watch(
+  () => tree.removedFromCurrentTeam,
+  removed => {
+    if (removed) void realtime.closeTeam();
+  },
+);
+
 onMounted(() => {
   tree.loadTeams();
 });
