@@ -109,6 +109,7 @@ describe('Backup administration page', () => {
     expect(summary).toContain('products');
     expect(summary).toContain('21');
     expect(summary).toContain('tree nodes');
+    expect(wrapper.get('[data-cy="restoreSummaryExportedAt"]').text()).toContain('2026-09-20T08:15:30Z');
   });
 
   it.each([
