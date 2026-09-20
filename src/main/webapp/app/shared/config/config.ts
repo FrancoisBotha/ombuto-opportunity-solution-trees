@@ -9,6 +9,7 @@ import { faBell } from '@fortawesome/free-solid-svg-icons/faBell';
 import { faBook } from '@fortawesome/free-solid-svg-icons/faBook';
 import { faCloud } from '@fortawesome/free-solid-svg-icons/faCloud';
 import { faCogs } from '@fortawesome/free-solid-svg-icons/faCogs';
+import { faCopy } from '@fortawesome/free-solid-svg-icons/faCopy';
 import { faDatabase } from '@fortawesome/free-solid-svg-icons/faDatabase';
 import { faEye } from '@fortawesome/free-solid-svg-icons/faEye';
 import { faFlag } from '@fortawesome/free-solid-svg-icons/faFlag';
@@ -17,6 +18,7 @@ import { faHome } from '@fortawesome/free-solid-svg-icons/faHome';
 import { faList } from '@fortawesome/free-solid-svg-icons/faList';
 import { faLock } from '@fortawesome/free-solid-svg-icons/faLock';
 import { faPencilAlt } from '@fortawesome/free-solid-svg-icons/faPencilAlt';
+import { faPlug } from '@fortawesome/free-solid-svg-icons/faPlug';
 import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
 import { faRoad } from '@fortawesome/free-solid-svg-icons/faRoad';
 import { faSave } from '@fortawesome/free-solid-svg-icons/faSave';
@@ -66,6 +68,7 @@ export function initFortAwesome(vue: App) {
     faBook,
     faCloud,
     faCogs,
+    faCopy,
     faDatabase,
     faEye,
     faFlag,
@@ -74,6 +77,7 @@ export function initFortAwesome(vue: App) {
     faList,
     faLock,
     faPencilAlt,
+    faPlug,
     faPlus,
     faRoad,
     faSave,

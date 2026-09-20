@@ -101,6 +101,10 @@
               <span class="no-bold">Account</span>
             </span>
           </template>
+          <b-dropdown-item data-cy="connectAgent" v-if="authenticated" to="/connect-agent" active-class="active">
+            <font-awesome-icon icon="plug" />
+            <span>Connect an agent</span>
+          </b-dropdown-item>
           <b-dropdown-item data-cy="logout" v-if="authenticated" @click="logout()" id="logout" active-class="active">
             <font-awesome-icon icon="sign-out-alt" />
             <span>Sign out</span>
