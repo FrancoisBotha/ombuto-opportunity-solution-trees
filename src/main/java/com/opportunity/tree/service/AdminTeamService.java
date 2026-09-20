@@ -10,6 +10,9 @@ import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.repository.UserRepository;
 import com.opportunity.tree.security.AuthoritiesConstants;
 import com.opportunity.tree.security.SecurityUtils;
+import com.opportunity.tree.service.broadcast.MembershipChangedPayload;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.AddTeamMemberRequest;
 import com.opportunity.tree.service.dto.AdminCreateTeamRequest;
 import com.opportunity.tree.service.dto.AdminTeamDTO;
@@ -43,17 +46,23 @@ public class AdminTeamService {
     private final TeamMemberRepository teamMemberRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final TreeChangePublisher changePublisher;
+    private final TreeStructureLock structureLock;
 
     public AdminTeamService(
         TeamRepository teamRepository,
         TeamMemberRepository teamMemberRepository,
         ProductRepository productRepository,
-        UserRepository userRepository
+        UserRepository userRepository,
+        TreeChangePublisher changePublisher,
+        TreeStructureLock structureLock
     ) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
+        this.changePublisher = changePublisher;
+        this.structureLock = structureLock;
     }
 
     @Transactional(readOnly = true)
@@ -98,6 +107,9 @@ public class AdminTeamService {
         if (request.getRole() == null) {
             throw new TeamManagementException("rolerequired");
         }
+        // Same per-team structure lock as TeamManagementService, so the membership event published
+        // below gets a seq ordered against this team's tree events (epic §11 risk 1).
+        structureLock.lockTeam(teamId);
         Team team = teamRepository.findById(teamId).orElseThrow(() -> new TeamManagementException("teamnotfound"));
         User user = userRepository.findById(request.getUserId()).orElseThrow(() -> new TeamManagementException("usernotfound"));
         if (teamMemberRepository.existsByTeamIdAndUserId(teamId, user.getId())) {
@@ -109,6 +121,11 @@ public class AdminTeamService {
         member.setRole(request.getRole());
         member.setJoinedDate(Instant.now());
         member = teamMemberRepository.save(member);
+        changePublisher.publish(
+            TreeChangeType.MEMBERSHIP_CHANGED,
+            teamId,
+            new MembershipChangedPayload(user.getLogin(), member.getRole(), false)
+        );
         return toTeamMemberViewDTO(member);
     }
 
@@ -120,6 +137,9 @@ public class AdminTeamService {
         if (!teamRepository.existsById(teamId)) {
             throw new TeamManagementException("teamnotfound");
         }
+        // The last-owner count is a read-then-write: without the lock two concurrent demotions both
+        // see two owners and the team ends up with none.
+        structureLock.lockTeam(teamId);
         TeamMember member = teamMemberRepository
             .findOneByTeamIdAndUserId(teamId, userId)
             .orElseThrow(() -> new TeamManagementException("membernotfound"));
@@ -128,6 +148,14 @@ public class AdminTeamService {
         }
         member.setRole(request.getRole());
         member = teamMemberRepository.save(member);
+        User user = member.getUser();
+        // An admin demoting a member must reach that member's open clients just like an owner
+        // doing it through TeamManagementService, or their canEdit stays stale (FR-037).
+        changePublisher.publish(
+            TreeChangeType.MEMBERSHIP_CHANGED,
+            teamId,
+            new MembershipChangedPayload(user == null ? null : user.getLogin(), member.getRole(), false)
+        );
         return toTeamMemberViewDTO(member);
     }
 
@@ -136,13 +164,19 @@ public class AdminTeamService {
         if (!teamRepository.existsById(teamId)) {
             throw new TeamManagementException("teamnotfound");
         }
+        // See changeRole: the last-owner count must be read under the team's structure lock.
+        structureLock.lockTeam(teamId);
         TeamMember member = teamMemberRepository
             .findOneByTeamIdAndUserId(teamId, userId)
             .orElseThrow(() -> new TeamManagementException("membernotfound"));
         if (member.getRole() == TeamRole.OWNER) {
             requireNotLastOwner(teamId);
         }
+        User user = member.getUser();
+        String login = user == null ? null : user.getLogin();
         teamMemberRepository.delete(member);
+        // The removed member's client sees its own login, drops canEdit and unsubscribes (FR-037).
+        changePublisher.publish(TreeChangeType.MEMBERSHIP_CHANGED, teamId, new MembershipChangedPayload(login, null, true));
     }
 
     public void deleteTeam(Long teamId) {

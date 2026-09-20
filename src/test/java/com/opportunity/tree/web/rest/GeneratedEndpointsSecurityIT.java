@@ -1,5 +1,6 @@
 package com.opportunity.tree.web.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +38,7 @@ import com.opportunity.tree.service.dto.UserDTO;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -424,6 +427,44 @@ class GeneratedEndpointsSecurityIT {
         body.setColour("#112233");
         body.setTeam(teamRef);
         assertAdminOnlyOnEveryVerb("/api/tags", body);
+    }
+
+    /**
+     * Authorisation must be decided before the request body is validated. Method security
+     * ({@code @PreAuthorize}) only runs once Spring MVC has deserialised and validated the
+     * arguments, so an admin-only resource used to answer an incomplete body from a plain user
+     * with a 400 naming the DTO's required fields — telling an unauthorised caller the controller's
+     * signature. The generated admin-only paths are matched in the security filter chain instead
+     * (see {@code SecurityConfiguration#GENERATED_ADMIN_ONLY_API_PATHS}), so the answer is 403
+     * whatever the body is.
+     */
+    @Test
+    @Transactional
+    void incompleteBodyOnAdminOnlyResource_isRefusedBeforeValidation_andLeaksNoFieldNames() throws Exception {
+        for (String baseUrl : List.of(
+            "/api/outcomes",
+            "/api/opportunities",
+            "/api/solutions",
+            "/api/assumptions",
+            "/api/evidences",
+            "/api/node-links",
+            "/api/open-questions",
+            "/api/node-histories",
+            "/api/comments",
+            "/api/interviews",
+            "/api/tags",
+            "/api/team-members"
+        )) {
+            MvcResult result = mvc
+                .perform(post(baseUrl).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden())
+                .andReturn();
+            String responseBody = result.getResponse().getContentAsString();
+            assertThat(responseBody)
+                .as("the 403 for %s must not describe the controller's payload", baseUrl)
+                .doesNotContain("fieldErrors")
+                .doesNotContain("must not be null");
+        }
     }
 
     /** Every verb on a generated CRUD resource must 403 for a plain ROLE_USER. The body is valid so validation cannot mask it. */

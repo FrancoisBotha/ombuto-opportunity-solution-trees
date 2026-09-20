@@ -78,6 +78,52 @@ class TeamManagementResourceIT {
         userRepository.deleteAll();
     }
 
+    // TEAMS-002 — a whitespace-only name used to be accepted (201) because @Size counted the
+    // spaces. The name is trimmed before validation, so it now fails @Size(min = 2) with a 400.
+    @Test
+    void createTeam_withWhitespaceOnlyName_isRejected() throws Exception {
+        mockMvc
+            .perform(
+                post(API + "/teams")
+                    .with(csrf())
+                    .with(user(creator.getLogin()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"   \",\"description\":\"d\"}")
+            )
+            .andExpect(status().isBadRequest());
+
+        assertThat(teamRepository.findAll()).noneMatch(t -> t.getName() == null || t.getName().isBlank());
+    }
+
+    // The same normalisation must apply to a rename, and a padded name must be stored trimmed.
+    @Test
+    void updateTeam_withWhitespaceOnlyName_isRejected_andPaddedNameIsTrimmed() throws Exception {
+        Long teamId = seedTeamWith(creator, TeamRole.OWNER).getId();
+
+        mockMvc
+            .perform(
+                put(API + "/teams/{id}", teamId)
+                    .with(csrf())
+                    .with(user(creator.getLogin()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\" \\t \",\"description\":\"d\"}")
+            )
+            .andExpect(status().isBadRequest());
+
+        mockMvc
+            .perform(
+                put(API + "/teams/{id}", teamId)
+                    .with(csrf())
+                    .with(user(creator.getLogin()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"  Trimmed Team  \",\"description\":\"d\"}")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Trimmed Team"));
+
+        assertThat(teamRepository.findById(teamId).orElseThrow().getName()).isEqualTo("Trimmed Team");
+    }
+
     // AC 1 + AC 9 — create team → creator is owner; createdDate/joinedDate ignored from client
     @Test
     void createTeam_makesCallerOwner_andIgnoresClientCreatedDate() throws Exception {

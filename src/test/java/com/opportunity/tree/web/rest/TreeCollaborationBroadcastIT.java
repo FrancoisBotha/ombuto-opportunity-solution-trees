@@ -75,6 +75,7 @@ class TreeCollaborationBroadcastIT {
     private static final String EDITOR = "rtc2-editor";
     private static final String VIEWER = "rtc2-viewer";
     private static final String OUTSIDER = "rtc2-outsider";
+    private static final String ADMIN = "rtc2-admin";
 
     @MockitoBean
     private SimpMessagingTemplate messagingTemplate;
@@ -271,7 +272,7 @@ class TreeCollaborationBroadcastIT {
     // AC #5 — role change publishes MEMBERSHIP_CHANGED with the affected login and the new role.
     @Test
     void changeRolePublishesMembershipChanged() throws Exception {
-        // Add outsider as EDITOR first (this itself does not currently publish, but reset to be safe).
+        // Add outsider as EDITOR first (that publishes its own event; reset so only the role change is captured).
         addMember(outsider.getId(), TeamRole.EDITOR);
         org.mockito.Mockito.reset(messagingTemplate);
 
@@ -306,6 +307,82 @@ class TreeCollaborationBroadcastIT {
         mvc
             .perform(
                 delete("/api/team-management/teams/{id}/members/{userId}", team.getId(), outsider.getId()).with(user(OWNER)).with(csrf())
+            )
+            .andExpect(status().isNoContent());
+
+        TreeChangeEvent event = capturedEvent();
+        assertThat(event.type()).isEqualTo(TreeChangeType.MEMBERSHIP_CHANGED);
+        assertThat(event.teamId()).isEqualTo(team.getId());
+        MembershipChangedPayload payload = (MembershipChangedPayload) event.payload();
+        assertThat(payload.login()).isEqualTo(OUTSIDER);
+        assertThat(payload.removed()).isTrue();
+        assertThat(payload.role()).isNull();
+    }
+
+    // ADHOC-001 — adding a member publishes MEMBERSHIP_CHANGED too, so a user granted access sees
+    // it without a reload.
+    @Test
+    void addMemberPublishesMembershipChanged() throws Exception {
+        addMember(outsider.getId(), TeamRole.EDITOR);
+
+        TreeChangeEvent event = capturedEvent();
+        assertThat(event.type()).isEqualTo(TreeChangeType.MEMBERSHIP_CHANGED);
+        assertThat(event.teamId()).isEqualTo(team.getId());
+        MembershipChangedPayload payload = (MembershipChangedPayload) event.payload();
+        assertThat(payload.login()).isEqualTo(OUTSIDER);
+        assertThat(payload.role()).isEqualTo(TeamRole.EDITOR);
+        assertThat(payload.removed()).isFalse();
+    }
+
+    // ADHOC-001 — the same three writes performed by an ADMIN through /api/admin/teams published
+    // nothing at all, so a member an admin demoted or removed kept a stale canEdit and stayed
+    // subscribed. They must publish exactly like the owner-facing endpoints.
+    @Test
+    void adminAddMemberPublishesMembershipChanged() throws Exception {
+        adminAddMember(outsider.getId(), TeamRole.EDITOR);
+
+        MembershipChangedPayload payload = (MembershipChangedPayload) capturedEvent().payload();
+        assertThat(payload.login()).isEqualTo(OUTSIDER);
+        assertThat(payload.role()).isEqualTo(TeamRole.EDITOR);
+        assertThat(payload.removed()).isFalse();
+    }
+
+    @Test
+    void adminChangeRolePublishesMembershipChanged() throws Exception {
+        adminAddMember(outsider.getId(), TeamRole.EDITOR);
+        org.mockito.Mockito.reset(messagingTemplate);
+
+        ChangeTeamMemberRoleRequest req = new ChangeTeamMemberRoleRequest();
+        req.setRole(TeamRole.VIEWER);
+        mvc
+            .perform(
+                put("/api/admin/teams/{id}/members/{userId}", team.getId(), outsider.getId())
+                    .with(user(ADMIN).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(req))
+            )
+            .andExpect(status().isOk());
+
+        TreeChangeEvent event = capturedEvent();
+        assertThat(event.type()).isEqualTo(TreeChangeType.MEMBERSHIP_CHANGED);
+        assertThat(event.teamId()).isEqualTo(team.getId());
+        MembershipChangedPayload payload = (MembershipChangedPayload) event.payload();
+        assertThat(payload.login()).isEqualTo(OUTSIDER);
+        assertThat(payload.role()).isEqualTo(TeamRole.VIEWER);
+        assertThat(payload.removed()).isFalse();
+    }
+
+    @Test
+    void adminRemoveMemberPublishesMembershipRemoved() throws Exception {
+        adminAddMember(outsider.getId(), TeamRole.EDITOR);
+        org.mockito.Mockito.reset(messagingTemplate);
+
+        mvc
+            .perform(
+                delete("/api/admin/teams/{id}/members/{userId}", team.getId(), outsider.getId())
+                    .with(user(ADMIN).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                    .with(csrf())
             )
             .andExpect(status().isNoContent());
 
@@ -374,6 +451,21 @@ class TreeCollaborationBroadcastIT {
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(login, "x", List.of(new SimpleGrantedAuthority("ROLE_USER")))
         );
+    }
+
+    private void adminAddMember(String userId, TeamRole role) throws Exception {
+        AddTeamMemberRequest add = new AddTeamMemberRequest();
+        add.setUserId(userId);
+        add.setRole(role);
+        mvc
+            .perform(
+                post("/api/admin/teams/{id}/members", team.getId())
+                    .with(user(ADMIN).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsBytes(add))
+            )
+            .andExpect(status().isCreated());
     }
 
     private void addMember(String userId, TeamRole role) throws Exception {
