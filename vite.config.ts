@@ -49,7 +49,7 @@ let config = defineConfig({
     // visit, or a merge that adds an import while the dev server runs, never makes Vite
     // re-optimise and full-reload every open page mid-navigation (the e2e "Open branch" flake).
     // Guarded by app/ost/vite-optimize-deps.spec.ts.
-    include: ['@vue-flow/core', '@phosphor-icons/vue'],
+    include: ['@vue-flow/core', '@phosphor-icons/vue', '@stomp/rx-stomp', '@stomp/stompjs', 'rxjs', 'sockjs-client', 'js-cookie'],
   },
   define: {
     I18N_HASH: '"generated_hash"',

@@ -95,6 +95,68 @@ authorisation is enforced per call inside the service.
 | `TeamProductResource`    | `/api/teams/{teamId}/products` | Lists a team's products (including archived); non-members get 403 via `teamAccessService.requireReadTeam`.                               |
 | `AdminTeamResource`      | `/api/admin/teams/**`          | Admin team list / create / delete and member management. `ROLE_ADMIN` (class-level and the `/api/admin/**` filter rule).                 |
 
+## MCP endpoint
+
+MCPSRV-001 wires the Spring AI MCP server starter (WebMVC / SSE transport,
+`org.springframework.ai:spring-ai-starter-mcp-server-webmvc`, pinned to Spring AI **2.0.1**
+via the `spring-ai-bom` in `pom.xml`) into the same Spring Boot process. Endpoint path is
+`/mcp` (SSE) with message posts on `/mcp/message`, configured in `application.yml` under
+`spring.ai.mcp.server`. Capabilities are locked down to **tools only** — resources, prompts and
+completions are all disabled. The only tool registered in this ticket is `ping`, a trivial
+read-only probe that exposes no application data; it exists to prove tool discovery and
+invocation over the transport. A dedicated, stateless, CSRF-exempt `SecurityFilterChain` in
+`McpSecurityConfiguration` isolates `/mcp/**` from the session-based `SecurityConfiguration` so
+the existing web login, CSRF and REST API rules are untouched.
+
+MCPSRV-002 replaces the placeholder permit-all rule on that chain with an OAuth2 resource-server
+JWT authentication step. The chain is `SessionCreationPolicy.STATELESS`, has CSRF disabled for
+`/mcp/**` only, and reuses the shared `JwtDecoder` bean (Keycloak JWK set, `JwtValidators`
+issuer + expiry, `AudienceValidator`) and the shared
+`Converter<Jwt, AbstractAuthenticationToken>` (`JwtAuthenticationConverter` +
+`SecurityUtils.extractAuthorityFromClaims`) so the caller resolves to the same application user
+and authorities the session login produces. `TeamAccessService` and any other REST code that
+reads the `SecurityContext` work unchanged from an MCP tool.
+
+| Endpoint       | Verb | Transport                | Protection                                                                                                                      |
+| -------------- | ---- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `/mcp`         | GET  | SSE stream (MCP)         | Keycloak bearer JWT (`Authorization: Bearer …`); signature, issuer, audience, expiry validated. No token / invalid token → 401. |
+| `/mcp/message` | POST | JSON-RPC message channel | Same as above. CSRF is disabled on this chain only; the session-based chain keeps `CookieCsrfTokenRepository` for `/api/**`.    |
+
+### Token acquisition for MCP callers (dev realm)
+
+The dev Keycloak realm (`src/main/docker/realm-config/jhipster-realm.json`) ships a dedicated
+public client `mcp_client` for MCP callers. It is separate from the web UI's `web_app` client so
+that a token issued for an MCP agent tool is scoped to that use, and its audience is set
+explicitly (via the `audience-account` protocol mapper) to `account`, which the existing
+`AudienceValidator` accepts.
+
+Two token-acquisition paths are supported out of the box:
+
+- **Authorization Code + PKCE** (recommended for desktop MCP clients that support OAuth): open
+  `http://localhost:9080/realms/jhipster/protocol/openid-connect/auth?client_id=mcp_client&response_type=code&scope=openid%20profile%20email%20roles&redirect_uri=http://localhost:8080/&code_challenge=<S256>&code_challenge_method=S256`
+  in a browser, complete the Keycloak login, then exchange the returned `code` at
+  `http://localhost:9080/realms/jhipster/protocol/openid-connect/token` with
+  `grant_type=authorization_code&client_id=mcp_client&code=<code>&redirect_uri=http://localhost:8080/&code_verifier=<verifier>`.
+- **Resource Owner Password (dev-only)** for smoke-testing from the terminal:
+
+  ```bash
+  curl -s -X POST http://localhost:9080/realms/jhipster/protocol/openid-connect/token \
+    -d client_id=mcp_client \
+    -d grant_type=password \
+    -d scope="openid profile email roles" \
+    -d username=admin -d password=admin
+  ```
+
+  This grant is enabled on `mcp_client` for the dev realm only (`directAccessGrantsEnabled`);
+  production Keycloak realms should not enable it.
+
+Use the resulting `access_token` as `Authorization: Bearer <token>` when connecting an MCP
+client. Tokens without a valid signature, with the wrong issuer, without `account` in the `aud`
+claim, or past their `exp` are rejected with HTTP 401. On every rejection the MCP chain's
+`McpAuthenticationEntryPoint` logs a WARN line with the `OAuth2Error` code and description
+(and, for `JwtValidationException`, the per-error details) without echoing the bearer token or
+the `Authorization` header.
+
 ## Platform endpoints (not team-owned)
 
 | Controller           | Path(s)                                     | Verbs             | Protection                                                                                                                                                                                                                                                                             |
