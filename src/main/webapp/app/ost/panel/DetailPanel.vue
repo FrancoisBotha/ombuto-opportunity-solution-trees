@@ -41,7 +41,14 @@
       />
       <div v-if="titleDropped !== undefined" class="ost-field__hint ost-field__hint--tight" role="status" data-cy="ost-panel-title-dropped">
         Someone else set this to “{{ titleDropped }}” — your edit is still unsaved.
-        <button type="button" class="ost-panel__dropped-dismiss ost-tap" data-cy="ost-panel-title-dropped-dismiss" @click="dismissTitleDropped">Dismiss</button>
+        <button
+          type="button"
+          class="ost-panel__dropped-dismiss ost-tap"
+          data-cy="ost-panel-title-dropped-dismiss"
+          @click="dismissTitleDropped"
+        >
+          Dismiss
+        </button>
       </div>
     </header>
 

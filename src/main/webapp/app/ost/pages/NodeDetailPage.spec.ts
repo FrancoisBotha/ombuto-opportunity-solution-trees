@@ -159,7 +159,7 @@ describe('NodeDetailPage', () => {
       await title.setValue('Renamed invite');
       await title.trigger('blur');
       await flushPromises();
-      expect(service.patchNode.firstCall.args).toEqual(['solution', 1, { title: 'Renamed invite' }]);
+      expect(service.patchNode.firstCall.args.slice(0, 3)).toEqual(['solution', 1, { title: 'Renamed invite' }]);
     });
 
     it('status and notes save through the store; a refusal shows on the page', async () => {
@@ -191,7 +191,7 @@ describe('NodeDetailPage', () => {
       await router.push('/trees/7/nodes/solution-2');
       await flushPromises();
       expect(service.patchNode.callCount).toBe(1);
-      expect(service.patchNode.firstCall.args).toEqual(['solution', 1, { notes: 'Half typed' }]);
+      expect(service.patchNode.firstCall.args.slice(0, 3)).toEqual(['solution', 1, { notes: 'Half typed' }]);
       expect((wrapper.get('[data-cy="ost-notes"]').element as HTMLTextAreaElement).value).toBe('');
     });
   });

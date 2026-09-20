@@ -13,7 +13,9 @@
     ></textarea>
     <div v-if="dropped !== undefined" class="ost-field__hint ost-field__hint--tight" role="status" data-cy="ost-notes-dropped">
       Someone else set this to “{{ dropped }}” — your edit is still unsaved.
-      <button type="button" class="ost-notes__dropped-dismiss ost-tap" data-cy="ost-notes-dropped-dismiss" @click="emit('dismissDropped')">Dismiss</button>
+      <button type="button" class="ost-notes__dropped-dismiss ost-tap" data-cy="ost-notes-dropped-dismiss" @click="emit('dismissDropped')">
+        Dismiss
+      </button>
     </div>
   </div>
 </template>
