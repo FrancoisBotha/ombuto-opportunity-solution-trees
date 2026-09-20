@@ -12,8 +12,11 @@ import org.springframework.security.messaging.access.intercept.MessageMatcherDel
  * STOMP message-level authorisation:
  *
  * <ul>
- *   <li>SUBSCRIBE to {@code /topic/**} requires an authenticated user; a per-team check is layered
- *       on top by {@link TreeTopicChannelInterceptor} (FR-034).</li>
+ *   <li>SUBSCRIBE to {@code /topic/**} requires an authenticated user. Authentication is the floor,
+ *       not the ceiling: {@link TreeTopicChannelInterceptor} then applies a default-deny rule that
+ *       admits only an exact {@code /topic/teams/{teamId}/tree} destination the principal may read,
+ *       so a wildcard subscription such as {@code /topic/**} cannot harvest other teams' events
+ *       (FR-034).</li>
  *   <li>Client SEND to {@code /topic/**} is denied outright — {@code /topic/**} is
  *       server-to-client only (FR-034).</li>
  *   <li>Every other message type is denied.</li>
@@ -31,7 +34,8 @@ public class WebsocketSecurityConfiguration {
             // Reject any client SEND to a /topic destination — server-to-client only.
             .simpMessageDestMatchers("/topic/**")
             .denyAll()
-            // SUBSCRIBE to /topic/** requires authentication; team-scoping is enforced by
+            // SUBSCRIBE to /topic/** requires authentication; team-scoping and the default-deny
+            // rule for anything that is not an exact tree topic are enforced by
             // TreeTopicChannelInterceptor.
             .simpSubscribeDestMatchers("/topic/**")
             .authenticated()

@@ -13,7 +13,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * the transaction rolls back — the listener is simply not invoked.
  *
  * <p>A failure to send is caught and logged; it never propagates to the caller and never rolls back
- * the write that produced the event (NFR-013).
+ * the write that produced the event (NFR-013). This covers {@link Error}s as well as runtime
+ * exceptions — a broadcast-time {@code LinkageError} or {@code AssertionError} would otherwise take
+ * down an already-committed write — with the exception of {@link VirtualMachineError}, which is
+ * rethrown because the JVM itself is no longer usable.
  */
 @Component
 public class TreeChangeBroadcaster {
@@ -31,8 +34,14 @@ public class TreeChangeBroadcaster {
         String destination = "/topic/teams/" + event.teamId() + "/tree";
         try {
             messagingTemplate.convertAndSend(destination, event);
-        } catch (RuntimeException e) {
-            LOG.warn("Failed to broadcast tree change {} seq {} to {}", event.type(), event.seq(), destination, e);
+        } catch (VirtualMachineError e) {
+            // OutOfMemoryError, StackOverflowError and friends: the JVM is not in a state we can
+            // recover from, so never swallow these.
+            throw e;
+        } catch (Throwable t) {
+            // Anything else — including a LinkageError raised while serialising the payload — must
+            // not escape: the write has already committed and broadcasting is best effort (NFR-013).
+            LOG.warn("Failed to broadcast tree change {} seq {} to {}", event.type(), event.seq(), destination, t);
         }
     }
 }

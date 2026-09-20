@@ -44,6 +44,7 @@ import com.opportunity.tree.service.dto.tree.TreeQuestionWriteDTO;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -118,6 +119,20 @@ class TreeCollaborationBroadcastIT {
             em.flush();
             return null;
         });
+    }
+
+    /**
+     * This IT is intentionally non-transactional (the AFTER_COMMIT broadcast only fires on a real
+     * commit), so everything {@link #setUp()} seeds is committed and would otherwise survive into
+     * later tests in the same JVM — the leftover {@code team_member} rows made
+     * {@code UserResourceIT.testUserEquals} fail with {@code fk_team_member__user_id}. Remove
+     * exactly what this class created, in FK-safe order.
+     */
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+        List<Long> teamIds = team == null || team.getId() == null ? List.of() : List.of(team.getId());
+        OstTreeTestCleanup.removeTeamsAndUsers(txMgr, em, teamIds, List.of(OWNER, EDITOR, VIEWER, OUTSIDER));
     }
 
     // AC #1, #4 — adding a link publishes LINK_ADDED with node key + TreeLinkDTO and the envelope.

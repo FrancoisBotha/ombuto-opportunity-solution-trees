@@ -97,9 +97,17 @@ class TeamManagementResourceIT {
             .andExpect(jsonPath("$.role").value("OWNER"))
             .andExpect(jsonPath("$.name").value("Alpha"));
 
-        List<Team> teams = teamRepository.findAll();
-        assertThat(teams).hasSize(1);
-        Team created = teams.get(0);
+        // Scope the lookup to the team this test created rather than asserting on the size of the
+        // whole table: a global row count makes the test fail for reasons that have nothing to do
+        // with it whenever another IT leaves a team behind.
+        Team created = teamRepository
+            .findAll()
+            .stream()
+            .filter(t -> "Alpha".equals(t.getName()))
+            .reduce((a, b) -> {
+                throw new AssertionError("More than one team named Alpha");
+            })
+            .orElseThrow(() -> new AssertionError("The created team was not persisted"));
         assertThat(created.getCreatedDate()).isAfter(Instant.EPOCH.plusSeconds(60)); // not the client value
 
         List<TeamMember> members = teamMemberRepository.findAllByTeamId(created.getId());
