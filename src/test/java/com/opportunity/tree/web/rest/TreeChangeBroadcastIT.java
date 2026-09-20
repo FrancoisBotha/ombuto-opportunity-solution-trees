@@ -36,6 +36,9 @@ import jakarta.persistence.EntityManager;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -107,6 +110,20 @@ class TreeChangeBroadcastIT {
             createFixture();
             return null;
         });
+    }
+
+    /**
+     * This IT is intentionally non-transactional (the AFTER_COMMIT broadcast only fires on a real
+     * commit), so everything {@link #setUp()} seeds is committed. Without this teardown those rows
+     * survive into later tests in the same JVM — the leftover {@code team_member} rows made
+     * {@code UserResourceIT.testUserEquals} fail with {@code fk_team_member__user_id}. Remove
+     * exactly what this class created, in FK-safe order.
+     */
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+        List<Long> teamIds = Stream.of(team, otherTeam).filter(Objects::nonNull).map(Team::getId).filter(Objects::nonNull).toList();
+        OstTreeTestCleanup.removeTeamsAndUsers(txMgr, em, teamIds, List.of(OWNER, EDITOR, VIEWER));
     }
 
     private void createFixture() {
@@ -383,19 +400,33 @@ class TreeChangeBroadcastIT {
             .andExpect(status().isCreated());
     }
 
+    /**
+     * Captures the single published event and, crucially, asserts the exact destination it went to —
+     * {@code /topic/teams/{teamId}/tree} for the event's own team. Matching {@code any(String.class)}
+     * would let a broadcast to the wrong (or a wildcard) topic pass unnoticed.
+     */
     private TreeChangeEvent capturedEvent() {
+        ArgumentCaptor<String> destination = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
-        verify(messagingTemplate, times(1)).convertAndSend(any(String.class), payload.capture());
-        return (TreeChangeEvent) payload.getValue();
+        verify(messagingTemplate, times(1)).convertAndSend(destination.capture(), payload.capture());
+        TreeChangeEvent event = (TreeChangeEvent) payload.getValue();
+        assertThat(destination.getValue()).isEqualTo("/topic/teams/" + event.teamId() + "/tree");
+        return event;
     }
 
     private List<TreeChangeEvent> capturedEvents() {
+        ArgumentCaptor<String> destination = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
-        verify(messagingTemplate, org.mockito.Mockito.atLeastOnce()).convertAndSend(any(String.class), payload.capture());
-        return payload
+        verify(messagingTemplate, org.mockito.Mockito.atLeastOnce()).convertAndSend(destination.capture(), payload.capture());
+        List<TreeChangeEvent> events = payload
             .getAllValues()
             .stream()
             .map(o -> (TreeChangeEvent) o)
             .toList();
+        List<String> destinations = destination.getAllValues();
+        for (int i = 0; i < events.size(); i++) {
+            assertThat(destinations.get(i)).isEqualTo("/topic/teams/" + events.get(i).teamId() + "/tree");
+        }
+        return events;
     }
 }

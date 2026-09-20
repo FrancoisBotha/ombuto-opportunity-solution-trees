@@ -178,4 +178,27 @@ describe('OST realtime store', () => {
     expect(applyEvents).toHaveBeenCalledOnce();
     expect(applyEvents.mock.calls[0][0].map((item: OstRealtimeEvent) => item.seq)).toEqual([10, 11, 12]);
   });
+
+  it('accepts an event whose actingUserLogin is null instead of dropping it as a gap', () => {
+    open();
+    client.emit({ ...event(7, 10), actingUserLogin: null });
+    client.emit(event(7, 11));
+    flushFrame();
+
+    expect(applyEvents).toHaveBeenCalledOnce();
+    expect(applyEvents.mock.calls[0][0].map((item: OstRealtimeEvent) => item.seq)).toEqual([10, 11]);
+    expect(applyEvents.mock.calls[0][0][0].actingUserLogin).toBeNull();
+    // The null-actor event was counted, so no gap is reported for seq 11.
+    expect(store.gapSignal).toBeNull();
+    expect(reloadTree).not.toHaveBeenCalled();
+    expect(store.lastSeqByTeam[7]).toBe(11);
+  });
+
+  it('still drops an event whose actingUserLogin is neither a string nor null', () => {
+    open();
+    client.emit({ ...event(7, 10), actingUserLogin: 42 } as unknown as OstRealtimeEvent);
+
+    expect(frames).toHaveLength(0);
+    expect(applyEvents).not.toHaveBeenCalled();
+  });
 });

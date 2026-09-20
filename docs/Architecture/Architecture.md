@@ -63,14 +63,27 @@ hand-written pieces sit on top of the generated code:
   `/topic/teams/{teamId}/tree`. Clients never write over the socket: a client
   `SEND` to any `/topic/**` destination is rejected by
   `WebsocketSecurityConfiguration` (server-to-client only), and
-  `TreeTopicChannelInterceptor` additionally drops any `SEND` that targets a
-  tree topic. SUBSCRIBE frames are authorised against `TeamAccessService` in the
-  same channel interceptor (`TreeTopicChannelInterceptor`): the `teamId` is
-  resolved from the destination and a non-member's SUBSCRIBE is dropped, so no
-  events ever reach that session. Viewers subscribe and receive events like any
-  other member (FR-034). The WebSocket handshake reuses the authenticated HTTP
-  session and unauthenticated handshakes are refused (NFR-011). Comments use
-  the same mechanism.
+  `TreeTopicChannelInterceptor` additionally refuses any `SEND` that targets the
+  `/topic` namespace. SUBSCRIBE frames are authorised against `TeamAccessService`
+  in the same channel interceptor (`TreeTopicChannelInterceptor`), which is
+  **default-deny for the whole `/topic` namespace**: a SUBSCRIBE is admitted only
+  when its destination is literally `/topic/teams/{teamId}/tree` (canonical
+  decimal id, no sign, no leading zeros, no trailing segment) _and_
+  `TeamAccessService.canReadTeam` grants the principal read access. This matters
+  because Spring's simple broker resolves subscription destinations with an
+  `AntPathMatcher`, so a _pattern_ destination such as `/topic/teams/*/tree` or
+  `/topic/**` matches every team's real destination; authenticating the
+  subscriber is therefore not enough, and anything that is not the exact tree
+  topic — wildcards, path traversal (`/topic/teams/1/tree/../2/tree`),
+  percent-encoded forms, zero-padded ids, unknown `/topic/...` destinations — is
+  refused. **A refusal is an explicit STOMP `ERROR` frame, not a silent drop:**
+  the interceptor throws `AccessDeniedException`, which Spring's
+  `StompSubProtocolHandler` renders as an `ERROR` frame, so a refused client
+  learns it is not subscribed instead of waiting forever for events that will
+  never come. Viewers subscribe and receive events like any other member
+  (FR-034). The WebSocket handshake reuses the authenticated HTTP session and
+  unauthenticated handshakes are refused (NFR-011). Comments use the same
+  mechanism.
 - **MCP server.** Read-only tools (list products, get tree, get node, list
   interviews) call the same services, so they are scoped the same way. Callers
   present a Keycloak bearer token. The starter is

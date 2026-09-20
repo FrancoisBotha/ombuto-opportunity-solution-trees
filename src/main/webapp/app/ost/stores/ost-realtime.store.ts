@@ -18,7 +18,9 @@ export interface OstRealtimeEvent {
   teamId: number;
   seq: number;
   epoch: string;
-  actingUserLogin: string;
+  // The server sends null when the change had no authenticated actor (TreeChangePublisher resolves
+  // the login from the SecurityContext, which can be empty for a system-initiated write).
+  actingUserLogin: string | null;
   at: string;
   payload?: unknown;
   [key: string]: unknown;
@@ -268,7 +270,9 @@ export const useOstRealtimeStore = defineStore('ostRealtime', () => {
       Number.isSafeInteger(candidate.teamId) &&
       Number.isSafeInteger(candidate.seq) &&
       typeof candidate.epoch === 'string' &&
-      typeof candidate.actingUserLogin === 'string' &&
+      // actingUserLogin may legitimately be null (a write with no authenticated actor). Dropping
+      // such an event would show up later as a spurious seq gap and a full reload.
+      (typeof candidate.actingUserLogin === 'string' || candidate.actingUserLogin === null) &&
       typeof candidate.at === 'string'
     );
   }
