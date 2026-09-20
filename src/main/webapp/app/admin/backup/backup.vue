@@ -53,7 +53,7 @@
     <b-alert v-if="restoreSummary" show variant="success" class="mt-4" data-cy="restoreSummary">
       <h3 class="h5 alert-heading">Restore summary</h3>
       <p class="mb-2">The backup was restored successfully.</p>
-      <ul class="mb-0">
+      <ul class="mb-2">
         <li>
           <strong>{{ restoreSummary.counts.teams ?? 0 }}</strong> teams
         </li>
@@ -64,6 +64,10 @@
           <strong>{{ restoreSummary.counts.treeNodes ?? 0 }}</strong> tree nodes
         </li>
       </ul>
+      <p v-if="restoreSummary.exportedAt" class="mb-0" data-cy="restoreSummaryExportedAt">
+        Backup taken on <time :datetime="restoreSummary.exportedAt">{{ restoreSummary.exportedAt }}</time
+        >.
+      </p>
     </b-alert>
 
     <b-modal
