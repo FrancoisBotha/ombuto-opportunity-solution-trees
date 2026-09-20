@@ -29,23 +29,29 @@ const PATCH_FIELDS: PatchField[] = ['title', 'note', 'status', 'conf', 'priority
 
 /** Realtime event body applied to the flat store (RTC-005). See docs/Epics/epic_05_REALTIME_COLLABORATION.md §5/FR-030. */
 export type OstTreeEvent =
-  | { type: 'NODE_CREATED'; actingUserLogin?: string; requestId?: string; node: TreeNodeDTO }
-  | { type: 'NODE_UPDATED'; actingUserLogin?: string; requestId?: string; node: TreeNodeDTO }
+  | { type: 'NODE_CREATED'; actingUserLogin?: string | null; requestId?: string; node: TreeNodeDTO }
+  | { type: 'NODE_UPDATED'; actingUserLogin?: string | null; requestId?: string; node: TreeNodeDTO }
   | {
       type: 'NODE_MOVED';
-      actingUserLogin?: string;
+      actingUserLogin?: string | null;
       requestId?: string;
       node: TreeNodeDTO;
       siblings?: { key: string; sortOrder: number }[];
     }
-  | { type: 'NODE_DELETED'; actingUserLogin?: string; requestId?: string; key: string; descendantKeys?: string[] }
-  | { type: 'LINK_ADDED' | 'LINK_UPDATED'; actingUserLogin?: string; requestId?: string; key: string; link: NodeLinkDTO }
-  | { type: 'LINK_REMOVED'; actingUserLogin?: string; requestId?: string; key: string; linkId: number }
-  | { type: 'QUESTION_ADDED' | 'QUESTION_UPDATED'; actingUserLogin?: string; requestId?: string; key: string; question: OpenQuestionDTO }
-  | { type: 'QUESTION_REMOVED'; actingUserLogin?: string; requestId?: string; key: string; questionId: number }
+  | { type: 'NODE_DELETED'; actingUserLogin?: string | null; requestId?: string; key: string; descendantKeys?: string[] }
+  | { type: 'LINK_ADDED' | 'LINK_UPDATED'; actingUserLogin?: string | null; requestId?: string; key: string; link: NodeLinkDTO }
+  | { type: 'LINK_REMOVED'; actingUserLogin?: string | null; requestId?: string; key: string; linkId: number }
+  | {
+      type: 'QUESTION_ADDED' | 'QUESTION_UPDATED';
+      actingUserLogin?: string | null;
+      requestId?: string;
+      key: string;
+      question: OpenQuestionDTO;
+    }
+  | { type: 'QUESTION_REMOVED'; actingUserLogin?: string | null; requestId?: string; key: string; questionId: number }
   | {
       type: 'COMMENT_ADDED' | 'COMMENT_UPDATED';
-      actingUserLogin?: string;
+      actingUserLogin?: string | null;
       requestId?: string;
       key: string;
       comment: CommentDTO;
@@ -53,7 +59,7 @@ export type OstTreeEvent =
     }
   | {
       type: 'COMMENT_DELETED';
-      actingUserLogin?: string;
+      actingUserLogin?: string | null;
       requestId?: string;
       key: string;
       commentId: number;
@@ -63,7 +69,7 @@ export type OstTreeEvent =
 /** Wire-shape event as broadcast by TreeChangePublisher / TreeChangeBroadcaster. */
 interface WireTreeEvent {
   type: string;
-  actingUserLogin?: string;
+  actingUserLogin?: string | null;
   requestId?: string;
   payload?: unknown;
   // The flat variant (still accepted for internal test/utility callers) uses these directly:
@@ -239,7 +245,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
       if (evicted) recentRequestIdSet.delete(evicted);
     }
   }
-  function isOwnEcho(event: { actingUserLogin?: string; requestId?: string }): boolean {
+  function isOwnEcho(event: { actingUserLogin?: string | null; requestId?: string }): boolean {
     const me = team.value?.currentUserLogin;
     if (!me || !event.actingUserLogin || event.actingUserLogin !== me) return false;
     return !!event.requestId && recentRequestIdSet.has(event.requestId);

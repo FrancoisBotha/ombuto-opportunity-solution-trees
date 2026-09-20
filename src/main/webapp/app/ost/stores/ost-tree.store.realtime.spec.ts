@@ -276,6 +276,19 @@ describe('OST tree store — realtime event application (RTC-005)', () => {
     expect(tree.byId('opportunity-1')?.priority).toBe(80);
   });
 
+  it('applies an event with no authenticated actor (actingUserLogin null) instead of treating it as an echo', () => {
+    // TreeChangePublisher resolves the login from the SecurityContext, which is empty for a
+    // system-initiated write, so the server legitimately sends null here.
+    tree.applyEvents([
+      {
+        type: 'NODE_UPDATED',
+        actingUserLogin: null,
+        node: dto('opportunity-1', 'outcome-1', { priority: 55 }),
+      } as OstTreeEvent,
+    ]);
+    expect(tree.byId('opportunity-1')?.priority).toBe(55);
+  });
+
   // ---- criterion 6: in-flight / typing rule (FR-033) ------------------------------------------
   it('keeps a field with a pending patch and applies every other field', async () => {
     const pending = deferred<any>();
