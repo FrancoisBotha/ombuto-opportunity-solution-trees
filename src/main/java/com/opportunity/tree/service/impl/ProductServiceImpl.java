@@ -10,7 +10,12 @@ import com.opportunity.tree.service.ProductService;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
 import com.opportunity.tree.service.TreeNodeCascadeService;
+import com.opportunity.tree.service.TreeNodeDtoAssembler;
+import com.opportunity.tree.service.TreeNodeRef;
 import com.opportunity.tree.service.TreeStructureLock;
+import com.opportunity.tree.service.broadcast.NodeDeletedPayload;
+import com.opportunity.tree.service.broadcast.TreeChangePublisher;
+import com.opportunity.tree.service.broadcast.TreeChangeType;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.TeamDTO;
 import com.opportunity.tree.service.mapper.ProductMapper;
@@ -65,6 +70,10 @@ public class ProductServiceImpl implements ProductService {
 
     private final TeamRepository teamRepository;
 
+    private final TreeChangePublisher changePublisher;
+
+    private final TreeNodeDtoAssembler dtoAssembler;
+
     public ProductServiceImpl(
         ProductRepository productRepository,
         ProductMapper productMapper,
@@ -72,7 +81,9 @@ public class ProductServiceImpl implements ProductService {
         DefaultNodeLinks defaultNodeLinks,
         TreeNodeCascadeService treeNodeCascadeService,
         TreeStructureLock structureLock,
-        TeamRepository teamRepository
+        TeamRepository teamRepository,
+        TreeChangePublisher changePublisher,
+        TreeNodeDtoAssembler dtoAssembler
     ) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
@@ -81,6 +92,24 @@ public class ProductServiceImpl implements ProductService {
         this.treeNodeCascadeService = treeNodeCascadeService;
         this.structureLock = structureLock;
         this.teamRepository = teamRepository;
+        this.changePublisher = changePublisher;
+        this.dtoAssembler = dtoAssembler;
+    }
+
+    /**
+     * Broadcasts a product write so other sessions with the team's tree open follow it without a
+     * reload (FR-029/FR-030). A product is a tree node like any other, but it is created, renamed
+     * and archived through the generated {@code /api/products} CRUD rather than
+     * {@code /api/tree/nodes}, so the publish has to happen here. Every caller is already holding
+     * the team's {@link TreeStructureLock}, which is what keeps {@code seq} ordered against the
+     * tree writes on the same team.
+     */
+    private void publishProduct(TreeChangeType type, Long teamId, Long productId) {
+        if (teamId == null || productId == null) {
+            return;
+        }
+        productRepository.flush();
+        changePublisher.publish(type, teamId, dtoAssembler.toDto(TreeNodeType.PRODUCT, productId));
     }
 
     @Override
@@ -104,6 +133,7 @@ public class ProductServiceImpl implements ProductService {
         product = productRepository.save(product);
         // OST: every new product gets its default "Product space" link.
         defaultNodeLinks.addDefaults(product);
+        publishProduct(TreeChangeType.NODE_CREATED, targetTeamId, product.getId());
         return productMapper.toDto(product);
     }
 
@@ -131,7 +161,28 @@ public class ProductServiceImpl implements ProductService {
         product.setCreatedDate(existing.getCreatedDate());
         product.setSortOrder(sortOrder);
         product = productRepository.save(product);
+        publishProductMoveOrUpdate(existingTeamId, targetTeamId, product.getId(), teamChanges);
         return productMapper.toDto(product);
+    }
+
+    /**
+     * A product that stays in its team is a plain update; one that changes team leaves the old
+     * team's tree (its members must drop it and its subtree) and appears in the new one, so both
+     * topics get an event of their own.
+     */
+    private void publishProductMoveOrUpdate(Long existingTeamId, Long targetTeamId, Long productId, boolean teamChanges) {
+        if (!teamChanges) {
+            publishProduct(TreeChangeType.NODE_UPDATED, existingTeamId, productId);
+            return;
+        }
+        if (existingTeamId != null) {
+            changePublisher.publish(
+                TreeChangeType.NODE_DELETED,
+                existingTeamId,
+                new NodeDeletedPayload(TreeNodeRef.key(TreeNodeType.PRODUCT, productId), List.of())
+            );
+        }
+        publishProduct(TreeChangeType.NODE_CREATED, targetTeamId, productId);
     }
 
     @Override
@@ -173,6 +224,10 @@ public class ProductServiceImpl implements ProductService {
                 return existingProduct;
             })
             .map(productRepository::save)
+            .map(saved -> {
+                publishProductMoveOrUpdate(existingTeamId, teamChanges ? targetTeamId : existingTeamId, saved.getId(), teamChanges);
+                return saved;
+            })
             .map(productMapper::toDto);
     }
 

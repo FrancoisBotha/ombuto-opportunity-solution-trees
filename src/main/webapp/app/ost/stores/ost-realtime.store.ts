@@ -60,6 +60,12 @@ type FrameCancel = (handle: number) => void;
 
 const INITIAL_RECONNECT_DELAY_MS = 1000;
 const MAX_RECONNECT_DELAY_MS = 30000;
+/**
+ * How many events are held while a full tree read is in flight. Past this the buffer is abandoned
+ * and another read is scheduled instead — cheaper than replaying an unbounded backlog, and the read
+ * is authoritative anyway.
+ */
+const MAX_BUFFERED_DURING_RELOAD = 2000;
 
 const websocketUrl = (): string => {
   const rawBaseHref = document.querySelector('base')?.getAttribute('href') ?? '/';
@@ -98,6 +104,9 @@ export const useOstRealtimeStore = defineStore('ostRealtime', () => {
   let frameCancel = defaultFrameCancel;
   let frameHandle: number | null = null;
   let queuedEvents: OstRealtimeEvent[] = [];
+  /** Events that arrived while a full tree read was in flight; replayed once it resolves. */
+  let bufferedDuringReload: OstRealtimeEvent[] = [];
+  let bufferOverflowed = false;
 
   function setClientFactory(factory: () => StompClient) {
     if (client) throw new Error('The realtime client factory must be set before opening a team.');
@@ -162,6 +171,7 @@ export const useOstRealtimeStore = defineStore('ostRealtime', () => {
       topicSubscription?.unsubscribe();
       topicSubscription = null;
       clearQueuedEvents();
+      clearReloadBuffer();
       reloadPendingTeam = null;
       activeTeamId.value = teamId;
       delete epochByTeam.value[teamId];
@@ -185,6 +195,7 @@ export const useOstRealtimeStore = defineStore('ostRealtime', () => {
     topicSubscription?.unsubscribe();
     topicSubscription = null;
     clearQueuedEvents();
+    clearReloadBuffer();
     if (client && activated) {
       activated = false;
       await client.deactivate();
@@ -198,8 +209,23 @@ export const useOstRealtimeStore = defineStore('ostRealtime', () => {
     } catch {
       return;
     }
-    if (!isRealtimeEvent(incoming) || incoming.teamId !== activeTeamId.value || reloadPendingTeam === incoming.teamId) return;
+    if (!isRealtimeEvent(incoming) || incoming.teamId !== activeTeamId.value) return;
+    if (reloadPendingTeam === incoming.teamId) {
+      // A full tree read is in flight. Dropping the event here used to lose the write outright:
+      // the read's snapshot is taken on the server before the event commits, the seq baseline has
+      // just been cleared (so the miss never shows up as a gap), and the session then stays
+      // silently behind until something else forces another read. Hold it instead and replay it
+      // once the read lands — every apply* handler is keyed by id, so replaying a change the
+      // snapshot already contains is a no-op.
+      if (bufferedDuringReload.length >= MAX_BUFFERED_DURING_RELOAD) bufferOverflowed = true;
+      else bufferedDuringReload.push(incoming);
+      return;
+    }
+    accept(incoming);
+  }
 
+  /** Epoch / gap checks and queueing for one event that is not waiting on a reload. */
+  function accept(incoming: OstRealtimeEvent) {
     const knownEpoch = epochByTeam.value[incoming.teamId];
     if (knownEpoch !== undefined && knownEpoch !== incoming.epoch) {
       epochByTeam.value[incoming.teamId] = incoming.epoch;
@@ -242,23 +268,50 @@ export const useOstRealtimeStore = defineStore('ostRealtime', () => {
     }
   }
 
+  function clearReloadBuffer() {
+    bufferedDuringReload = [];
+    bufferOverflowed = false;
+  }
+
+  /**
+   * Replays what arrived while the tree was being read. Runs synchronously the moment
+   * `reloadPendingTeam` is cleared, so nothing can slip in between the two.
+   */
+  function drainReloadBuffer(teamId: number) {
+    const held = bufferedDuringReload;
+    const overflowed = bufferOverflowed;
+    clearReloadBuffer();
+    if (overflowed) {
+      requestReload('gap');
+      return;
+    }
+    for (const event of held) {
+      if (event.teamId !== activeTeamId.value || reloadPendingTeam === teamId) break;
+      accept(event);
+    }
+  }
+
   function requestReload(reason: ReloadReason) {
     const teamId = activeTeamId.value;
     const target = consumer;
     if (teamId === null || !target || reloadPendingTeam === teamId) return;
     reloadPendingTeam = teamId;
+    clearReloadBuffer();
     reloadSignal.value = { id: ++reloadId, teamId, reason };
     let result: void | Promise<unknown>;
     try {
       result = target.reloadTree(reason);
     } catch {
       reloadPendingTeam = null;
+      clearReloadBuffer();
       return;
     }
     Promise.resolve(result)
       .catch(() => undefined)
       .finally(() => {
-        if (reloadPendingTeam === teamId) reloadPendingTeam = null;
+        if (reloadPendingTeam !== teamId) return;
+        reloadPendingTeam = null;
+        drainReloadBuffer(teamId);
       });
   }
 
