@@ -76,6 +76,9 @@ class TeamManagementServiceTest {
     @Mock
     private TreeChangePublisher changePublisher;
 
+    @Mock
+    private TreeStructureLock structureLock;
+
     private TeamManagementService service;
 
     private User creator;
@@ -89,7 +92,8 @@ class TeamManagementServiceTest {
             productRepository,
             userRepository,
             teamAccessService,
-            changePublisher
+            changePublisher,
+            structureLock
         );
         creator = user(CREATOR_USER_ID, LOGIN, "Alice", "Anderson");
         bob = user(OTHER_USER_ID, "bob", "Bob", "Brown");

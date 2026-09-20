@@ -23,8 +23,12 @@ public class CreateTeamRequest implements Serializable {
         return name;
     }
 
+    /**
+     * Normalises the name before Bean Validation sees it, so a whitespace-only name fails
+     * {@code @Size(min = 2)} with a 400 instead of creating a team with a blank name.
+     */
     public void setName(String name) {
-        this.name = name;
+        this.name = name == null ? null : name.trim();
     }
 
     public String getDescription() {

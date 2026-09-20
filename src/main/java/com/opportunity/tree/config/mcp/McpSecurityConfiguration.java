@@ -1,5 +1,7 @@
 package com.opportunity.tree.config.mcp;
 
+import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -10,6 +12,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 /**
  * A stateless, CSRF-exempt filter chain isolated to the MCP endpoint paths that authenticates
@@ -32,14 +35,20 @@ public class McpSecurityConfiguration {
 
     static final String MCP_SSE_PATH = "/mcp";
     static final String MCP_MESSAGE_PATH_PATTERN = "/mcp/**";
+    static final String MCP_DEFAULT_MESSAGE_PATH = "/mcp/message";
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 10)
     public SecurityFilterChain mcpSecurityFilterChain(
         HttpSecurity http,
-        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter
+        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
+        McpSessionRegistry mcpSessionRegistry,
+        ObjectProvider<McpServerSseProperties> sseProperties
     ) throws Exception {
         McpAuthenticationEntryPoint entryPoint = new McpAuthenticationEntryPoint();
+        McpServerSseProperties properties = sseProperties.getIfAvailable();
+        String ssePath = properties != null ? properties.getSseEndpoint() : MCP_SSE_PATH;
+        String messagePath = properties != null ? properties.getSseMessageEndpoint() : MCP_DEFAULT_MESSAGE_PATH;
         http
             .securityMatcher(MCP_SSE_PATH, MCP_MESSAGE_PATH_PATTERN)
             .csrf(csrf -> csrf.disable())
@@ -48,7 +57,10 @@ public class McpSecurityConfiguration {
             .exceptionHandling(eh -> eh.authenticationEntryPoint(entryPoint))
             .oauth2ResourceServer(oauth2 ->
                 oauth2.authenticationEntryPoint(entryPoint).jwt(jwt -> jwt.jwtAuthenticationConverter(authenticationConverter))
-            );
+            )
+            // After AuthorizationFilter: the caller is authenticated, so the SSE session can be
+            // bound to them and a message posted to somebody else's session can be refused.
+            .addFilterAfter(new McpSessionPrincipalFilter(mcpSessionRegistry, ssePath, messagePath), AuthorizationFilter.class);
         return http.build();
     }
 }

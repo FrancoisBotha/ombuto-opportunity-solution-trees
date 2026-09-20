@@ -48,6 +48,33 @@ import tech.jhipster.config.JHipsterProperties;
 @EnableMethodSecurity(securedEnabled = true)
 public class SecurityConfiguration {
 
+    /**
+     * Generated CRUD resources that are locked to {@code ROLE_ADMIN} by a class-level
+     * {@code @PreAuthorize}. Method security runs <em>after</em> argument resolution, so an
+     * incomplete body used to be answered with a 400 that echoed the controller's DTO fields
+     * before the caller was ever shown to be unauthorised. Matching the paths here refuses them in
+     * the filter chain instead, so a non-admin always gets a plain 403 whatever the body is; the
+     * {@code @PreAuthorize} annotations stay as defence in depth.
+     *
+     * <p>{@code /api/teams/**} and {@code /api/products/**} are deliberately absent: those prefixes
+     * are shared with the member-facing {@code TeamTreeResource}, {@code TeamProductResource} and
+     * {@code ProductResource}, which authorise per team membership rather than by role.
+     */
+    private static final String[] GENERATED_ADMIN_ONLY_API_PATHS = {
+        "/api/outcomes/**",
+        "/api/opportunities/**",
+        "/api/solutions/**",
+        "/api/assumptions/**",
+        "/api/evidences/**",
+        "/api/node-links/**",
+        "/api/open-questions/**",
+        "/api/node-histories/**",
+        "/api/comments/**",
+        "/api/interviews/**",
+        "/api/tags/**",
+        "/api/team-members/**",
+    };
+
     private final Environment env;
 
     private final JHipsterProperties jHipsterProperties;
@@ -91,6 +118,7 @@ public class SecurityConfiguration {
                     .requestMatchers("/api/authenticate").permitAll()
                     .requestMatchers("/api/auth-info").permitAll()
                     .requestMatchers("/api/admin/**").hasAuthority(AuthoritiesConstants.ADMIN)
+                    .requestMatchers(GENERATED_ADMIN_ONLY_API_PATHS).hasAuthority(AuthoritiesConstants.ADMIN)
                     .requestMatchers("/api/**").authenticated()
                     .requestMatchers("/websocket/**").authenticated()
                     .requestMatchers("/v3/api-docs/**").hasAuthority(AuthoritiesConstants.ADMIN)

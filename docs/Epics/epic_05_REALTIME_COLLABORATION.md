@@ -202,6 +202,12 @@ Epic is complete when:
 - **Ordering vs. the team lock:** structural writes serialise on
   `TreeStructureLock`, but PATCH and comment writes take it too — confirm every
   publisher assigns `seq` under the lock so events cannot be numbered out of order.
+  _Resolved:_ membership writes were the last publishers outside the lock.
+  `TeamManagementService` and `AdminTeamService` now take `lockTeam(teamId)` in
+  `addMember` / `changeRole` / `removeMember` before touching membership rows, so
+  `MEMBERSHIP_CHANGED` shares the team's single `seq` space with tree events
+  instead of getting a sequence space of its own. That also closes the last-owner
+  race, since the owner count is a read-then-write.
 - **Move events:** carry the subtree implicitly; clients must re-parent from
   `siblings` without reloading. Falling back to a reload for moves is acceptable
   only if the event proves unreliable.
