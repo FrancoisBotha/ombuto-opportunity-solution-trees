@@ -138,6 +138,49 @@ class TeamMembershipConcurrencyIT {
         assertThat(statuses).containsExactlyInAnyOrder(204, 400);
     }
 
+    /**
+     * The two races above each stay inside one service. The invariant has to survive the mixed
+     * cases too: a demotion and a removal at the same time, and the owner-facing API racing the
+     * admin API. Both services take the same per-team row lock, so whichever commits first is the
+     * state the other reads — but only a test that crosses the two paths shows that the lock is one
+     * lock rather than two independent ones.
+     */
+    @Test
+    void demotionRacingRemoval_leavesTheTeamWithAnOwner() throws Exception {
+        assertAtMostOneSucceeds(runTogether(List.of(demoteAsOwner(ownerBId, ownerALogin), removeAsOwner(ownerAId, ownerBLogin))));
+    }
+
+    @Test
+    void ownerDemotionRacingAdminRemoval_leavesTheTeamWithAnOwner() throws Exception {
+        assertAtMostOneSucceeds(runTogether(List.of(demoteAsOwner(ownerBId, ownerALogin), removeAsAdmin(ownerAId))));
+    }
+
+    @Test
+    void adminDemotionRacingOwnerRemoval_leavesTheTeamWithAnOwner() throws Exception {
+        assertAtMostOneSucceeds(runTogether(List.of(demoteAsAdmin(ownerBId), removeAsOwner(ownerAId, ownerBLogin))));
+    }
+
+    /**
+     * The loser of a mixed race is refused either as the last owner (400) or because the winner
+     * took its own ownership away first (403) — which of the two depends on whether its
+     * authorisation read happened before or after the winner committed. Both are correct; what must
+     * never happen is that both writes land.
+     */
+    private void assertAtMostOneSucceeds(List<Integer> statuses) {
+        assertThat(ownerCount()).as("a team must never be left without an owner").isGreaterThanOrEqualTo(1);
+        assertThat(
+            statuses
+                .stream()
+                .filter(s -> s >= 200 && s < 300)
+                .count()
+        )
+            .as("at most one of the two membership writes may succeed, got %s", statuses)
+            .isLessThanOrEqualTo(1L);
+        assertThat(statuses)
+            .as("the loser must be refused, not served an error page")
+            .allMatch(s -> s < 500);
+    }
+
     // Helpers ---------------------------------------------------------------
 
     private MockHttpServletRequestBuilder demoteAsOwner(String targetUserId, String actingLogin) throws Exception {

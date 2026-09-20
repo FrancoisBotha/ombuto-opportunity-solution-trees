@@ -56,9 +56,13 @@ public class SecurityConfiguration {
      * the filter chain instead, so a non-admin always gets a plain 403 whatever the body is; the
      * {@code @PreAuthorize} annotations stay as defence in depth.
      *
-     * <p>{@code /api/teams/**} and {@code /api/products/**} are deliberately absent: those prefixes
-     * are shared with the member-facing {@code TeamTreeResource}, {@code TeamProductResource} and
-     * {@code ProductResource}, which authorise per team membership rather than by role.
+     * <p>{@code /api/products/**} is deliberately absent: {@code ProductResource} is member-facing
+     * and authorises per team membership inside {@code ProductService} rather than by role.
+     * {@code /api/teams/**} cannot be listed wholesale either, because that prefix is shared with
+     * the member-facing {@code TeamTreeResource} ({@code /api/teams/{teamId}/tree}) and
+     * {@code TeamProductResource} ({@code /api/teams/{teamId}/products}) — see
+     * {@link #GENERATED_ADMIN_ONLY_TEAM_PATHS} for the exact two shapes the generated
+     * {@code TeamResource} owns.
      */
     private static final String[] GENERATED_ADMIN_ONLY_API_PATHS = {
         "/api/outcomes/**",
@@ -73,7 +77,22 @@ public class SecurityConfiguration {
         "/api/interviews/**",
         "/api/tags/**",
         "/api/team-members/**",
+        // AuthorityResource is admin-only per method (@PreAuthorize on every handler) rather than
+        // per class, so it has the same before-validation hole and belongs here too. Nothing else
+        // serves /api/authorities.
+        "/api/authorities/**",
     };
+
+    /**
+     * The generated, admin-only {@code TeamResource} operations, spelled out segment by segment
+     * because {@code /api/teams/**} would also swallow the member-facing
+     * {@code /api/teams/{teamId}/tree} and {@code /api/teams/{teamId}/products}. {@code TeamResource}
+     * owns exactly {@code /api/teams} (list, create) and {@code /api/teams/{id}} (read, update,
+     * patch, delete): one path segment, never two. A single {@code *} matches one segment, so the
+     * two member-facing sub-resources fall through to the {@code /api/**} authenticated rule and
+     * keep authorising per membership.
+     */
+    private static final String[] GENERATED_ADMIN_ONLY_TEAM_PATHS = { "/api/teams", "/api/teams/*" };
 
     private final Environment env;
 
@@ -119,6 +138,7 @@ public class SecurityConfiguration {
                     .requestMatchers("/api/auth-info").permitAll()
                     .requestMatchers("/api/admin/**").hasAuthority(AuthoritiesConstants.ADMIN)
                     .requestMatchers(GENERATED_ADMIN_ONLY_API_PATHS).hasAuthority(AuthoritiesConstants.ADMIN)
+                    .requestMatchers(GENERATED_ADMIN_ONLY_TEAM_PATHS).hasAuthority(AuthoritiesConstants.ADMIN)
                     .requestMatchers("/api/**").authenticated()
                     .requestMatchers("/websocket/**").authenticated()
                     .requestMatchers("/v3/api-docs/**").hasAuthority(AuthoritiesConstants.ADMIN)

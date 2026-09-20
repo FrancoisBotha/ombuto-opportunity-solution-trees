@@ -72,6 +72,22 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
 
     static final String CONCURRENCY_DETAIL = "Someone else changed this at the same time. Please reload and try again.";
 
+    /**
+     * Detail of a bean-validation failure on a request body or parameter.
+     *
+     * <p>{@link MethodArgumentNotValidException#getMessage()} is Java's rendering of the handler
+     * method — {@code "Validation failed for argument [0] in public
+     * org.springframework.http.ResponseEntity&lt;com.opportunity.tree.service.dto.TeamDTO&gt;
+     * com.opportunity.tree.web.rest.TeamResource.createTeam(...)"} — so returning it hands any
+     * caller the controller class, its package, the DTO type and the method signature. Under the
+     * {@code prod} profile {@code containsPackageName} used to swap it for "Unexpected runtime
+     * exception", which hides the leak but reports a 400 validation failure as an internal error —
+     * the wrong cause. Both are replaced by this fixed sentence; the per-field information a client
+     * legitimately needs is carried by the {@code fieldErrors} property, which names only DTO
+     * fields.
+     */
+    static final String VALIDATION_DETAIL = "The request was rejected by validation; see fieldErrors for the fields at fault.";
+
     private static final Logger LOG = LoggerFactory.getLogger(ExceptionTranslator.class);
 
     @Value("${jhipster.clientApp.name:opportunitySolutionTree}")
@@ -276,7 +292,10 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
             problem.setTitle(title);
         }
 
-        if (problem.getDetail() == null) {
+        if (problem.getDetail() == null && err instanceof MethodArgumentNotValidException) {
+            // Never the exception's own message: it names the controller and its DTO (see VALIDATION_DETAIL).
+            problem.setDetail(VALIDATION_DETAIL);
+        } else if (problem.getDetail() == null) {
             // An ErrorResponseException (BadRequestAlertException, ResponseStatusException, ...) without
             // a detail: its getMessage() is Java's toString of the status and body ("400 BAD_REQUEST,
             // ProblemDetailWithCause[type=...]"), never a message for a client. Use the human message a

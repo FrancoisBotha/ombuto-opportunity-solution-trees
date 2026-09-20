@@ -142,6 +142,32 @@ class ExceptionTranslatorIT {
             .andExpect(jsonPath("$.fieldErrors.[0].message").value("must not be null"));
     }
 
+    /**
+     * A validation 400 must describe the request, never the server. Until this was fixed the
+     * {@code detail} was {@code MethodArgumentNotValidException#getMessage()}, which reads
+     * "Validation failed for argument [0] in public org.springframework.http.ResponseEntity&lt;…&gt;
+     * com.opportunity.tree.web.rest.….methodArgument(…)": the controller class, its package, the
+     * DTO type and the whole method signature, handed to any caller that posts an invalid body.
+     * (Under {@code prod} the package check swapped it for "Unexpected runtime exception", hiding
+     * the leak but reporting a validation failure as an internal error — the wrong cause.) The
+     * fields at fault stay available in {@code fieldErrors}, which names only DTO fields.
+     */
+    @Test
+    void methodArgumentNotValid_detailNamesNoControllerPackageOrSignature() throws Exception {
+        mockMvc
+            .perform(
+                post("/api/exception-translator-test/method-argument").content("{}").contentType(MediaType.APPLICATION_JSON).with(csrf())
+            )
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.detail").value(ExceptionTranslator.VALIDATION_DETAIL))
+            .andExpect(jsonPath("$.fieldErrors.[0].field").value("test"))
+            .andExpect(content().string(not(containsString("com.opportunity.tree"))))
+            .andExpect(content().string(not(containsString("org.springframework"))))
+            .andExpect(content().string(not(containsString("ResponseEntity"))))
+            .andExpect(content().string(not(containsString("Validation failed for argument"))))
+            .andExpect(content().string(not(containsString("Unexpected runtime exception"))));
+    }
+
     @Test
     void testMissingServletRequestPartException() throws Exception {
         mockMvc

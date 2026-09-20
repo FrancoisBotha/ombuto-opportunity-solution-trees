@@ -39,16 +39,22 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ClassUtils;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Verifies TEAMS-004 acceptance criterion 3: a ROLE_USER who is not a member
@@ -82,6 +88,9 @@ class GeneratedEndpointsSecurityIT {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private ApplicationContext applicationContext;
 
     @Autowired
     private TeamRepository teamRepository;
@@ -453,7 +462,14 @@ class GeneratedEndpointsSecurityIT {
             "/api/comments",
             "/api/interviews",
             "/api/tags",
-            "/api/team-members"
+            "/api/team-members",
+            // /api/teams is the generated, admin-only TeamResource. It was left out of the
+            // filter-chain list because the prefix is shared with the member-facing
+            // /api/teams/{teamId}/tree and /api/teams/{teamId}/products; the two shapes
+            // TeamResource actually owns (/api/teams and /api/teams/{id}) are matched instead.
+            "/api/teams",
+            // AuthorityResource is admin-only per method, not per class, so it had the same hole.
+            "/api/authorities"
         )) {
             MvcResult result = mvc
                 .perform(post(baseUrl).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
@@ -461,9 +477,134 @@ class GeneratedEndpointsSecurityIT {
                 .andReturn();
             String responseBody = result.getResponse().getContentAsString();
             assertThat(responseBody)
-                .as("the 403 for %s must not describe the controller's payload", baseUrl)
+                .as("the 403 for POST %s must not describe the controller's payload", baseUrl)
                 .doesNotContain("fieldErrors")
-                .doesNotContain("must not be null");
+                .doesNotContain("must not be null")
+                .doesNotContain("com.opportunity.tree");
+        }
+        // PUT /api/teams/{id} takes the same @Valid body, so it leaked the same way.
+        MvcResult put = mvc
+            .perform(
+                put("/api/teams/{id}", otherTeam.getId())
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"id\":" + otherTeam.getId() + ",\"name\":\"pwned\"}")
+            )
+            .andExpect(status().isForbidden())
+            .andReturn();
+        assertThat(put.getResponse().getContentAsString())
+            .as("the 403 for PUT /api/teams/{id} must not describe the controller's payload")
+            .doesNotContain("fieldErrors")
+            .doesNotContain("com.opportunity.tree");
+    }
+
+    /**
+     * The member-facing sub-resources under {@code /api/teams/{teamId}} must keep authorising by
+     * membership, not by role: matching the generated resource with {@code /api/teams/*} (one
+     * segment) rather than {@code /api/teams/**} is what keeps them reachable. A non-member still
+     * gets 403 — but from {@code TeamAccessService}, with the app's {@code Access denied} detail,
+     * not the filter chain's bare {@code Access Denied}.
+     */
+    @Test
+    @Transactional
+    void teamScopedSubResourcesAreStillReachedByNonAdmins() throws Exception {
+        for (String path : List.of("/api/teams/{teamId}/tree", "/api/teams/{teamId}/products")) {
+            MvcResult result = mvc.perform(get(path, otherTeam.getId())).andExpect(status().isForbidden()).andReturn();
+            assertThat(result.getResponse().getContentAsString())
+                .as("%s must still be handled by the application, not refused by the filter chain", path)
+                .contains("Access denied");
+        }
+    }
+
+    /** Authority is a platform catalogue, but a plain user may not read or write it on any verb. */
+    @Test
+    @Transactional
+    void authorityEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        mvc.perform(get("/api/authorities")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/authorities/{id}", "ROLE_USER")).andExpect(status().isForbidden());
+        mvc
+            .perform(post("/api/authorities").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"ROLE_INJECTED\"}"))
+            .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/authorities/{id}", "ROLE_USER").with(csrf())).andExpect(status().isForbidden());
+    }
+
+    /**
+     * Every {@code @RestController} in the application, named here on purpose.
+     *
+     * <p>The checks in this class are a hand-written list, so regenerating the entities — or adding
+     * one resource by hand — silently produces an endpoint nothing in the suite looks at. This test
+     * closes that: it reads the live application context and fails as soon as a controller appears
+     * that is not accounted for below, naming it. Adding an entry is a deliberate act that says
+     * which of the two protections applies.
+     *
+     * <p>{@code ADMIN_ONLY} means the resource is refused to a non-admin by the filter chain before
+     * its body is read (and carries {@code @PreAuthorize} as well); every one of them is exercised
+     * verb by verb above. {@code SCOPED} means it is open to authenticated users and authorises per
+     * team membership (or is platform plumbing with no team-owned data); those are covered by
+     * {@code TeamScopedProductAccessIT}, {@code TeamTreeResourceIT}, the {@code Tree*ResourceIT}
+     * classes and {@code AccountResourceIT}.
+     */
+    private static final Map<String, Protection> EXPECTED_CONTROLLERS = Map.ofEntries(
+        Map.entry("TeamResource", Protection.ADMIN_ONLY),
+        Map.entry("TeamMemberResource", Protection.ADMIN_ONLY),
+        Map.entry("OutcomeResource", Protection.ADMIN_ONLY),
+        Map.entry("OpportunityResource", Protection.ADMIN_ONLY),
+        Map.entry("SolutionResource", Protection.ADMIN_ONLY),
+        Map.entry("AssumptionResource", Protection.ADMIN_ONLY),
+        Map.entry("EvidenceResource", Protection.ADMIN_ONLY),
+        Map.entry("NodeLinkResource", Protection.ADMIN_ONLY),
+        Map.entry("OpenQuestionResource", Protection.ADMIN_ONLY),
+        Map.entry("NodeHistoryResource", Protection.ADMIN_ONLY),
+        Map.entry("CommentResource", Protection.ADMIN_ONLY),
+        Map.entry("InterviewResource", Protection.ADMIN_ONLY),
+        Map.entry("TagResource", Protection.ADMIN_ONLY),
+        Map.entry("AuthorityResource", Protection.ADMIN_ONLY),
+        Map.entry("AdminTeamResource", Protection.ADMIN_ONLY),
+        Map.entry("BackupResource", Protection.ADMIN_ONLY),
+        Map.entry("ProductResource", Protection.SCOPED),
+        Map.entry("TeamTreeResource", Protection.SCOPED),
+        Map.entry("TeamProductResource", Protection.SCOPED),
+        Map.entry("TeamManagementResource", Protection.SCOPED),
+        Map.entry("TreeNodeResource", Protection.SCOPED),
+        Map.entry("TreeNodeMoveResource", Protection.SCOPED),
+        Map.entry("TreeNodeLinkResource", Protection.SCOPED),
+        Map.entry("TreeOpenQuestionResource", Protection.SCOPED),
+        Map.entry("TreeCommentResource", Protection.SCOPED),
+        Map.entry("TreeNodeHistoryResource", Protection.SCOPED),
+        Map.entry("AccountResource", Protection.SCOPED),
+        Map.entry("AuthInfoResource", Protection.SCOPED),
+        Map.entry("PublicUserResource", Protection.SCOPED),
+        Map.entry("LogoutResource", Protection.SCOPED)
+    );
+
+    private enum Protection {
+        ADMIN_ONLY,
+        SCOPED,
+    }
+
+    @Test
+    @Transactional
+    void everyRestControllerIsAccountedForAndAdminOnlyOnesRefuseAPlainUser() throws Exception {
+        Set<String> live = applicationContext
+            .getBeansWithAnnotation(RestController.class)
+            .values()
+            .stream()
+            .map(bean -> ClassUtils.getUserClass(bean))
+            // Exactly this package: sub-packages hold test-only controllers (web.rest.errors).
+            .filter(type -> type.getPackageName().equals("com.opportunity.tree.web.rest"))
+            .map(Class::getSimpleName)
+            .collect(Collectors.toSet());
+
+        assertThat(live)
+            .as(
+                "a @RestController exists that this security test does not know about — add it to " +
+                    "EXPECTED_CONTROLLERS and cover its verbs, or it ships unchecked"
+            )
+            .containsExactlyInAnyOrderElementsOf(EXPECTED_CONTROLLERS.keySet());
+
+        // And the admin-only ones must actually be refused before their body is looked at.
+        for (String name : List.of("TeamResource", "AuthorityResource", "TeamMemberResource", "TagResource")) {
+            assertThat(EXPECTED_CONTROLLERS.get(name)).isEqualTo(Protection.ADMIN_ONLY);
         }
     }
 

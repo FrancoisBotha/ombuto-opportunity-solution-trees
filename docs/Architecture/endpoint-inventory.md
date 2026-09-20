@@ -49,6 +49,19 @@ A generated DELETE that a database reference blocks (for example, an opportunity
 that still has children) returns `409 error.dataintegrity` without any SQL.
 `GeneratedEndpointsSecurityIT` asserts that every verb above is admin-only.
 
+**Authorisation runs before body validation.** Method security (`@PreAuthorize`)
+only fires once Spring MVC has deserialised and validated the handler arguments,
+so an admin-only resource answered an unauthorised caller's incomplete body with
+a 400 naming the controller, its package and its DTO fields. The admin-only
+paths are therefore also matched in the filter chain
+(`SecurityConfiguration.GENERATED_ADMIN_ONLY_API_PATHS`), which makes the answer
+a plain 403 whatever the body is; the annotations stay as defence in depth.
+`/api/teams` is a special case: the prefix is shared with the member-facing
+`/api/teams/{teamId}/tree` and `/api/teams/{teamId}/products`, so
+`GENERATED_ADMIN_ONLY_TEAM_PATHS` matches only the two shapes `TeamResource`
+owns — `/api/teams` and `/api/teams/*` (one segment). `/api/products/**` is not
+matched at all: `ProductResource` is member-facing.
+
 ## Tree Builder APIs (built on `TeamAccessService`)
 
 These are hand-written resources beside the generated code (Epic 11), open to
@@ -94,6 +107,27 @@ authorisation is enforced per call inside the service.
 | `TeamManagementResource` | `/api/team-management/**`      | Create team / list-my-teams / member add-remove-role / user-search. All flows delegate to `TeamManagementService` → `TeamAccessService`. |
 | `TeamProductResource`    | `/api/teams/{teamId}/products` | Lists a team's products (including archived); non-members get 403 via `teamAccessService.requireReadTeam`.                               |
 | `AdminTeamResource`      | `/api/admin/teams/**`          | Admin team list / create / delete and member management. `ROLE_ADMIN` (class-level and the `/api/admin/**` filter rule).                 |
+
+## STOMP / WebSocket destinations
+
+Not an HTTP resource, but the same access-control rules apply and they are easy
+to miss when auditing controllers.
+
+| Destination                        | Frame     | Who                                                                                                                                     |
+| ---------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `/websocket/**` (SockJS handshake) | —         | `authenticated` (`SecurityConfiguration`)                                                                                               |
+| `/topic/teams/{teamId}/tree`       | SUBSCRIBE | Any member of that team (`TeamAccessService.canReadTeam`), viewers included. Enforced by `TreeTopicChannelInterceptor`.                 |
+| anything else under `/topic`       | SUBSCRIBE | Refused (default-deny, STOMP `ERROR` frame) — wildcards, traversal, encoded and zero-padded ids all fail the exact-match rule (FR-034). |
+| any `/topic` destination           | SEND      | Refused — `/topic` is server-to-client only.                                                                                            |
+
+**Known gap.** Authorisation is decided once, when the SUBSCRIBE frame arrives.
+`TreeChangeBroadcaster` then fans every event out to the topic, so a member
+removed afterwards keeps receiving that team's tree events until its own client
+acts on the `MEMBERSHIP_CHANGED` event and unsubscribes. That is a client-side
+courtesy, not an enforcement: the server neither re-checks membership on the
+outbound channel nor force-unsubscribes. Closing it needs a `clientOutboundChannel`
+interceptor that re-resolves the subscriber's membership per message (or a
+registry of subscriptions to revoke on removal) — see epic 5 FR-034 / FR-037.
 
 ## MCP endpoint
 
@@ -159,13 +193,14 @@ the `Authorization` header.
 
 ## Platform endpoints (not team-owned)
 
-| Controller           | Path(s)                                     | Verbs             | Protection                                                                                                                                                                                                                                                                             |
-| -------------------- | ------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AccountResource`    | `/api/account`, `/api/authenticate`         | GET               | `authenticated` (SecurityConfiguration `authz` rules; `/api/authenticate` and `/api/auth-info` are `permitAll`)                                                                                                                                                                        |
-| `AuthInfoResource`   | `/api/auth-info`                            | GET               | `permitAll`                                                                                                                                                                                                                                                                            |
-| `AuthorityResource`  | `/api/authorities`, `/api/authorities/{id}` | GET, POST, DELETE | Restricted by SecurityConfiguration — falls under `/api/admin/**`? No, `/api/authorities/**` matches `/api/**` (`authenticated`). The controller itself does not add `@PreAuthorize`; the authorities catalogue is inherently a platform concern and is treated as authenticated-only. |
-| `PublicUserResource` | `/api/users`                                | GET               | `authenticated` — exposes the user directory the team-member picker needs.                                                                                                                                                                                                             |
-| `LogoutResource`     | `/api/logout`                               | POST              | `authenticated`                                                                                                                                                                                                                                                                        |
+| Controller           | Path(s)                                          | Verbs             | Protection                                                                                                                                                                                                                                                           |
+| -------------------- | ------------------------------------------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AccountResource`    | `/api/account`, `/api/authenticate`              | GET               | `authenticated` (SecurityConfiguration `authz` rules; `/api/authenticate` and `/api/auth-info` are `permitAll`)                                                                                                                                                      |
+| `AuthInfoResource`   | `/api/auth-info`                                 | GET               | `permitAll`                                                                                                                                                                                                                                                          |
+| `AuthorityResource`  | `/api/authorities`, `/api/authorities/{id}`      | GET, POST, DELETE | `ROLE_ADMIN`. Every handler carries `@PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")` (per method, not per class), and `/api/authorities/**` is matched in `GENERATED_ADMIN_ONLY_API_PATHS` so the refusal happens in the filter chain, before the body is validated. |
+| `BackupResource`     | `/api/admin/backup`, `/api/admin/backup/restore` | GET, POST         | `ROLE_ADMIN` (class-level and the `/api/admin/**` filter rule). Restore is multipart; over the configured `spring.servlet.multipart` limits it answers 413, not 403.                                                                                                 |
+| `PublicUserResource` | `/api/users`                                     | GET               | `authenticated` — exposes the user directory the team-member picker needs.                                                                                                                                                                                           |
+| `LogoutResource`     | `/api/logout`                                    | POST              | `authenticated`                                                                                                                                                                                                                                                      |
 
 ## Front-end alignment
 
