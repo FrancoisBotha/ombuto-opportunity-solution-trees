@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { type APIRequestContext, type Page, expect, test } from '@playwright/test';
 
+import { registerTeamForCleanup } from './support/cleanup';
 import { USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
@@ -20,7 +21,10 @@ import { USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
  *
  * What the restore did is asserted against the database through the API afterwards, not against the
  * numbers the server echoed back from the uploaded file: the teams and the tree that were there
- * before the restore have to be there after it.
+ * before the restore have to be there after it. Both sides of the count assertion are reads of the
+ * database, over the same population — every team in the installation, which is what an archive
+ * covers — and the spec creates a team it is *not* a member of so that population is never
+ * accidentally identical to "the admin's teams".
  *
  * Scenario 1's "download" is captured from the network response rather than
  * page.waitForEvent('download'): the app uses a blob URL + anchor click and revokes the URL
@@ -36,11 +40,23 @@ interface TeamSummary {
   name: string;
 }
 
-/** The teams this account can see, by name — read from the database through the API. */
+/**
+ * EVERY team in the installation, by name — the same set a backup archive covers.
+ *
+ * Deliberately not /api/team-management/my-teams: that endpoint lists the teams the caller is a
+ * *member* of, which is a subset. A backup exports all of them, so comparing the restore summary
+ * against my-teams compares two different populations. On a database that only holds the seeded
+ * teams the admin belongs to they happen to be equal, which is why this spec passed on its own and
+ * failed after a full suite run, where the other specs create teams owned by `user`.
+ *
+ * The page size is explicit because /api/admin/teams is a paged endpoint (default 20) — a backup
+ * assertion must never be silently truncated by a page boundary.
+ */
 async function readTeams(request: APIRequestContext): Promise<TeamSummary[]> {
-  const response = await request.get('/api/team-management/my-teams');
-  expect(response.status(), 'GET /api/team-management/my-teams').toBe(200);
+  const response = await request.get('/api/admin/teams?size=5000&sort=id,asc');
+  expect(response.status(), 'GET /api/admin/teams').toBe(200);
   const teams = (await response.json()) as TeamSummary[];
+  expect(teams.length, 'the whole team list fits in one page').toBeLessThan(5000);
   return teams.map(team => ({ id: team.id, name: team.name }));
 }
 
@@ -74,11 +90,38 @@ test.describe.configure({ mode: 'serial' });
 test.describe('BDD BACKUP_RESTORE', () => {
   test.setTimeout(180_000);
 
-  test('admin downloads a backup, restores it and the data is still there (Scenarios 1 & 2)', async ({ page }, testInfo) => {
+  test('admin downloads a backup, restores it and the data is still there (Scenarios 1 & 2)', async ({ page, browser }, testInfo) => {
     const request = page.request;
+
+    // A team owned by someone else, so the database is not the degenerate case where every team
+    // happens to be one the admin belongs to. A backup covers this team, an admin-membership
+    // listing does not, and the restore has to bring it back just the same. Without it this spec
+    // only ever saw the seeded teams the admin is a member of.
+    const outsider = await openSession(browser, USER_USERNAME, USER_PASSWORD);
+    let outsiderTeamId: number;
+    try {
+      const created = await outsider.api('post', '/api/team-management/teams', {
+        name: `backup-outsider-${Date.now()}`,
+        description: 'a team the admin is not a member of (backup-restore.spec.ts)',
+      });
+      expect(created.status(), 'create a team owned by another user').toBe(201);
+      outsiderTeamId = ((await created.json()) as { id: number }).id;
+      registerTeamForCleanup(outsiderTeamId);
+    } finally {
+      await outsider.context.close();
+    }
+    const myTeams = await request.get('/api/team-management/my-teams');
+    expect(
+      ((await myTeams.json()) as TeamSummary[]).some(team => team.id === outsiderTeamId),
+      'the admin is deliberately NOT a member of the outsider team',
+    ).toBe(false);
 
     // What the database holds before anything destructive happens.
     const teamsBefore = await readTeams(request);
+    expect(
+      teamsBefore.some(team => team.id === outsiderTeamId),
+      'a backup-scope team list covers teams the admin does not belong to',
+    ).toBe(true);
     const jupiter = teamsBefore.find(team => team.name === 'Team Jupiter');
     expect(jupiter, 'the seeded Team Jupiter is present before the restore').toBeTruthy();
     const jupiterKeysBefore = await readTreeNodeKeys(request, jupiter!.id);
@@ -135,7 +178,14 @@ test.describe('BDD BACKUP_RESTORE', () => {
     expect(jupiterAfter!.id, 'restored rows keep their ids').toBe(jupiter!.id);
     expect(await readTreeNodeKeys(request, jupiterAfter!.id), "Team Jupiter's tree came back node for node").toEqual(jupiterKeysBefore);
 
-    // And the summary's counts agree with what the database now holds.
+    expect(
+      teamsAfter.some(team => team.id === outsiderTeamId),
+      'a team the admin does not belong to was restored too',
+    ).toBe(true);
+
+    // And the summary's counts agree with what the database now holds. Both sides are read from
+    // the database: the left through the restore summary (BackupService counts the tables after
+    // writing them), the right through the admin team listing.
     const restored = await restoreResponse.json();
     expect(restored.counts.teams, 'summary team count matches the database').toBe(teamsAfter.length);
   });

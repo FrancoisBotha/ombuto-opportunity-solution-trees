@@ -758,8 +758,7 @@ public class BackupService {
 
         restartIdSequence(archive);
 
-        Map<String, Integer> counts = restoredCounts(archive);
-        return new BackupRestoreSummary(archive.exportedAt(), counts);
+        return new BackupRestoreSummary(archive.exportedAt(), restoredCounts());
     }
 
     /**
@@ -879,34 +878,53 @@ public class BackupService {
         }
     }
 
-    private Map<String, Integer> restoredCounts(BackupArchive archive) {
+    /**
+     * What the database holds once the replacement has been written — counted with
+     * {@code select count(*)} against the tables themselves, never taken from the uploaded file.
+     *
+     * <p>The summary the admin reads after a restore is the only feedback the feature gives, so it
+     * has to be a statement about the database rather than an echo of the archive that was just
+     * parsed: numbers copied out of the upload would report a full restore even if rows had
+     * silently failed to land. Reading them back also means the counts stay correct if the restore
+     * ever gains a step that writes or skips something the archive does not simply mirror.
+     *
+     * <p>Called inside {@link #restoreAll} after the final flush, so the counts see the inserts of
+     * the not-yet-committed transaction and nothing else.
+     */
+    private Map<String, Integer> restoredCounts() {
+        em.flush();
         Map<String, Integer> counts = new LinkedHashMap<>();
-        counts.put("teams", archive.teams().size());
-        counts.put("teamMembers", archive.teamMembers().size());
-        counts.put("products", archive.products().size());
-        counts.put("outcomes", archive.outcomes().size());
-        counts.put("opportunities", archive.opportunities().size());
-        counts.put("solutions", archive.solutions().size());
-        counts.put("assumptions", archive.assumptions().size());
-        counts.put("evidences", archive.evidences().size());
-        counts.put("interviews", archive.interviews().size());
-        counts.put("tags", archive.tags().size());
-        counts.put("comments", archive.comments().size());
-        counts.put("nodeLinks", archive.nodeLinks().size());
-        counts.put("openQuestions", archive.openQuestions().size());
-        counts.put("nodeHistories", archive.nodeHistories().size());
-        counts.put("opportunityInterviews", archive.opportunityInterviews().size());
-        counts.put("opportunityTags", archive.opportunityTags().size());
-        counts.put("solutionTags", archive.solutionTags().size());
+        counts.put("teams", countRows("team"));
+        counts.put("teamMembers", countRows("team_member"));
+        counts.put("products", countRows("product"));
+        counts.put("outcomes", countRows("outcome"));
+        counts.put("opportunities", countRows("opportunity"));
+        counts.put("solutions", countRows("solution"));
+        counts.put("assumptions", countRows("assumption"));
+        counts.put("evidences", countRows("evidence"));
+        counts.put("interviews", countRows("interview"));
+        counts.put("tags", countRows("tag"));
+        counts.put("comments", countRows("comment"));
+        counts.put("nodeLinks", countRows("node_link"));
+        counts.put("openQuestions", countRows("open_question"));
+        counts.put("nodeHistories", countRows("node_history"));
+        counts.put("opportunityInterviews", countRows("rel_opportunity__interview"));
+        counts.put("opportunityTags", countRows("rel_opportunity__tag"));
+        counts.put("solutionTags", countRows("rel_solution__tag"));
         counts.put(
             "treeNodes",
-            archive.outcomes().size() +
-                archive.opportunities().size() +
-                archive.solutions().size() +
-                archive.assumptions().size() +
-                archive.evidences().size()
+            counts.get("outcomes") +
+                counts.get("opportunities") +
+                counts.get("solutions") +
+                counts.get("assumptions") +
+                counts.get("evidences")
         );
         return counts;
+    }
+
+    /** {@code table} is a constant from {@link #restoredCounts()}; never anything a caller supplied. */
+    private int countRows(String table) {
+        return Math.toIntExact(toLong(em.createNativeQuery("select count(*) from " + table).getSingleResult()));
     }
 
     private static <E> Long idOf(E entity, Function<E, Long> getId) {
