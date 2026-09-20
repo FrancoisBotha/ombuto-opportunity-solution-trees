@@ -6,6 +6,19 @@ import BackupService, { type BackupRestoreSummary } from './backup.service';
 
 const INVALID_BACKUP_MESSAGE = 'That file is not a valid backup.';
 const INCOMPATIBLE_BACKUP_MESSAGE = 'That backup was created by an incompatible version and cannot be restored.';
+const GENERIC_RESTORE_FAILURE_MESSAGE = 'The backup could not be restored. No data was changed.';
+
+/**
+ * One sentence per message key the restore endpoint can answer with. The server never returns the
+ * underlying Java or SQL failure, so the page has to do the wording.
+ */
+const RESTORE_ERROR_MESSAGES: Record<string, string> = {
+  'error.backup.invalid': INVALID_BACKUP_MESSAGE,
+  'error.backup.incompatibleVersion': INCOMPATIBLE_BACKUP_MESSAGE,
+  'error.backup.restoreFailed': GENERIC_RESTORE_FAILURE_MESSAGE,
+  'error.upload.tooLarge': 'That backup file is larger than this server accepts. No data was changed.',
+  'error.concurrencyFailure': 'Another restore is already running. Wait for it to finish and try again.',
+};
 
 function datedBackupFilename(): string {
   const timestamp = new Date()
@@ -96,12 +109,11 @@ export default defineComponent({
         this.alertService.showSuccess(this.successMessage);
       } catch (error: any) {
         const errorKey = error?.response?.data?.message;
-        if (errorKey === 'error.backup.invalid') {
-          this.errorMessage = INVALID_BACKUP_MESSAGE;
-        } else if (errorKey === 'error.backup.incompatibleVersion') {
-          this.errorMessage = INCOMPATIBLE_BACKUP_MESSAGE;
+        if (errorKey === 'error.backup.unresolvedReferences') {
+          // The server lists which users or rows it could not resolve; that list is the message.
+          this.errorMessage = error?.response?.data?.detail ?? GENERIC_RESTORE_FAILURE_MESSAGE;
         } else {
-          this.errorMessage = 'The backup could not be restored. No data was changed.';
+          this.errorMessage = RESTORE_ERROR_MESSAGES[errorKey] ?? GENERIC_RESTORE_FAILURE_MESSAGE;
         }
         this.alertService.showError(this.errorMessage);
       } finally {

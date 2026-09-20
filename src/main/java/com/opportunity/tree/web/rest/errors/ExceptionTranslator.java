@@ -208,6 +208,35 @@ public class ExceptionTranslator extends ResponseEntityExceptionHandler {
         return handleExceptionInternal(ex, customizeProblem(problem, ex, request), null, HttpStatus.CONFLICT, request);
     }
 
+    /**
+     * An upload over {@code spring.servlet.multipart.max-file-size} is a 413 carrying the same
+     * message key as {@link com.opportunity.tree.web.filter.UploadSizeLimitFilter}, which answers
+     * the copies of this failure that are raised in the filter chain and never reach a controller
+     * (BKRST fix C3). Spring's default would be a 413 with no message key, so the client could not
+     * tell it apart from any other failure.
+     */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+        org.springframework.web.multipart.MaxUploadSizeExceededException ex,
+        HttpHeaders headers,
+        HttpStatusCode status,
+        WebRequest request
+    ) {
+        LOG.warn("Rejected an over-sized upload: {}", ex.getMessage());
+        ProblemDetailWithCause problem = ProblemDetailWithCauseBuilder.instance()
+            .withStatus(HttpStatus.PAYLOAD_TOO_LARGE.value())
+            .withDetail(com.opportunity.tree.web.filter.UploadSizeLimitFilter.TOO_LARGE_DETAIL)
+            .withProperty(MESSAGE_KEY, com.opportunity.tree.web.filter.UploadSizeLimitFilter.ERR_UPLOAD_TOO_LARGE)
+            .build();
+        return handleExceptionInternal(
+            ex,
+            customizeProblem(problem, ex, (NativeWebRequest) request),
+            headers,
+            HttpStatus.PAYLOAD_TOO_LARGE,
+            request
+        );
+    }
+
     @SuppressWarnings("java:S2638")
     @Nullable
     @Override

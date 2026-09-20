@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Opportunity;
@@ -52,6 +53,9 @@ class BackupRestoreResourceIT {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private com.opportunity.tree.service.RestoreMutex restoreMutex;
 
     private Team seededTeam;
     private Product seededProduct;
@@ -197,6 +201,146 @@ class BackupRestoreResourceIT {
                 .setParameter("name", "not in backup")
                 .getSingleResult()
         ).isZero();
+    }
+
+    /**
+     * BKRST fix C2. Restored rows keep their own ids (they are written with {@code replicate}), so
+     * without a restart the generator is still sitting wherever it was and the first create after a
+     * restore is handed an id the archive already used. The probe team carries an id far above
+     * anything this database has issued, which is exactly the shape of restoring a production
+     * archive onto a fresh install.
+     */
+    @Test
+    void restoreRestartsTheIdSequenceAboveTheHighestRestoredId() throws Exception {
+        long probeId = 9_000_000L;
+        ObjectNode archive = (ObjectNode) objectMapper.readTree(exportArchive());
+        ObjectNode probe = ((ArrayNode) archive.get("teams")).addObject();
+        probe.put("id", probeId);
+        probe.put("name", "BKRST sequence probe");
+        probe.put("createdDate", Instant.now().toString());
+
+        mockMvc.perform(adminRestore(objectMapper.writeValueAsBytes(archive))).andExpect(status().isOk());
+
+        assertThat(nextSequenceValue())
+            .as("sequence_generator must be past the highest restored id, or the next create collides")
+            .isGreaterThan(probeId);
+
+        // And a create after the restore really does succeed.
+        em.clear();
+        Team created = new Team().name("BKRST post-restore team").createdDate(Instant.now());
+        em.persist(created);
+        em.flush();
+        assertThat(created.getId()).isNotNull();
+    }
+
+    /**
+     * BKRST fix C5. {@code jhi_user} is not part of a backup, so rows are re-attached to users by
+     * reference: a login the archive names but this installation does not have used to blow up deep
+     * inside the insert phase, with everything already deleted. It is now a clean 400 and nothing
+     * has been touched.
+     */
+    @Test
+    void archiveReferringToAnUnknownUserIsRejectedBeforeDeleting() throws Exception {
+        long teamId = seededTeam.getId();
+        ObjectNode archive = (ObjectNode) objectMapper.readTree(exportArchive());
+        ObjectNode member = ((ArrayNode) archive.get("teamMembers")).addObject();
+        member.put("id", 9_000_001L);
+        member.put("role", "OWNER");
+        member.put("joinedDate", Instant.now().toString());
+        member.put("teamId", teamId);
+        member.put("userId", "bkrst-no-such-user");
+
+        mockMvc
+            .perform(adminRestore(objectMapper.writeValueAsBytes(archive)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("error.backup.unresolvedReferences"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("user bkrst-no-such-user")));
+
+        em.clear();
+        assertThat(em.find(Team.class, teamId)).isNotNull();
+    }
+
+    /**
+     * BKRST fix C5, the other half: a reference the archive makes to a row it does not itself carry.
+     */
+    @Test
+    void archiveWithADanglingInternalReferenceIsRejectedBeforeDeleting() throws Exception {
+        long teamId = seededTeam.getId();
+        ObjectNode archive = (ObjectNode) objectMapper.readTree(exportArchive());
+        ObjectNode product = ((ArrayNode) archive.get("products")).addObject();
+        product.put("id", 9_000_002L);
+        product.put("name", "BKRST orphan product");
+        product.put("archived", false);
+        product.put("sortOrder", 0);
+        product.put("createdDate", Instant.now().toString());
+        product.put("teamId", 8_000_000L);
+
+        mockMvc
+            .perform(adminRestore(objectMapper.writeValueAsBytes(archive)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("error.backup.unresolvedReferences"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("missing team 8000000")));
+
+        em.clear();
+        assertThat(em.find(Team.class, teamId)).isNotNull();
+    }
+
+    /**
+     * BKRST fix C4. A row the archive carries that this build's constraints reject used to come
+     * back as a 500 quoting {@code ConstraintViolationImpl{... rootBeanClass=class
+     * com.opportunity.tree.domain.Team ...}}. Nothing is asserted about the data afterwards: the
+     * failure happens inside the transaction this test shares with the service, so the rollback
+     * that protects the data in production only happens when the test itself ends.
+     */
+    @Test
+    void aRowThePersistLayerRejectsIsReportedWithoutJavaInternals() throws Exception {
+        ObjectNode archive = (ObjectNode) objectMapper.readTree(exportArchive());
+        ObjectNode invalid = ((ArrayNode) archive.get("teams")).addObject();
+        invalid.put("id", 9_000_003L);
+        invalid.putNull("name");
+        invalid.put("createdDate", Instant.now().toString());
+
+        mockMvc
+            .perform(adminRestore(objectMapper.writeValueAsBytes(archive)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("error.backup.restoreFailed"))
+            .andExpect(jsonPath("$.detail").value("The backup could not be restored. No data was changed."));
+    }
+
+    /**
+     * BKRST fix C6. Two restores at once would interleave one's deletes with the other's inserts.
+     * Holding the mutex from the test thread is the same state the loser of that race sees.
+     */
+    @Test
+    void aSecondRestoreIsRefusedWhileOneIsRunning() throws Exception {
+        byte[] archiveBytes = exportArchive();
+        assertThat(restoreMutex.tryAcquire()).as("no other restore is running in this test").isTrue();
+        try {
+            mockMvc
+                .perform(adminRestore(archiveBytes))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("error.concurrencyFailure"));
+        } finally {
+            restoreMutex.release();
+        }
+
+        em.clear();
+        assertThat(em.find(Team.class, seededTeam.getId())).isNotNull();
+    }
+
+    /** Reads (and consumes) sequence_generator's next value the same way the service does. */
+    private long nextSequenceValue() {
+        String sql = em
+            .unwrap(org.hibernate.engine.spi.SessionImplementor.class)
+            .getFactory()
+            .getJdbcServices()
+            .getDialect()
+            .getSequenceSupport()
+            .getSequenceNextValString("sequence_generator");
+        if (sql.regionMatches(true, 0, "call ", 0, 5)) {
+            sql = "select " + sql.substring(5);
+        }
+        return ((Number) em.createNativeQuery(sql).getSingleResult()).longValue();
     }
 
     private byte[] exportArchive() throws Exception {

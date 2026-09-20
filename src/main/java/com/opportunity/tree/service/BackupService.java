@@ -32,13 +32,23 @@ import com.opportunity.tree.repository.TeamRepository;
 import com.opportunity.tree.service.dto.backup.BackupArchive;
 import com.opportunity.tree.service.dto.backup.BackupRestoreSummary;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.hibernate.ReplicationMode;
 import org.hibernate.Session;
+import org.hibernate.engine.spi.SessionImplementor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +61,17 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class BackupService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(BackupService.class);
+
+    /** The single sequence every generated entity id comes from (see the initial Liquibase changelog). */
+    static final String ID_SEQUENCE = "sequence_generator";
+
+    /** {@code allocationSize} of the entities' {@code @SequenceGenerator}: the restart leaves this much head room. */
+    static final int ID_SEQUENCE_ALLOCATION_SIZE = 50;
+
+    /** At most this many unresolvable references are named in the 400 body; the rest are counted. */
+    public static final int MAX_REPORTED_REFERENCES = 20;
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
@@ -379,12 +400,133 @@ public class BackupService {
     }
 
     /**
+     * Every reference in the archive that cannot be resolved in this installation, described in
+     * words (BKRST fix C5). Two kinds are checked, both <em>before</em> the restore transaction so
+     * nothing has been deleted when the answer comes back:
+     *
+     * <ul>
+     *   <li>users: {@code jhi_user} is deliberately not part of a backup, so every login the
+     *       archive re-attaches rows to (members, owners, authors, interviewers) has to already
+     *       exist here — restoring a production archive onto a fresh install otherwise fails deep
+     *       inside the insert phase, with everything already deleted;</li>
+     *   <li>rows inside the archive itself: a truncated or hand-edited file can point a product at
+     *       a team, or an opportunity at an outcome, that it does not carry.</li>
+     * </ul>
+     *
+     * @return the unresolvable references, empty when the archive can be restored as it stands
+     */
+    @Transactional(readOnly = true)
+    public List<String> unresolvableReferences(BackupArchive archive) {
+        List<String> problems = new ArrayList<>();
+        problems.addAll(missingUsers(archive));
+        problems.addAll(danglingRowReferences(archive));
+        return problems;
+    }
+
+    private List<String> missingUsers(BackupArchive archive) {
+        Set<String> referenced = new LinkedHashSet<>();
+        collect(referenced, archive.teamMembers().stream().map(BackupArchive.TeamMemberRow::userId));
+        collect(referenced, archive.outcomes().stream().map(BackupArchive.OutcomeRow::ownerId));
+        collect(referenced, archive.opportunities().stream().map(BackupArchive.OpportunityRow::ownerId));
+        collect(referenced, archive.solutions().stream().map(BackupArchive.SolutionRow::ownerId));
+        collect(referenced, archive.assumptions().stream().map(BackupArchive.AssumptionRow::ownerId));
+        collect(referenced, archive.interviews().stream().map(BackupArchive.InterviewRow::interviewerId));
+        collect(referenced, archive.comments().stream().map(BackupArchive.CommentRow::authorId));
+        collect(referenced, archive.nodeHistories().stream().map(BackupArchive.NodeHistoryRow::authorId));
+        if (referenced.isEmpty()) {
+            return List.of();
+        }
+        Set<String> known = new HashSet<>(
+            em.createQuery("select u.id from User u where u.id in :ids", String.class).setParameter("ids", referenced).getResultList()
+        );
+        return referenced.stream().filter(id -> !known.contains(id)).map(id -> "user " + id).toList();
+    }
+
+    private List<String> danglingRowReferences(BackupArchive archive) {
+        Set<Long> teams = ids(archive.teams().stream().map(BackupArchive.TeamRow::id));
+        Set<Long> products = ids(archive.products().stream().map(BackupArchive.ProductRow::id));
+        Set<Long> outcomes = ids(archive.outcomes().stream().map(BackupArchive.OutcomeRow::id));
+        Set<Long> opportunities = ids(archive.opportunities().stream().map(BackupArchive.OpportunityRow::id));
+        Set<Long> solutions = ids(archive.solutions().stream().map(BackupArchive.SolutionRow::id));
+        Set<Long> assumptions = ids(archive.assumptions().stream().map(BackupArchive.AssumptionRow::id));
+        Set<Long> evidences = ids(archive.evidences().stream().map(BackupArchive.EvidenceRow::id));
+        Set<Long> interviews = ids(archive.interviews().stream().map(BackupArchive.InterviewRow::id));
+        Set<Long> tags = ids(archive.tags().stream().map(BackupArchive.TagRow::id));
+
+        List<String> problems = new ArrayList<>();
+        archive.teamMembers().forEach(r -> check(problems, "team member " + r.id(), "team", r.teamId(), teams));
+        archive.products().forEach(r -> check(problems, "product " + r.id(), "team", r.teamId(), teams));
+        archive.tags().forEach(r -> check(problems, "tag " + r.id(), "team", r.teamId(), teams));
+        archive.outcomes().forEach(r -> check(problems, "outcome " + r.id(), "product", r.productId(), products));
+        archive.interviews().forEach(r -> check(problems, "interview " + r.id(), "product", r.productId(), products));
+        archive.opportunities().forEach(r -> {
+            check(problems, "opportunity " + r.id(), "outcome", r.outcomeId(), outcomes);
+            check(problems, "opportunity " + r.id(), "parent opportunity", r.parentId(), opportunities);
+        });
+        archive.solutions().forEach(r -> check(problems, "solution " + r.id(), "opportunity", r.opportunityId(), opportunities));
+        archive.assumptions().forEach(r -> check(problems, "assumption " + r.id(), "solution", r.solutionId(), solutions));
+        archive.evidences().forEach(r -> {
+            check(problems, "evidence " + r.id(), "opportunity", r.opportunityId(), opportunities);
+            check(problems, "evidence " + r.id(), "assumption", r.assumptionId(), assumptions);
+        });
+        archive.openQuestions().forEach(r -> check(problems, "open question " + r.id(), "opportunity", r.opportunityId(), opportunities));
+        archive.comments().forEach(r -> {
+            String owner = "comment " + r.id();
+            check(problems, owner, "outcome", r.outcomeId(), outcomes);
+            check(problems, owner, "opportunity", r.opportunityId(), opportunities);
+            check(problems, owner, "solution", r.solutionId(), solutions);
+            check(problems, owner, "assumption", r.assumptionId(), assumptions);
+            check(problems, owner, "evidence", r.evidenceId(), evidences);
+        });
+        archive.nodeLinks().forEach(r -> {
+            String owner = "link " + r.id();
+            check(problems, owner, "product", r.productId(), products);
+            check(problems, owner, "outcome", r.outcomeId(), outcomes);
+            check(problems, owner, "opportunity", r.opportunityId(), opportunities);
+            check(problems, owner, "solution", r.solutionId(), solutions);
+            check(problems, owner, "assumption", r.assumptionId(), assumptions);
+            check(problems, owner, "evidence", r.evidenceId(), evidences);
+        });
+        archive.opportunityInterviews().forEach(r -> {
+            check(problems, "opportunity/interview link", "opportunity", r.leftId(), opportunities);
+            check(problems, "opportunity/interview link", "interview", r.rightId(), interviews);
+        });
+        archive.opportunityTags().forEach(r -> {
+            check(problems, "opportunity/tag link", "opportunity", r.leftId(), opportunities);
+            check(problems, "opportunity/tag link", "tag", r.rightId(), tags);
+        });
+        archive.solutionTags().forEach(r -> {
+            check(problems, "solution/tag link", "solution", r.leftId(), solutions);
+            check(problems, "solution/tag link", "tag", r.rightId(), tags);
+        });
+        return problems;
+    }
+
+    private static void check(List<String> problems, String owner, String targetType, Long targetId, Set<Long> known) {
+        if (targetId != null && !known.contains(targetId)) {
+            problems.add(owner + " refers to missing " + targetType + " " + targetId);
+        }
+    }
+
+    private static void collect(Collection<String> into, Stream<String> ids) {
+        ids.filter(java.util.Objects::nonNull).forEach(into::add);
+    }
+
+    private static Set<Long> ids(Stream<Long> ids) {
+        return ids.filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+    }
+
+    /**
      * Replaces every application-data row with the rows in a previously validated archive.
      * Deletion, insertion and join-table rebuilding are one transaction, so any constraint or
      * persistence failure rolls the entire replacement back.
+     *
+     * <p>Callers must have checked {@link #unresolvableReferences(BackupArchive)} first and must
+     * hold the {@link RestoreMutex}.
      */
     @Transactional
     public BackupRestoreSummary restoreAll(BackupArchive archive) {
+        lockEveryTeam();
         deleteAllApplicationData();
 
         Map<Long, Team> teams = new HashMap<>();
@@ -614,8 +756,85 @@ public class BackupService {
         insertJoinRows("rel_opportunity__tag", "opportunity_id", "tag_id", archive.opportunityTags());
         insertJoinRows("rel_solution__tag", "solution_id", "tag_id", archive.solutionTags());
 
+        restartIdSequence(archive);
+
         Map<String, Integer> counts = restoredCounts(archive);
         return new BackupRestoreSummary(archive.exportedAt(), counts);
+    }
+
+    /**
+     * Takes the tree-structure lock of every existing team, lowest id first, before anything is
+     * deleted (BKRST fix C6). A restore is the one write that touches all teams at once, so it
+     * queues behind — and then blocks — the per-team writes that {@link TreeStructureLock} guards,
+     * instead of deleting rows from under a create or a move that is half done. Lowest id first is
+     * the same order {@link TreeStructureLock#lockTeams} uses, so the two cannot deadlock.
+     */
+    private void lockEveryTeam() {
+        em
+            .createQuery("select t from Team t order by t.id", Team.class)
+            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+            .setHint("jakarta.persistence.lock.timeout", TreeStructureLock.LOCK_TIMEOUT_MS)
+            .getResultList();
+    }
+
+    /**
+     * Moves {@code sequence_generator} past the highest id the archive brought in (BKRST fix C2).
+     *
+     * <p>Restored rows keep their original ids — they are written with {@code Session.replicate},
+     * which never calls the generator — so on a fresh database the sequence is still sitting at its
+     * initial value and the very first node created after a restore would be handed an id the
+     * archive has already used. The restart leaves one {@code allocationSize} of head room above
+     * the highest restored id, and never moves the sequence <em>backwards</em>: the current value is
+     * read first (consuming one id, which is free) and kept if it is already higher, so ids handed
+     * out to rows this backup does not cover stay unique too.
+     */
+    private void restartIdSequence(BackupArchive archive) {
+        long highestRestoredId = highestRestoredId(archive);
+        long current = nextSequenceValue();
+        long restartAt = Math.max(current, highestRestoredId + ID_SEQUENCE_ALLOCATION_SIZE);
+        LOG.info("Restarting {} at {} after restoring ids up to {}", ID_SEQUENCE, restartAt, highestRestoredId);
+        // No bind parameter: ALTER SEQUENCE takes a literal. restartAt is a long we computed.
+        em.createNativeQuery("alter sequence " + ID_SEQUENCE + " restart with " + restartAt).executeUpdate();
+    }
+
+    /** Reads (and consumes) the sequence's next value, portably across H2 and PostgreSQL. */
+    private long nextSequenceValue() {
+        String sql = em
+            .unwrap(SessionImplementor.class)
+            .getFactory()
+            .getJdbcServices()
+            .getDialect()
+            .getSequenceSupport()
+            .getSequenceNextValString(ID_SEQUENCE);
+        // H2 phrases it as "call next value for ...", which JDBC cannot run as a query.
+        if (sql.regionMatches(true, 0, "call ", 0, 5)) {
+            sql = "select " + sql.substring(5);
+        }
+        return toLong(em.createNativeQuery(sql).getSingleResult());
+    }
+
+    private static long highestRestoredId(BackupArchive archive) {
+        return Stream.of(
+            archive.teams().stream().map(BackupArchive.TeamRow::id),
+            archive.teamMembers().stream().map(BackupArchive.TeamMemberRow::id),
+            archive.products().stream().map(BackupArchive.ProductRow::id),
+            archive.outcomes().stream().map(BackupArchive.OutcomeRow::id),
+            archive.opportunities().stream().map(BackupArchive.OpportunityRow::id),
+            archive.solutions().stream().map(BackupArchive.SolutionRow::id),
+            archive.assumptions().stream().map(BackupArchive.AssumptionRow::id),
+            archive.evidences().stream().map(BackupArchive.EvidenceRow::id),
+            archive.interviews().stream().map(BackupArchive.InterviewRow::id),
+            archive.comments().stream().map(BackupArchive.CommentRow::id),
+            archive.nodeLinks().stream().map(BackupArchive.NodeLinkRow::id),
+            archive.openQuestions().stream().map(BackupArchive.OpenQuestionRow::id),
+            archive.tags().stream().map(BackupArchive.TagRow::id),
+            archive.nodeHistories().stream().map(BackupArchive.NodeHistoryRow::id)
+        )
+            .flatMap(Function.identity())
+            .filter(java.util.Objects::nonNull)
+            .mapToLong(Long::longValue)
+            .max()
+            .orElse(0L);
     }
 
     private void deleteAllApplicationData() {

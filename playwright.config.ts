@@ -40,13 +40,23 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
       dependencies: ['setup'],
-      testIgnore: /anonymous\.spec\.ts/,
+      testIgnore: [/anonymous\.spec\.ts/, /backup-restore\.spec\.ts/],
     },
     // Tests that must run without a session (sign-in page etc.).
     {
       name: 'chromium-anonymous',
       use: { ...devices['Desktop Chrome'] },
       testMatch: /anonymous\.spec\.ts/,
+    },
+    // Destructive: restore replaces every row the other specs rely on. Depending on the two
+    // browser projects makes Playwright finish them completely before this one starts, so it can
+    // never interleave with a spec that is creating or reading rows (BKRST fix C7). Run it on its
+    // own with `npx playwright test --project=backup-restore --no-deps`.
+    {
+      name: 'backup-restore',
+      use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
+      dependencies: ['chromium', 'chromium-anonymous'],
+      testMatch: /backup-restore\.spec\.ts/,
     },
   ],
 });
