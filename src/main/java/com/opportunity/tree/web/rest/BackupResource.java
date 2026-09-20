@@ -3,6 +3,7 @@ package com.opportunity.tree.web.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opportunity.tree.security.AuthoritiesConstants;
 import com.opportunity.tree.service.BackupService;
+import com.opportunity.tree.service.RestoreMutex;
 import com.opportunity.tree.service.dto.backup.BackupArchive;
 import com.opportunity.tree.service.dto.backup.BackupRestoreSummary;
 import com.opportunity.tree.web.rest.errors.BadRequestAlertException;
@@ -10,8 +11,10 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -42,12 +45,17 @@ public class BackupResource {
     private static final String ENTITY_NAME = "backup";
     private static final String INVALID_DETAIL = "The uploaded file is not a valid backup archive.";
     private static final String INCOMPATIBLE_VERSION_DETAIL = "The backup archive format version is not supported.";
+    static final String RESTORE_FAILED_DETAIL = "The backup could not be restored. No data was changed.";
+    static final String IN_PROGRESS_DETAIL = "Another restore is already running. Wait for it to finish and try again.";
+    static final String UNRESOLVED_REFERENCES_DETAIL = "The backup refers to data that does not exist in this installation: ";
 
     private final BackupService backupService;
+    private final RestoreMutex restoreMutex;
     private final ObjectMapper objectMapper;
 
-    public BackupResource(BackupService backupService, ObjectMapper objectMapper) {
+    public BackupResource(BackupService backupService, RestoreMutex restoreMutex, ObjectMapper objectMapper) {
         this.backupService = backupService;
+        this.restoreMutex = restoreMutex;
         this.objectMapper = objectMapper;
     }
 
@@ -67,7 +75,40 @@ public class BackupResource {
     public ResponseEntity<BackupRestoreSummary> restoreBackup(@RequestPart("file") MultipartFile file) {
         BackupArchive archive = readAndValidate(file);
         LOG.info("REST request to restore application data backup exported at {}", archive.exportedAt());
-        return ResponseEntity.ok(backupService.restoreAll(archive));
+        // Only one restore at a time: a second one would interleave its deletes with this one's
+        // inserts (BKRST fix C6). Taken before anything is validated against the database so the
+        // loser never touches it at all.
+        if (!restoreMutex.tryAcquire()) {
+            throw new ConcurrencyFailureException(IN_PROGRESS_DETAIL);
+        }
+        try {
+            // Everything the archive points at is checked before the restore transaction can delete
+            // a single row (BKRST fix C5).
+            List<String> unresolvable = backupService.unresolvableReferences(archive);
+            if (!unresolvable.isEmpty()) {
+                throw new BadRequestAlertException(unresolvedReferencesDetail(unresolvable), ENTITY_NAME, "backup.unresolvedReferences");
+            }
+            return ResponseEntity.ok(backupService.restoreAll(archive));
+        } catch (BadRequestAlertException | ConcurrencyFailureException rethrown) {
+            throw rethrown;
+        } catch (RuntimeException failure) {
+            // A row the archive carries that this build's constraints reject (a bean-validation
+            // failure carries ConstraintViolationImpl{... rootBeanClass=class com.opportunity.tree
+            // .domain.Team ...} in its message), or any other persistence failure. The restore
+            // transaction has already rolled back, so nothing changed; the client gets one generic
+            // key and the Java detail is logged, never returned (BKRST fix C4).
+            LOG.error("Restore of the backup exported at {} failed and was rolled back", archive.exportedAt(), failure);
+            throw new BadRequestAlertException(RESTORE_FAILED_DETAIL, ENTITY_NAME, "backup.restoreFailed");
+        } finally {
+            restoreMutex.release();
+        }
+    }
+
+    private static String unresolvedReferencesDetail(List<String> unresolvable) {
+        List<String> shown = unresolvable.stream().distinct().limit(BackupService.MAX_REPORTED_REFERENCES).toList();
+        String detail = UNRESOLVED_REFERENCES_DETAIL + String.join(", ", shown);
+        long hidden = unresolvable.stream().distinct().count() - shown.size();
+        return hidden > 0 ? detail + " and " + hidden + " more" : detail + ".";
     }
 
     private BackupArchive readAndValidate(MultipartFile file) {

@@ -100,6 +100,13 @@
               </router-link>
               <span class="menu-tooltip">Logs</span>
             </li>
+            <li :class="{ active: currentPath === '/admin/backup' }" data-cy="backupMenu">
+              <router-link to="/admin/backup" class="menu-item menu-item-child">
+                <font-awesome-icon class="va-icon" icon="save" />
+                <span class="nav-item">Backup</span>
+              </router-link>
+              <span class="menu-tooltip">Backup</span>
+            </li>
             <li v-if="openAPIEnabled" :class="{ active: currentPath === '/admin/docs' }">
               <router-link to="/admin/docs" class="menu-item menu-item-child">
                 <font-awesome-icon class="va-icon" icon="book" />

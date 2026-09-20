@@ -150,6 +150,13 @@ spring:
         registration:
           oidc:
             scope: openid, profile
+  servlet:
+    multipart:
+      # A backup archive of a real installation is far bigger than Spring's 1MB default, which
+      # rejected the upload inside the filter chain (a bare 403/500 the UI could only report as a
+      # generic failure). Anything over this is answered with 413 error.upload.tooLarge (BKRST C3).
+      max-file-size: 256MB
+      max-request-size: 257MB
   task:
     execution:
       thread-name-prefix: opportunity-solution-tree-task-
