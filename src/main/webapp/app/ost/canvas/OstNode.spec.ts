@@ -328,4 +328,54 @@ describe('OstNode', () => {
       expect(wrapper.find('[data-cy="ost-add-menu"]').exists()).toBe(false);
     });
   });
+
+  describe('remote-change pulse (RTC-006, FR-036)', () => {
+    const pulse = { key: 'opportunity-1', by: 'admin', name: 'Ana R', initials: 'AR', id: 1 };
+
+    it('shows who changed the node, and nothing at all without a pulse', async () => {
+      const wrapper = mountNode(node('opportunity-1', 'outcome-1'));
+      expect(wrapper.find('[data-cy="ost-node-pulse-opportunity-1"]').exists()).toBe(false);
+      expect(wrapper.find('.ost-node__pulse-ring').exists()).toBe(false);
+
+      await wrapper.setProps({ pulse });
+      const badge = wrapper.get('[data-cy="ost-node-pulse-opportunity-1"]');
+      expect(badge.text()).toBe('AR');
+      expect(badge.attributes('title')).toBe('Ana R just changed this');
+      expect(badge.attributes('data-by')).toBe('admin');
+      expect(wrapper.get('.ost-node').classes()).toContain('is-pulsing');
+
+      await wrapper.setProps({ pulse: null });
+      expect(wrapper.find('[data-cy="ost-node-pulse-opportunity-1"]').exists()).toBe(false);
+    });
+
+    it('is inert: it cannot take the pointer, and it is not in the tab order', async () => {
+      const wrapper = mountNode(node('opportunity-1', 'outcome-1'), { pulse });
+      for (const el of [wrapper.get('.ost-node__pulse-ring'), wrapper.get('.ost-node__pulse-by')]) {
+        expect(el.attributes('aria-hidden')).toBe('true');
+        expect(el.attributes('tabindex')).toBeUndefined();
+        expect(el.element.tagName).toBe('SPAN');
+      }
+      // No focus was moved onto (or away from) the node by the pulse arriving.
+      expect(document.activeElement).not.toBe(wrapper.get('.ost-node').element);
+      await wrapper.setProps({ pulse: { ...pulse, id: 2 } });
+      expect(document.activeElement).not.toBe(wrapper.get('.ost-node').element);
+    });
+
+    it('re-keys both layers when the same node is changed again, so the animation restarts', async () => {
+      const wrapper = mountNode(node('opportunity-1', 'outcome-1'), { pulse });
+      const first = wrapper.get('.ost-node__pulse-ring').element;
+      await wrapper.setProps({ pulse: { ...pulse, id: 2 } });
+      expect(wrapper.get('.ost-node__pulse-ring').element).not.toBe(first);
+    });
+
+    it('names the changing member in the accessible name rather than in a live region', async () => {
+      const wrapper = mountNode(node('opportunity-1', 'outcome-1', { title: 'Hard to find people' }));
+      const root = wrapper.get('.ost-node');
+      expect(root.attributes('aria-label')).not.toContain('Ana R');
+      await wrapper.setProps({ pulse });
+      expect(root.attributes('aria-label')).toContain('changed by Ana R');
+      // Nothing about the node became a live region (a burst would chatter).
+      expect(wrapper.findAll('[aria-live]:not([aria-live="off"]), [role="status"], [role="alert"]')).toHaveLength(0);
+    });
+  });
 });

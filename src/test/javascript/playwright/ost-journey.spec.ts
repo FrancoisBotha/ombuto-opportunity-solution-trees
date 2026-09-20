@@ -753,15 +753,16 @@ test.describe('OST journey (editor, then viewer)', () => {
     const demoted = await admin.api('put', `/api/team-management/teams/${teamId}/members/${userId}`, { role: 'VIEWER' });
     expect(demoted.status()).toBe(200);
 
-    await test.step('the open editor page: the next write is refused, the page says the role changed and turns read-only', async () => {
-      await title(stale, k.op2).dblclick();
-      await renameInput(stale).fill('Written after the demotion');
-      await api(stale, 'PATCH', '/api/tree/nodes/opportunity/', 403, () => renameInput(stale).press('Enter'));
+    await test.step('the open editor page says the role changed and turns read-only, live (FR-037)', async () => {
+      // Since RTC-006 the demotion arrives as a MEMBERSHIP_CHANGED event, so the page turns
+      // read-only at once — the user never gets as far as a write the server would refuse (that
+      // fallback still guards a page whose socket is down; ost-tree.store.spec.ts covers it).
       await expect(stale.getByTestId('ostError')).toContainText('Your role changed to viewer — changes are no longer possible.');
       await expect(stale.locator('[data-cy^="ost-node-add-"]')).toHaveCount(0);
       await expect(stale.getByTestId('ost-palette')).toHaveCount(0);
+      await title(stale, k.op2).dblclick();
       await expect(renameInput(stale)).toHaveCount(0);
-      await expect(title(stale, k.op2)).toHaveText('Nested opportunity renamed'); // rolled back
+      await expect(title(stale, k.op2)).toHaveText('Nested opportunity renamed');
     });
 
     const viewer = await openSessionAt(browser, USER_USERNAME, USER_PASSWORD);

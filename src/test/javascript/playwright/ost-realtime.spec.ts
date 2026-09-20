@@ -132,6 +132,10 @@ test.describe('OST realtime collaboration — two sessions', () => {
   let user: Session;
   let admin: Session;
   let teamId: number;
+  /** the admin's user id in the throwaway team (RTC-006: the role is changed through it) */
+  let adminUserId: string;
+  /** the acting user's initials, as the team meta reports them (the pulse badge shows exactly these) */
+  let userInitials: string;
   const productIds: number[] = [];
   const k: Record<string, string> = {};
   const n: Record<string, TreeNode> = {};
@@ -199,7 +203,7 @@ test.describe('OST realtime collaboration — two sessions', () => {
       id: string;
       login: string;
     }[];
-    const adminUserId = found.find(u => u.login === ADMIN_USERNAME)!.id;
+    adminUserId = found.find(u => u.login === ADMIN_USERNAME)!.id;
     expect((await user.api('post', `/api/team-management/teams/${teamId}/members`, { userId: adminUserId, role: 'EDITOR' })).status()).toBe(
       201,
     );
@@ -221,6 +225,11 @@ test.describe('OST realtime collaboration — two sessions', () => {
     // Renamed by proveLive() to check that a session really is receiving events.
     n.probe = await mk(user, 'opportunity', 'outcome', n.o2.id, 'Liveness probe');
     for (const [name, value] of Object.entries(n)) k[name] = value.key;
+
+    const meta = (await (await user.api('get', `/api/teams/${teamId}/tree`)).json()) as {
+      members: { login: string; initials: string }[];
+    };
+    userInitials = meta.members.find(m => m.login === USER_USERNAME)!.initials;
   });
 
   test.afterAll(async () => {
@@ -386,6 +395,50 @@ test.describe('OST realtime collaboration — two sessions', () => {
     for (const page of [user.page, admin.page]) expect(takeErrors(page), 'page / console errors').toEqual([]);
   });
 
+  test('a node changed by the other member pulses with their initials, without moving the view or focus (FR-036)', async () => {
+    const target = await mk(user, 'opportunity', 'outcome', n.o1.id, 'Pulse target');
+    await openCanvas(user.page);
+    await openCanvas(admin.page);
+    await proveLive(admin.page);
+    await admin.page.getByTestId('ost-fit').click();
+    await settle(admin.page);
+    await expect(node(admin.page, target.key)).toBeVisible();
+
+    const badge = admin.page.getByTestId(`ost-node-pulse-${target.key}`);
+    const viewport = () => admin.page.evaluate(() => getComputedStyle(document.querySelector('.vue-flow__transformationpane')!).transform);
+    const focused = () => admin.page.evaluate(() => document.activeElement?.getAttribute('data-cy') ?? document.activeElement?.tagName);
+
+    // Focus something of the observer's own: a remote change must not take it away.
+    await admin.page.getByTestId('ost-search').focus();
+    const viewportBefore = await viewport();
+    expect(await focused()).toBe('ost-search');
+
+    // The pulse lasts ~1.6 s, so a slow moment could expire it before the first poll — each retry
+    // is simply another remote change to the same node.
+    for (let attempt = 1; ; attempt++) {
+      expect((await patch(user, target.key, { title: `Pulse ${attempt}` })).status()).toBe(200);
+      try {
+        await expect(badge).toHaveText(userInitials, { timeout: 2000 });
+        break;
+      } catch (error) {
+        if (attempt === 5) throw error;
+      }
+    }
+    await expect(badge).toHaveAttribute('title', new RegExp('just changed this'));
+    await expect(node(admin.page, target.key)).toHaveClass(/is-pulsing/);
+
+    // Neither the viewport nor the focus moved while it pulsed …
+    expect(await viewport(), 'the viewport did not move').toBe(viewportBefore);
+    expect(await focused(), 'focus was not stolen').toBe('ost-search');
+    // … and the pulse ends by itself, leaving the node exactly as it was.
+    await expect(badge).toHaveCount(0, { timeout: 10_000 });
+    await expect(node(admin.page, target.key)).toBeVisible();
+    expect(await viewport(), 'the viewport did not move when the pulse ended').toBe(viewportBefore);
+
+    expect((await user.api('delete', `/api/tree/nodes/opportunity/${target.id}`)).status()).toBe(204);
+    for (const page of [user.page, admin.page]) expect(takeErrors(page), 'page / console errors').toEqual([]);
+  });
+
   test('a dropped connection is restored with exactly one full tree reload', async () => {
     const treeReads: string[] = [];
     const onRequest = (request: { method(): string; url(): string }) => {
@@ -415,8 +468,17 @@ test.describe('OST realtime collaboration — two sessions', () => {
       await proveLive(admin.page);
       treeReads.length = 0;
 
+      // FR-035: the indicator says the connection is up before it is cut …
+      const indicator = admin.page.getByTestId('ost-connection');
+      await expect(indicator).toHaveAttribute('data-state', 'live');
+      await expect(indicator).toHaveAccessibleName('Connection: Live');
+
       blocked = true;
       await current!.close({ code: 1006, reason: 'e2e drop' });
+
+      // … and says so as soon as it is gone (reconnecting, or offline once it gives up).
+      await expect(indicator).toHaveAttribute('data-state', /reconnecting|offline/, { timeout: 20_000 });
+      await expect(indicator).toHaveAccessibleName(/Connection: (Reconnecting|Offline)/);
 
       // A change the dropped session cannot possibly have received.
       const missed = await mk(user, 'opportunity', 'outcome', n.o2.id, 'Created while offline');
@@ -437,8 +499,9 @@ test.describe('OST realtime collaboration — two sessions', () => {
       await expect(node(admin.page, afterwards.key)).toBeVisible();
       expect(treeReads.length, 'no second reload').toBe(1);
 
-      // TODO(RTC-006): assert the connection indicator goes reconnecting → live here. No component
-      // reads ostRealtime.connectionState yet, so there is nothing to assert on; add it with RTC-006.
+      // RTC-006 / FR-035: and back to live once the transport is restored.
+      await expect(indicator).toHaveAttribute('data-state', 'live', { timeout: 60_000 });
+      await expect(indicator).toHaveAccessibleName('Connection: Live');
 
       for (const id of [missed.id, afterwards.id])
         expect((await user.api('delete', `/api/tree/nodes/opportunity/${id}`)).status()).toBe(204);
@@ -553,6 +616,46 @@ test.describe('OST realtime collaboration — two sessions', () => {
       `NFR-014 burst — ${built} nodes, delete applied in ${applyMs} ms, settled in ${settledMs} ms, interaction ${interactionMs} ms`,
     );
     expect(interactionMs, 'interaction after the burst').toBeLessThan(RESPONSIVE_BUDGET_MS);
+
+    for (const page of [user.page, admin.page]) expect(takeErrors(page), 'page / console errors').toEqual([]);
+  });
+
+  test('a role change updates the other member’s edit affordances live (FR-037)', async () => {
+    await openCanvas(user.page);
+    await openCanvas(admin.page);
+    await proveLive(admin.page);
+    await admin.page.getByTestId('ost-fit').click();
+    await settle(admin.page);
+
+    // The admin is an EDITOR: the node palette and the per-node + are there.
+    const palette = admin.page.getByTestId('ost-palette');
+    await expect(palette).toHaveCount(1);
+    await expect(admin.page.getByTestId(`ost-node-add-${k.o1}`)).toBeVisible();
+
+    const role = (next: 'VIEWER' | 'EDITOR') =>
+      user.api('put', `/api/team-management/teams/${teamId}/members/${adminUserId}`, { role: next });
+
+    // "Without a reload" is asserted literally: no tree read may happen while the role changes.
+    let treeReads = 0;
+    const onRequest = (request: { method(): string; url(): string }) => {
+      if (request.method() === 'GET' && request.url().includes(`/api/teams/${teamId}/tree`)) treeReads++;
+    };
+    admin.page.on('request', onRequest);
+
+    // Demoted to viewer: the affordances go, and the session is told why.
+    expect((await role('VIEWER')).status()).toBe(200);
+    await expect(palette).toHaveCount(0);
+    await expect(admin.page.getByTestId(`ost-node-add-${k.o1}`)).toHaveCount(0);
+    await expect(admin.page.getByTestId('ostError')).toContainText('viewer');
+    await admin.page.getByTestId('ostErrorDismiss').click();
+
+    // Promoted back: they come back, still without a reload.
+    expect((await role('EDITOR')).status()).toBe(200);
+    await expect(palette).toHaveCount(1);
+    await expect(admin.page.getByTestId(`ost-node-add-${k.o1}`)).toBeVisible();
+
+    admin.page.off('request', onRequest);
+    expect(treeReads, 'the role change was applied live, with no tree re-read').toBe(0);
 
     for (const page of [user.page, admin.page]) expect(takeErrors(page), 'page / console errors').toEqual([]);
   });

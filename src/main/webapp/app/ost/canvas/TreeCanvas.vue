@@ -51,6 +51,7 @@
           :editing="tree.canEdit && ui.editingId === id"
           :edit-draft="retry?.key === id ? retry.draft : null"
           :edit-error="retry?.key === id ? retry.error : null"
+          :pulse="tree.pulseFor(id)"
           :evidence-score="evidence.get(id)?.score ?? null"
           :evidence-tests="evidence.get(id)?.tests ?? 0"
           @add="toggleAddMenu(id)"

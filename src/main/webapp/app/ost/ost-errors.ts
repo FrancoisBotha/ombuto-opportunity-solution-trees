@@ -48,6 +48,9 @@ export const DELETED_ELSEWHERE = 'This item was deleted by someone else.';
 /** A write refused because the user was demoted to viewer meanwhile (the re-read shows it). */
 export const DEMOTED_TO_VIEWER = 'Your role changed to viewer — changes are no longer possible.';
 
+/** FR-037: a MEMBERSHIP_CHANGED event says this user is no longer a member of the open team. */
+export const REMOVED_FROM_TEAM = 'You were removed from this team — changes are no longer possible.';
+
 /**
  * `type` (the node the failed write was about) makes the title rule specific: products 100,
  * assumptions and evidence 500, the other types 200 characters.
