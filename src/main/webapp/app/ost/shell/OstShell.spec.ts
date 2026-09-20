@@ -9,6 +9,7 @@ import { type Router, createMemoryHistory, createRouter } from 'vue-router';
 import { dto, treeDto } from '../domain/fixtures.test-util';
 import OstService from '../ost.service';
 import { useOstRealtimeStore } from '../stores/ost-realtime.store';
+import { useOstTreeStore } from '../stores/ost-tree.store';
 import { useOstUiStore } from '../stores/ost-ui.store';
 
 import OstShell from './OstShell.vue';
@@ -108,6 +109,37 @@ describe('OstShell', () => {
     expect(router.currentRoute.value.fullPath).toBe('/trees/8/experiments');
     expect(service.getTree.calledWith(8)).toBe(true);
     expect(wrapper.find('[data-cy="ostTeamComboLabel"]').text()).toBe('Team Venus');
+    wrapper.unmount();
+  });
+
+  it('hands received events to the tree store so a remote change reaches the flat node list', async () => {
+    // Guards the applyEvents wiring: the transport used to validate and batch every event and then
+    // drop it on the floor, which made live collaboration silently a no-op.
+    const realtime = useOstRealtimeStore(pinia);
+    const frames: FrameRequestCallback[] = [];
+    realtime.setFrameScheduler(callback => frames.push(callback), vi.fn());
+    const messages = new Subject<{ body: string }>();
+    stomp.watch.mockReturnValue(messages);
+
+    const wrapper = await mountAt('/trees/7');
+    const tree = useOstTreeStore(pinia);
+    expect(tree.byId('outcome-1')?.title).not.toBe('Renamed remotely');
+
+    messages.next({
+      body: JSON.stringify({
+        type: 'NODE_UPDATED',
+        teamId: 7,
+        seq: 1,
+        epoch: 'e1',
+        actingUserLogin: 'someone-else',
+        at: '2026-09-20T00:00:00Z',
+        payload: dto('outcome-1', 'product-1', { title: 'Renamed remotely' }),
+      }),
+    });
+    frames.shift()?.(performance.now());
+    await flushPromises();
+
+    expect(tree.byId('outcome-1')?.title).toBe('Renamed remotely');
     wrapper.unmount();
   });
 

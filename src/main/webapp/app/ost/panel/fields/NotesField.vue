@@ -8,9 +8,15 @@
       placeholder="What did we learn?"
       :readonly="readonly"
       data-cy="ost-notes"
-      @focus="focused = true"
+      @focus="onFocus"
       @blur="commit"
     ></textarea>
+    <div v-if="dropped !== undefined" class="ost-field__hint ost-field__hint--tight" role="status" data-cy="ost-notes-dropped">
+      Someone else set this to “{{ dropped }}” — your edit is still unsaved.
+      <button type="button" class="ost-notes__dropped-dismiss ost-tap" data-cy="ost-notes-dropped-dismiss" @click="emit('dismissDropped')">
+        Dismiss
+      </button>
+    </div>
   </div>
 </template>
 
@@ -26,8 +32,18 @@ import { ref, watch } from 'vue';
 
 import type { Settled } from '../panel-action';
 
-const props = defineProps<{ value: string; readonly?: boolean }>();
-const emit = defineEmits<{ change: [value: string, settled: Settled] }>();
+const props = defineProps<{ value: string; readonly?: boolean; dropped?: string }>();
+const emit = defineEmits<{
+  change: [value: string, settled: Settled];
+  focus: [];
+  blur: [];
+  dismissDropped: [];
+}>();
+
+function onFocus() {
+  focused.value = true;
+  emit('focus');
+}
 
 const id = `ost-notes-${Math.random().toString(36).slice(2, 9)}`;
 const draft = ref(props.value);
@@ -45,6 +61,7 @@ watch(
 
 function commit() {
   focused.value = false;
+  emit('blur');
   if (props.readonly) return;
   unsaved.value = null;
   if (draft.value === props.value) return;
@@ -62,5 +79,16 @@ function commit() {
   font-size: 13px;
   min-height: 78px;
   background: transparent;
+}
+
+.ost-notes__dropped-dismiss {
+  margin-left: 6px;
+  padding: 0;
+  font: inherit;
+  color: var(--color-accent-300);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
 }
 </style>

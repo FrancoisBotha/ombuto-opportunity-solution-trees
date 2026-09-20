@@ -134,7 +134,7 @@ describe('DetailPanel', () => {
       expect(field.value).toBe('Renamed on the canvas yz'); // the user's own typing is never overwritten
       await input.trigger('blur');
       await flushPromises();
-      expect(service.patchNode.lastCall.args).toEqual(['outcome', 1, { title: 'Renamed on the canvas yz' }]);
+      expect(service.patchNode.lastCall.args.slice(0, 3)).toEqual(['outcome', 1, { title: 'Renamed on the canvas yz' }]);
       // Afterwards the field follows the store again.
       tree.byId('outcome-1')!.title = 'Later remote title';
       await flushPromises();
@@ -275,6 +275,28 @@ describe('DetailPanel', () => {
       await flushPromises();
       expect(ui.panelTab).toBe('detail');
       expect(document.activeElement?.getAttribute('data-cy')).toBe('ost-tab-detail');
+    });
+
+    it('focusing the title marks it as being typed and a suppressed remote value shows as a dismissible hint', async () => {
+      const { wrapper, tree } = await mountPanel('outcome-1');
+      const input = wrapper.get('[data-cy="ost-panel-title"]');
+      await input.trigger('focus');
+      // A remote NODE_UPDATED for a field the user is typing in must be suppressed and recorded.
+      tree.applyEvents([
+        {
+          type: 'NODE_UPDATED',
+          node: dto('outcome-1', 'product-1', { title: 'Remote rename' }),
+          actingUserLogin: 'someone-else',
+        },
+      ]);
+      await flushPromises();
+      expect(tree.droppedRemoteFor('outcome-1').title).toBe('Remote rename');
+      const hint = wrapper.get('[data-cy="ost-panel-title-dropped"]');
+      expect(hint.text()).toContain('Remote rename');
+      await wrapper.get('[data-cy="ost-panel-title-dropped-dismiss"]').trigger('click');
+      await flushPromises();
+      expect(wrapper.find('[data-cy="ost-panel-title-dropped"]').exists()).toBe(false);
+      expect(tree.droppedRemoteFor('outcome-1').title).toBeUndefined();
     });
 
     it('hide moves focus to the Details tab, reopening moves it back to the hide button', async () => {
