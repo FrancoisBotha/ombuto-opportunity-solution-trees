@@ -5,7 +5,6 @@ import { BToastOrchestrator } from 'bootstrap-vue-next';
 
 import JhiFooter from '@/core/jhi-footer/jhi-footer.vue';
 import Navbar from '@/core/navbar/navbar.vue';
-import Ribbon from '@/core/ribbon/ribbon.vue';
 import SidebarMenu from '@/core/sidebar-menu/sidebar-menu.vue';
 import { readStoredSidebarState } from '@/core/sidebar-menu/sidebar-menu.component';
 import { useAlertService } from '@/shared/alert/alert.service';
@@ -15,7 +14,6 @@ export default defineComponent({
   name: 'App',
   components: {
     BToastOrchestrator,
-    Ribbon,
     Navbar,
     SidebarMenu,
     JhiFooter,

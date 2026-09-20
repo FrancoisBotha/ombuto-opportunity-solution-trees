@@ -221,7 +221,7 @@ branches and the last-used team are kept in `localStorage` per user (and team).
 Vue Flow's base CSS are imported only by the lazy OST chunk and use no global
 selectors, because that CSS stays loaded after the user navigates away. Vue Flow's
 `theme-default.css` is not imported, and OST screens use no Bootstrap buttons or
-cards.
+cards. The palette the tokens draw from is app-wide and lives in §7.
 
 **Backend: custom tree APIs beside the generated CRUD.** The tree rules live in
 hand-written classes, never in generated ones (engineering guide §4b):
@@ -299,3 +299,50 @@ carry SQL in any profile.
 reload (Epic 5). Only the nodes in view are in the DOM, so Tab cannot reach
 off-screen nodes. Search + Enter jumps to any match, and the panel breadcrumb
 and child list move through the tree.
+
+## 7. Theming (light / dark)
+
+`src/main/webapp/content/css/theme.css` is the **single source of the palette**
+("Ombuto OST · Nocturne", `docs/Mockups/ColorPalette.png`). It has two halves:
+
+1. **Fixed palette** — the accent and neutral ramps, the four Nocturne core
+   colours (`--ost-nocturne-ground/surface/text/accent`), the status tones and
+   the priority spectrum. A ramp step is a pigment; it never varies by theme.
+2. **Roles** — `--ost-bg`, `--ost-surface`, `--ost-text`, `--ost-border`,
+   `--ost-accent`, the chrome roles, … defined on `:root` for **dark** and
+   re-pointed at other steps of the **same ramps** under
+   `:root[data-theme='light']`. No new hues are invented for light.
+
+CSS custom properties, not Sass variables: Sass cannot be re-pointed at runtime,
+so a toggle would mean shipping two stylesheets. Bootstrap is followed rather
+than forked — `global.scss` maps `--ost-*` onto Bootstrap's `--bs-*` under
+`html[data-theme]`, and `data-bs-theme` rides along on `<html>`. Every pair the
+app ships meets WCAG 2.1 AA (4.5:1 body text, 3:1 UI borders); the ratios are
+recorded beside each role in `theme.css`.
+
+**Dark is the default, and the OS preference is never consulted.** The choice is
+the user's: a navbar toggle (`data-cy="themeToggle"`) writes `dark` or `light` to
+`localStorage` under `ombuto-theme` and sets `data-theme` on `<html>`
+(`app/shared/config/store/theme-store.ts`). `index.html` carries a tiny inline
+copy of the same read so the loading splash is already themed; `main.ts` calls
+`initTheme()` before mounting. Every storage access is wrapped in `try`/`catch`
+and falls back to dark.
+
+Two deliberate exceptions stay **Nocturne dark in the light theme**:
+
+- **The tree canvas.** OST is a design-tool artboard, not a document. It reads
+  only the fixed palette, never the roles, so the light theme cannot reach it.
+- **The sidebar rail.** The rail is the app's spine and shares the canvas's
+  ground, so navigation reads the same wherever you are. Its `--ost-sidebar-*`
+  roles are built from the fixed palette and are **not** repeated in the light
+  block. This is a product decision, not an oversight — do not "fix" it by adding
+  light overrides. The navbar and all page content do follow the theme.
+
+`src/test/javascript/playwright/theme.spec.ts` guards all of it, including the
+rail's computed background being the dark token in both themes.
+
+The non-production marker (`app/core/ribbon/`, driven by
+`display-ribbon-on-profiles`) is a pill in the navbar beside the version badge,
+tinted with the warm end of the priority spectrum. It used to be a diagonal
+banner pinned to the viewport's top-left corner, where it covered the sidebar's
+first rows.

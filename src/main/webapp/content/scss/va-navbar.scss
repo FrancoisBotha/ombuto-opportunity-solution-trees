@@ -12,7 +12,8 @@ Top navbar (slim, fixed)
   z-index: 1030;
   height: $navbar-height;
   padding: 0 !important;
-  background-color: $navbar-bg-color;
+  background-color: var(--ost-navbar-bg);
+  border-bottom: 1px solid var(--ost-navbar-border);
   justify-content: flex-start;
   align-items: center;
   display: flex;
@@ -36,47 +37,88 @@ Top navbar (slim, fixed)
   .navbar-title {
     display: inline-block;
     vertical-align: middle;
-    font-weight: 300;
-    color: white;
+    font-weight: 500;
+    color: var(--ost-navbar-fg);
     margin-left: 0.5rem;
     white-space: nowrap;
   }
 
+  /* Version pill — "VDEV" in the mockup. */
   .navbar-version {
-    font-size: 0.65em;
-    vertical-align: sub;
-    color: $navbar-fg-color;
-    margin-left: 0.4rem;
+    display: inline-flex;
+    align-items: center;
+    height: 1.15rem;
+    padding: 0 0.45rem;
+    margin-left: 0.6rem;
+    border-radius: 999px;
+    background-color: var(--ost-surface-2);
+    color: var(--ost-text-muted);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* Right-hand cluster: theme toggle, user, sign in / out. */
+  .navbar-actions {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
   }
 
   .navbar-user {
-    color: $navbar-fg-color;
-    margin-left: auto;
+    color: var(--ost-navbar-muted);
     padding: 0 0.75rem;
     font-size: 0.85rem;
     white-space: nowrap;
+  }
+
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-right: 0.25rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.4rem;
+    background-color: transparent;
+    color: var(--ost-navbar-muted);
+    cursor: pointer;
+    transition:
+      color 0.15s,
+      background-color 0.15s;
+
+    &:hover {
+      color: var(--ost-navbar-fg);
+      background-color: var(--ost-navbar-hover-bg);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ost-focus-ring, var(--ost-accent));
+      outline-offset: 2px;
+    }
   }
 
   .sign-in,
   .sign-out {
     display: flex;
     align-items: center;
-    color: white;
+    color: var(--ost-navbar-fg);
     cursor: pointer;
     padding: 0.35rem 1rem;
     margin-right: 0.5rem;
     border: none;
     border-radius: 5px;
-    background-color: $navbar-bg-color;
+    background-color: transparent;
     text-decoration: none;
     white-space: nowrap;
 
     &:hover {
-      background-color: #565a5e;
+      background-color: var(--ost-navbar-hover-bg);
+      color: var(--ost-navbar-fg);
     }
-  }
-
-  .sign-in {
-    margin-left: auto;
   }
 }

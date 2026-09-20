@@ -1,0 +1,192 @@
+/*
+ * Ombuto OST — the single source of the palette.
+ *
+ * Authority: docs/Mockups/ColorPalette.png ("Ombuto OST · Nocturne").
+ *
+ * Structure (why `:root` custom properties and not Sass):
+ *   1. FIXED PALETTE — the two ramps, the four Nocturne core colours, the status tones and the
+ *      priority spectrum. Identical in both themes: a ramp step is a pigment, not a role.
+ *   2. ROLES — `--ost-bg`, `--ost-surface`, `--ost-text`, … defined on `:root` for DARK (the
+ *      default) and re-pointed at other ramp steps under `:root[data-theme='light']`.
+ * Sass variables cannot be re-pointed at runtime, so a theme toggle would mean shipping two
+ * stylesheets. Custom properties give one stylesheet and one attribute flip on <html>.
+ *
+ * The OST tree canvas is a design-tool artboard and stays dark in BOTH themes, so it consumes the
+ * `--ost-nocturne-*` constants and the ramps (never the roles) — see app/ost/styles/ost-tokens.css.
+ * Nothing in this file may be overridden inside `.ost-root`.
+ *
+ * Contrast (WCAG 2.1 AA) of the pairs shipped here is recorded next to each role.
+ */
+
+:root {
+  /* ======================================================================================
+     1. FIXED PALETTE — never varies by theme
+     ====================================================================================== */
+
+  /* Nocturne core — the OST artboard */
+  --ost-nocturne-ground: #161826;
+  --ost-nocturne-surface: #232532;
+  --ost-nocturne-text: #e9e9ed;
+  --ost-nocturne-accent: #9184d9;
+
+  /* Accent ramp */
+  --ost-accent-100: #f5f4ff;
+  --ost-accent-200: #e7e5fe;
+  --ost-accent-300: #d2cefd;
+  --ost-accent-400: #b5abfc;
+  --ost-accent-500: #968ae0;
+  --ost-accent-600: #796cbf;
+  --ost-accent-700: #5d5294;
+  --ost-accent-800: #423a6a;
+  --ost-accent-900: #2b2741;
+
+  /* Neutral ramp */
+  --ost-neutral-100: #f3f5fe;
+  --ost-neutral-200: #e4e7f5;
+  --ost-neutral-300: #cfd3e5;
+  --ost-neutral-400: #b2b6ca;
+  --ost-neutral-500: #9397ab;
+  --ost-neutral-600: #75798c;
+  --ost-neutral-700: #595d6c;
+  --ost-neutral-800: #3f424d;
+  --ost-neutral-900: #292b31;
+
+  /* Priority spectrum — oklch(0.74 C H), hue 250° → 25°, chroma .075 → .16 */
+  --ost-priority-lowest: oklch(0.74 0.075 250);
+  --ost-priority-critical: oklch(0.74 0.16 25);
+  --ost-priority-spectrum: linear-gradient(90deg, var(--ost-priority-lowest), var(--ost-priority-critical));
+
+  /* ======================================================================================
+     2. ROLES — DARK (the default theme)
+     ====================================================================================== */
+  color-scheme: dark;
+
+  --ost-bg: var(--ost-nocturne-ground);
+  --ost-surface: var(--ost-nocturne-surface);
+  /* One step up from the surface: menus, tooltips, hovered rows. */
+  --ost-surface-2: color-mix(in srgb, var(--ost-nocturne-surface) 85%, var(--ost-nocturne-text));
+
+  --ost-text: var(--ost-nocturne-text); /* 14.5:1 on --ost-bg */
+  --ost-text-muted: var(--ost-neutral-400); /* 8.7:1 on --ost-bg */
+  --ost-text-subtle: var(--ost-neutral-500); /* 6.1:1 on --ost-bg */
+
+  --ost-border: color-mix(in srgb, var(--ost-nocturne-text) 16%, transparent);
+  --ost-border-strong: var(--ost-neutral-600); /* 4.1:1 on --ost-bg — meets 3:1 for UI borders */
+
+  --ost-accent: var(--ost-nocturne-accent); /* 5.5:1 on --ost-bg */
+  --ost-accent-rgb: 145, 132, 217; /* #9184d9 — the channels of --ost-accent, for rgb()/alpha use */
+  --ost-accent-strong: var(--ost-accent-400);
+  --ost-accent-contrast: var(--ost-nocturne-ground); /* on an --ost-accent fill: 5.5:1 */
+  --ost-accent-soft: color-mix(in srgb, var(--ost-nocturne-accent) 18%, transparent);
+  --ost-link: var(--ost-accent-300); /* 11.7:1 on --ost-bg */
+  --ost-link-hover: var(--ost-accent-200);
+
+  --ost-focus-ring: var(--ost-accent);
+
+  /* Status tones — settled·good / in-flight / settled·negative */
+  --ost-status-good-bg: var(--ost-accent-800);
+  --ost-status-good-fg: var(--ost-accent-200); /* 8.3:1 */
+  --ost-status-good-border: transparent;
+  --ost-status-flight-bg: transparent;
+  --ost-status-flight-fg: var(--ost-accent-300);
+  --ost-status-flight-border: var(--ost-accent-600);
+  --ost-status-bad-bg: var(--ost-neutral-900);
+  --ost-status-bad-fg: var(--ost-neutral-300); /* 8.8:1 */
+  --ost-status-bad-border: transparent;
+
+  /* Non-production marker (the dev-profile pill). The system has no danger hue, so this borrows
+   * the warm end of the priority spectrum — same hue and chroma, a lightness that carries on the
+   * ground it sits on. Nothing else may use it: it has to stay unmistakable. */
+  --ost-warn: #ff7e76; /* = oklch(0.74 0.16 25), the spectrum's "critical" end, in sRGB */
+  --ost-warn-fg: #ff9188; /* = oklch(0.8 0.16 25) — 8.1:1 on --ost-navbar-bg */
+  --ost-warn-bg: color-mix(in srgb, var(--ost-warn) 16%, transparent);
+  --ost-warn-border: color-mix(in srgb, var(--ost-warn) 55%, transparent);
+
+  /* ---- app chrome ---- */
+  --ost-navbar-bg: var(--ost-bg);
+  --ost-navbar-fg: var(--ost-text);
+  --ost-navbar-muted: var(--ost-text-muted);
+  --ost-navbar-border: var(--ost-border);
+  --ost-navbar-hover-bg: color-mix(in srgb, var(--ost-nocturne-text) 8%, transparent);
+
+  /* ---- the sidebar rail: DELIBERATELY NOCTURNE DARK IN BOTH THEMES ----------------------
+   * A product decision, not an oversight. The rail is the app's spine and shares the tree
+   * canvas's artboard ground, so navigation reads the same wherever you are. These roles are
+   * therefore built from the FIXED palette and are NOT repeated in the light block below —
+   * do not "fix" the light theme by adding overrides here. Both the Playwright spec
+   * (theme.spec.ts, "the sidebar rail stays Nocturne dark in both themes") and the theming
+   * section of docs/Architecture/Architecture.md pin this down.
+   * Contrast below is quoted against the rail's own dark ground, in either theme.
+   */
+  --ost-sidebar-bg: var(--ost-nocturne-ground);
+  --ost-sidebar-fg: var(--ost-neutral-300); /* 11.8:1 on --ost-sidebar-bg */
+  --ost-sidebar-muted: var(--ost-neutral-500); /* 6.1:1 on --ost-sidebar-bg */
+  --ost-sidebar-strong-fg: var(--ost-nocturne-text); /* 14.5:1 — hovered row, hamburger */
+  --ost-sidebar-border: color-mix(in srgb, var(--ost-nocturne-text) 16%, transparent);
+  --ost-sidebar-scrollbar: color-mix(in srgb, var(--ost-nocturne-text) 15%, transparent);
+  --ost-sidebar-hover-bg: color-mix(in srgb, var(--ost-nocturne-text) 7%, transparent);
+  --ost-sidebar-active-bg: color-mix(in srgb, var(--ost-nocturne-accent) 18%, transparent);
+  --ost-sidebar-active-fg: var(--ost-accent-200); /* 12.2:1 on the tinted row */
+  --ost-sidebar-active-border: color-mix(in srgb, var(--ost-nocturne-accent) 45%, transparent);
+  --ost-sidebar-tooltip-bg: var(--ost-nocturne-surface);
+  --ost-sidebar-tooltip-fg: var(--ost-nocturne-text);
+  --ost-sidebar-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+
+  --ost-content-bg: var(--ost-bg);
+  /* A themed hover wash for page content (tables, dropdowns) — the rail has its own, above. */
+  --ost-hover-bg: color-mix(in srgb, var(--ost-nocturne-text) 7%, transparent);
+  --ost-tooltip-bg: var(--ost-surface-2);
+  --ost-tooltip-fg: var(--ost-text);
+  --ost-shadow: 0 6px 18px rgb(0 0 0 / 55%);
+}
+
+/* ========================================================================================
+   LIGHT — the same ramps, different steps. No new hues.
+   ======================================================================================== */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --ost-bg: var(--ost-neutral-100);
+  --ost-surface: #ffffff;
+  --ost-surface-2: var(--ost-neutral-200);
+
+  --ost-text: var(--ost-neutral-900); /* 12.5:1 on --ost-bg, 15.9:1 on --ost-surface */
+  --ost-text-muted: var(--ost-neutral-700); /* 6.0:1 on --ost-bg, 6.5:1 on --ost-surface */
+  --ost-text-subtle: var(--ost-neutral-700); /* neutral-600 is only 4.0:1 — not used for text */
+
+  --ost-border: var(--ost-neutral-300);
+  --ost-border-strong: var(--ost-neutral-600); /* 4.0:1 on --ost-bg — meets 3:1 for UI borders */
+
+  --ost-accent: var(--ost-accent-700); /* 6.2:1 on --ost-bg, 6.8:1 on --ost-surface */
+  --ost-accent-rgb: 93, 82, 148; /* #5d5294 */
+  --ost-accent-strong: var(--ost-accent-800);
+  --ost-accent-contrast: #ffffff; /* on an --ost-accent fill: 6.8:1 */
+  --ost-accent-soft: color-mix(in srgb, var(--ost-accent-600) 14%, transparent);
+  --ost-link: var(--ost-accent-700);
+  --ost-link-hover: var(--ost-accent-800);
+
+  --ost-status-good-bg: var(--ost-accent-200);
+  --ost-status-good-fg: var(--ost-accent-800); /* 8.3:1 */
+  --ost-status-flight-fg: var(--ost-accent-700); /* 6.2:1 */
+  --ost-status-flight-border: var(--ost-accent-600);
+  --ost-status-bad-bg: var(--ost-neutral-200);
+  --ost-status-bad-fg: var(--ost-neutral-800); /* 8.1:1 */
+
+  --ost-warn: #d55853; /* = oklch(0.62 0.16 25) */
+  --ost-warn-fg: #971a20; /* = oklch(0.44 0.16 25) — 8.4:1 on the white navbar */
+  --ost-warn-bg: color-mix(in srgb, var(--ost-warn) 14%, transparent);
+  --ost-warn-border: color-mix(in srgb, #bd413f 55%, transparent); /* = oklch(0.55 0.16 25) */
+
+  --ost-navbar-bg: var(--ost-surface);
+  --ost-navbar-fg: var(--ost-text);
+  --ost-navbar-muted: var(--ost-text-muted);
+  --ost-navbar-border: var(--ost-border);
+  --ost-navbar-hover-bg: color-mix(in srgb, var(--ost-neutral-900) 8%, transparent);
+
+  /* No --ost-sidebar-* here on purpose: the rail stays Nocturne dark (see the dark block). */
+
+  --ost-hover-bg: color-mix(in srgb, var(--ost-neutral-900) 7%, transparent);
+  --ost-tooltip-bg: var(--ost-neutral-900);
+  --ost-tooltip-fg: var(--ost-neutral-100);
+  --ost-shadow: 0 6px 18px rgb(41 43 49 / 18%);
+}

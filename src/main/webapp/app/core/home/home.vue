@@ -82,12 +82,11 @@
 <script lang="ts" src="./home.component.ts"></script>
 
 <style scoped lang="scss">
-@import '../../../content/scss/va-variables';
-
-$home-ink: $navbar-bg-color;
-$home-accent: $sidebar-menu-accent-color;
-$home-muted: #66756f;
-$home-border: #e6e4ec;
+/*
+ * Colours come from content/css/theme.css (the shared palette), so the home page follows the
+ * light / dark toggle. Sass colour functions (lighten / darken / rgba) cannot operate on custom
+ * properties — color-mix() does the same job at runtime and keeps one source of hex.
+ */
 
 .home {
   display: flex;
@@ -102,10 +101,11 @@ $home-border: #e6e4ec;
   gap: 2rem;
   padding: 2.75rem 3rem;
   border-radius: 14px;
-  color: $navbar-fg-color;
+  /* The hero is a dark plate in both themes — the Nocturne ground, like the canvas. */
+  color: var(--ost-nocturne-text);
   background:
-    radial-gradient(40rem 22rem at 10% 0%, rgba($home-accent, 0.3), transparent 60%),
-    linear-gradient(150deg, $navbar-bg-color 0%, $sidebar-menu-tooltip-bg-color 100%);
+    radial-gradient(40rem 22rem at 10% 0%, color-mix(in srgb, var(--ost-nocturne-accent) 30%, transparent), transparent 60%),
+    linear-gradient(150deg, var(--ost-nocturne-ground) 0%, var(--ost-accent-900) 100%);
 }
 
 .home-hero-text {
@@ -119,21 +119,21 @@ $home-border: #e6e4ec;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: lighten($home-accent, 18%);
+  color: var(--ost-accent-300);
 }
 
 .home-hero h1 {
   margin-bottom: 0.75rem;
   font-size: 2.25rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--ost-neutral-100);
 }
 
 .home-lead {
   margin-bottom: 1.75rem;
   font-size: 1.05rem;
   line-height: 1.6;
-  color: rgba($navbar-fg-color, 0.85);
+  color: var(--ost-neutral-300);
 }
 
 .home-actions {
@@ -152,27 +152,28 @@ $home-border: #e6e4ec;
 }
 
 .home-btn-primary {
-  color: #fff;
-  background: $home-accent;
-  border-color: $home-accent;
+  color: var(--ost-nocturne-ground);
+  background: var(--ost-nocturne-accent);
+  border-color: var(--ost-nocturne-accent);
 
   &:hover,
   &:focus-visible {
-    color: #fff;
-    background: darken($home-accent, 6%);
-    box-shadow: 0 6px 16px rgba($home-accent, 0.35);
+    color: var(--ost-nocturne-ground);
+    background: var(--ost-accent-400);
+    border-color: var(--ost-accent-400);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--ost-nocturne-accent) 35%, transparent);
   }
 }
 
 .home-btn-ghost {
-  color: $navbar-fg-color;
-  border-color: rgba($navbar-fg-color, 0.35);
+  color: var(--ost-neutral-200);
+  border-color: color-mix(in srgb, var(--ost-neutral-200) 35%, transparent);
 
   &:hover,
   &:focus-visible {
-    color: #fff;
-    border-color: $navbar-fg-color;
-    background: rgba(255, 255, 255, 0.06);
+    color: var(--ost-neutral-100);
+    border-color: var(--ost-neutral-200);
+    background: color-mix(in srgb, var(--ost-neutral-100) 6%, transparent);
   }
 }
 
@@ -183,25 +184,25 @@ $home-border: #e6e4ec;
 }
 
 .home-tree-lines path {
-  stroke: rgba($navbar-fg-color, 0.35);
+  stroke: color-mix(in srgb, var(--ost-neutral-200) 35%, transparent);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .home-tree-node {
-  fill: rgba(255, 255, 255, 0.1);
-  stroke: rgba($navbar-fg-color, 0.45);
+  fill: color-mix(in srgb, var(--ost-neutral-100) 10%, transparent);
+  stroke: color-mix(in srgb, var(--ost-neutral-200) 45%, transparent);
   stroke-width: 1.5;
 
   &.is-outcome {
-    fill: $home-accent;
+    fill: var(--ost-nocturne-accent);
     stroke: none;
   }
 
   &.is-solution {
-    fill: rgba($home-accent, 0.35);
-    stroke: rgba($home-accent, 0.9);
+    fill: color-mix(in srgb, var(--ost-nocturne-accent) 35%, transparent);
+    stroke: color-mix(in srgb, var(--ost-nocturne-accent) 90%, transparent);
   }
 }
 
@@ -215,28 +216,28 @@ $home-border: #e6e4ec;
   display: flex;
   gap: 0.9rem;
   padding: 1.25rem;
-  border: 1px solid $home-border;
+  border: 1px solid var(--ost-border);
   border-radius: 12px;
-  background: #fff;
+  background: var(--ost-surface);
 
   h2 {
     margin-bottom: 0.35rem;
     font-size: 1rem;
     font-weight: 600;
-    color: $home-ink;
+    color: var(--ost-text);
   }
 
   p {
     margin: 0;
     font-size: 0.9rem;
     line-height: 1.5;
-    color: $home-muted;
+    color: var(--ost-text-muted);
   }
 }
 
 .home-step-number {
   margin-right: 0.4rem;
-  color: $home-accent;
+  color: var(--ost-accent);
 }
 
 .home-step-icon {
@@ -247,22 +248,22 @@ $home-border: #e6e4ec;
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 10px;
-  color: $home-accent;
-  background: rgba($home-accent, 0.12);
+  color: var(--ost-accent);
+  background: var(--ost-accent-soft);
 }
 
 .home-section-title {
   margin-bottom: 0.9rem;
   font-size: 1.1rem;
   font-weight: 600;
-  color: $home-ink;
+  color: var(--ost-text);
 }
 
 .home-section-note {
   margin-left: 0.5rem;
   font-size: 0.75rem;
   font-weight: 500;
-  color: $home-muted;
+  color: var(--ost-text-muted);
 }
 
 .home-link-grid {
@@ -276,11 +277,11 @@ $home-border: #e6e4ec;
   flex-direction: column;
   gap: 0.25rem;
   padding: 1.1rem 1.25rem;
-  border: 1px solid $home-border;
+  border: 1px solid var(--ost-border);
   border-radius: 12px;
-  color: $home-ink;
+  color: var(--ost-text);
   text-decoration: none;
-  background: $main-content-bg-color;
+  background: var(--ost-surface);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease,
@@ -288,8 +289,8 @@ $home-border: #e6e4ec;
 
   &:hover,
   &:focus-visible {
-    border-color: $home-accent;
-    box-shadow: 0 8px 20px rgba($navbar-bg-color, 0.12);
+    border-color: var(--ost-accent);
+    box-shadow: var(--ost-shadow);
     transform: translateY(-2px);
   }
 }
@@ -297,7 +298,7 @@ $home-border: #e6e4ec;
 .home-link-icon {
   margin-bottom: 0.4rem;
   font-size: 1.25rem;
-  color: $home-accent;
+  color: var(--ost-accent);
 }
 
 .home-link-label {
@@ -306,7 +307,7 @@ $home-border: #e6e4ec;
 
 .home-link-text {
   font-size: 0.85rem;
-  color: $home-muted;
+  color: var(--ost-text-muted);
 }
 
 @media (max-width: 991px) {
