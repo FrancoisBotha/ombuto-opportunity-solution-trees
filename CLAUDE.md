@@ -68,8 +68,9 @@ could not go there.
 - **`config/ApplicationProperties.java`**: the `seed` property. **`config/application-dev.yml`**:
   `application.seed.enabled: true`, and the Liquibase `contexts: dev` (without `faker`).
 - **`config/liquibase/master.xml`**: the custom includes
-  `20260918110000_add_unique_constraint_team_member.xml` and
-  `20260919120000_add_index_node_history_node.xml`.
+  `20260918110000_add_unique_constraint_team_member.xml`,
+  `20260919120000_add_index_node_history_node.xml` and
+  `20260921120000_link_001_delete_placeholder_node_links.xml`.
 - **Frontend shell**:
   - `router/entities.ts`: every entity route has `authorities: [Authority.ADMIN]`.
   - `router/pages.ts`: the Teams and OST routes.

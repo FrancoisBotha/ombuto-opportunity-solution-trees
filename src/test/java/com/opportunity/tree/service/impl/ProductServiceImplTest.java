@@ -14,7 +14,6 @@ import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.repository.TeamRepository;
-import com.opportunity.tree.service.DefaultNodeLinks;
 import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
@@ -78,7 +77,6 @@ class ProductServiceImplTest {
             productRepository,
             productMapper,
             teamAccessService,
-            mock(DefaultNodeLinks.class),
             mock(TreeNodeCascadeService.class),
             mock(TreeStructureLock.class),
             mock(TeamRepository.class),

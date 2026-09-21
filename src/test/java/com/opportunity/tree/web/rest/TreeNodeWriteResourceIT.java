@@ -169,7 +169,9 @@ class TreeNodeWriteResourceIT {
     // ---------------------------------------------------------------------
 
     @Test
-    void createOpportunityAppliesDefaultsLinksAndCreatedHistory() throws Exception {
+    void createOpportunityWritesNoDefaultLinksAndRecordsCreatedHistory() throws Exception {
+        // LINK-001: node creation no longer writes placeholder NodeLink rows. The panel offers
+        // the type's default slots as add-buttons — a NodeLink row means a human attached it.
         JsonNode node = createOk(TreeNodeType.OPPORTUNITY, TreeNodeType.OUTCOME, outcome.getId(), null);
         long id = node.get("id").asLong();
 
@@ -183,9 +185,13 @@ class TreeNodeWriteResourceIT {
         assertThat(node.get("sortOrder").asInt()).isEqualTo(6);
         assertThat(node.get("createdDate").isNull()).isFalse();
         assertThat(node.get("lastModifiedDate").isNull()).isFalse();
-        assertThat(linkNames(node)).containsExactly("Confluence", "Jira Initiative", "Jira Epic");
-        assertThat(node.get("links").get(0).get("url").asText()).isEqualTo("https://ombuto.atlassian.net/wiki/discovery/opportunity-" + id);
-        assertThat(node.get("links").get(1).get("url").asText()).isEqualTo("https://ombuto.atlassian.net/browse/INIT-000");
+        assertThat(linkNames(node)).isEmpty();
+        assertThat(
+            em
+                .createQuery("select count(l) from NodeLink l where l.opportunity.id = :id", Long.class)
+                .setParameter("id", id)
+                .getSingleResult()
+        ).isZero();
 
         List<NodeHistory> history = data.history(TreeNodeType.OPPORTUNITY, id);
         assertThat(history).hasSize(1);
@@ -195,31 +201,32 @@ class TreeNodeWriteResourceIT {
     }
 
     @Test
-    void createAppliesPerTypeDefaults() throws Exception {
+    void createNodeOfAnyTypeWritesNoDefaultLinks() throws Exception {
+        // LINK-001 AC #1: creating a node of any type writes no NodeLink rows.
         JsonNode out = createOk(TreeNodeType.OUTCOME, TreeNodeType.PRODUCT, product.getId(), null);
         assertThat(out.get("title").asText()).isEqualTo("New outcome");
         assertThat(out.get("status").isNull()).isTrue();
         assertThat(out.get("sortOrder").asInt()).isEqualTo(1);
-        assertThat(linkNames(out)).containsExactly("Confluence");
+        assertThat(linkNames(out)).isEmpty();
 
         JsonNode sol = createOk(TreeNodeType.SOLUTION, TreeNodeType.OPPORTUNITY, opportunity.getId(), null);
         assertThat(sol.get("title").asText()).isEqualTo("New solution");
         assertThat(sol.get("status").asText()).isEqualTo("CANDIDATE");
         assertThat(sol.get("sortOrder").asInt()).isEqualTo(1);
-        assertThat(linkNames(sol)).containsExactly("Confluence", "Jira Initiative", "Jira Epic");
+        assertThat(linkNames(sol)).isEmpty();
 
         JsonNode asm = createOk(TreeNodeType.ASSUMPTION, TreeNodeType.SOLUTION, solution.getId(), null);
         assertThat(asm.get("title").asText()).isEqualTo("New assumption");
         assertThat(asm.get("status").asText()).isEqualTo("UNTESTED");
         assertThat(asm.get("confidence").asInt()).isEqualTo(40);
         assertThat(asm.get("priority").isNull()).isTrue();
-        assertThat(linkNames(asm)).containsExactly("Confluence");
+        assertThat(linkNames(asm)).isEmpty();
 
         JsonNode ev = createOk(TreeNodeType.EVIDENCE, TreeNodeType.ASSUMPTION, assumption.getId(), null);
         assertThat(ev.get("title").asText()).isEqualTo("New snippet");
         assertThat(ev.get("parentKey").asText()).isEqualTo("assumption-" + assumption.getId());
         assertThat(ev.get("sortOrder").asInt()).isZero();
-        assertThat(linkNames(ev)).containsExactly("Confluence", "Jira Ticket");
+        assertThat(linkNames(ev)).isEmpty();
 
         JsonNode evOpp = createOk(TreeNodeType.EVIDENCE, TreeNodeType.OPPORTUNITY, opportunity.getId(), "  Quote from PM  ");
         assertThat(evOpp.get("title").asText()).isEqualTo("Quote from PM");
@@ -442,7 +449,8 @@ class TreeNodeWriteResourceIT {
     }
 
     @Test
-    void productCreatedThroughProductApiGetsItsDefaultLink() throws Exception {
+    void productCreatedThroughProductApiWritesNoDefaultLinks() throws Exception {
+        // LINK-001 AC #5: ProductServiceImpl no longer writes a "Product space" placeholder.
         Map<String, Object> body = Map.of("name", "Brand new product", "archived", false, "team", Map.of("id", teamA.getId()));
         String json = mvc
             .perform(json(post("/api/products"), body).with(user(OWNER)))
@@ -455,8 +463,7 @@ class TreeNodeWriteResourceIT {
             .createQuery("select l from NodeLink l where l.product.id = :id", NodeLink.class)
             .setParameter("id", productId)
             .getResultList();
-        assertThat(links).extracting(NodeLink::getName).containsExactly("Product space");
-        assertThat(links.get(0).getUrl()).isEqualTo("https://ombuto.atlassian.net/wiki/spaces/product-" + productId);
+        assertThat(links).isEmpty();
     }
 
     // ---------------------------------------------------------------------

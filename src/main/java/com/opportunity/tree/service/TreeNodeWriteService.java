@@ -87,7 +87,6 @@ public class TreeNodeWriteService {
 
     private final TeamAccessService teamAccessService;
     private final NodeHistoryRecorder historyRecorder;
-    private final DefaultNodeLinks defaultNodeLinks;
     private final TreeNodeDtoAssembler dtoAssembler;
     private final TreeNodeCascadeService cascadeService;
     private final UserRepository userRepository;
@@ -101,7 +100,6 @@ public class TreeNodeWriteService {
     public TreeNodeWriteService(
         TeamAccessService teamAccessService,
         NodeHistoryRecorder historyRecorder,
-        DefaultNodeLinks defaultNodeLinks,
         TreeNodeDtoAssembler dtoAssembler,
         TreeNodeCascadeService cascadeService,
         UserRepository userRepository,
@@ -111,7 +109,6 @@ public class TreeNodeWriteService {
     ) {
         this.teamAccessService = teamAccessService;
         this.historyRecorder = historyRecorder;
-        this.defaultNodeLinks = defaultNodeLinks;
         this.dtoAssembler = dtoAssembler;
         this.cascadeService = cascadeService;
         this.userRepository = userRepository;
@@ -226,7 +223,9 @@ public class TreeNodeWriteService {
         };
         em.flush();
         Long id = (Long) em.getEntityManagerFactory().getPersistenceUnitUtil().getIdentifier(entity);
-        defaultNodeLinks.addDefaults(entity);
+        // LINK-001: no placeholder NodeLink rows on creation. Default link slots are UI
+        // affordances rendered as add-buttons in the panel; nothing is persisted until a human
+        // attaches a real link.
         historyRecorder.record(type, id, HistoryEventType.CREATED, "Node created as " + TreeNodeRules.label(type));
         em.flush();
         TreeNodeDTO dto = dtoAssembler.toDto(type, id);

@@ -551,13 +551,10 @@ describe('OST tree store', () => {
       expect(tree.byId('opportunity-1')?.questions.map(q => q.id)).toEqual([11]);
     });
 
-    it('restores only missing default links', async () => {
-      service.addLink.callsFake(async (_t, _id, link) => ({ id: Math.random(), ...link }));
-      await tree.restoreDefaultLinks('opportunity-1');
-      expect(tree.byId('opportunity-1')?.links.map(l => l.name)).toEqual(['Confluence', 'Jira Initiative', 'Jira Epic']);
-      service.addLink.resetHistory();
-      await tree.restoreDefaultLinks('opportunity-1');
-      expect(service.addLink.called).toBe(false);
+    it('does not expose a restore-defaults action — default slots are UI only (LINK-001)', () => {
+      // Default link "slots" are add-buttons in the panel now; they are never persisted as
+      // placeholder rows. The store no longer offers a bulk-restore action.
+      expect((tree as unknown as Record<string, unknown>).restoreDefaultLinks).toBeUndefined();
     });
 
     it('toggles open questions optimistically with rollback', async () => {

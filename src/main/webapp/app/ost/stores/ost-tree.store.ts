@@ -5,7 +5,7 @@ import { defineStore } from 'pinia';
 import { breadcrumb, descendantIds, evidenceThisMonth as countEvidenceThisMonth, orderTree } from '../domain/derive';
 import { layoutTree } from '../domain/layout';
 import { type NodePatch, fromDto, parseKey, toApiType, toPatchBody } from '../domain/mapping';
-import { ALLOWED, canReparent, defaultLinks } from '../domain/rules';
+import { ALLOWED, canReparent } from '../domain/rules';
 import type { NodeType, OstNode } from '../domain/types';
 import {
   DELETED_ELSEWHERE,
@@ -904,17 +904,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     }
   }
 
-  /** Re-adds any default link (by name) the node is missing. */
-  async function restoreDefaultLinks(key: string): Promise<boolean> {
-    const node = byId(key);
-    if (!node) return false;
-    const have = new Set(node.links.map(l => l.name));
-    let ok = true;
-    for (const link of defaultLinks({ id: node.id, type: node.type })) {
-      if (!have.has(link.name)) ok = (await addLink(key, link)) && ok;
-    }
-    return ok;
-  }
+  // LINK-001: restoreDefaultLinks was removed — default slots are UI affordances now, not
+  // persisted data. The Links tab clicks a slot to prefill the add-link form (see LinksTab.vue).
 
   // ---- actions: open questions -------------------------------------------------------------------
   async function addQuestion(key: string, text: string): Promise<boolean> {
@@ -1350,7 +1341,6 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     addLink,
     updateLink,
     removeLink,
-    restoreDefaultLinks,
     addQuestion,
     updateQuestion,
     removeQuestion,

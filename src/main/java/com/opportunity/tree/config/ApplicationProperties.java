@@ -19,6 +19,8 @@ public class ApplicationProperties {
 
     private final Mcp mcp = new Mcp();
 
+    private final DefaultLinks defaultLinks = new DefaultLinks();
+
     // jhipster-needle-application-properties-property
 
     public Liquibase getLiquibase() {
@@ -31,6 +33,10 @@ public class ApplicationProperties {
 
     public Mcp getMcp() {
         return mcp;
+    }
+
+    public DefaultLinks getDefaultLinks() {
+        return defaultLinks;
     }
 
     // jhipster-needle-application-properties-property-getter
@@ -82,6 +88,25 @@ public class ApplicationProperties {
 
         public void setAudience(List<String> audience) {
             this.audience = audience;
+        }
+    }
+
+    /**
+     * LINK-001: the Atlassian tenant used to build placeholder URLs for the default link slots
+     * that the panel offers as add-buttons. Not persisted at node creation; kept in configuration
+     * so the hardcoded tenant no longer lives in code (was {@code DefaultNodeLinks.BASE_URL} and
+     * the frontend {@code rules.ts}). The current production value is the default.
+     */
+    public static class DefaultLinks {
+
+        private String baseUrl = "https://ombuto.atlassian.net";
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
         }
     }
 

@@ -103,6 +103,16 @@ Tests: [`test-strategy.md`](../Test%20Strategy/test-strategy.md) section 9a.
 - **Add-link form**: "Add link" opens a name + URL form validated as
   `http(s)://…`. The prototype appended a "New link / https://" row at once, but
   the server rejects URLs that are not valid.
+- **Default links are a UI affordance, not persisted data** (LINK-001): the panel
+  shows each node type's default slots (Confluence, Jira Initiative, Jira Epic
+  for opportunities and solutions; one Confluence slot for outcomes and
+  assumptions; Confluence + Jira Ticket for evidence; a Product space slot for
+  products) as empty add-buttons. Clicking one opens the add-link form prefilled
+  with the slot's name; nothing is persisted until the user submits a URL. Node
+  creation writes zero `NodeLink` rows, so `linkCount` and the MCP link list
+  contain only links a human attached. The Atlassian tenant that used to be
+  hardcoded in `DefaultNodeLinks.BASE_URL` and `rules.ts` now lives in
+  configuration (`application.default-links.base-url`).
 - **Dashboard counter**: the fourth counter is _Evidence this month_, not
   _Interviews_. Interviews are not part of the tree.
 - **Viewers are read-only everywhere, chat included.**
