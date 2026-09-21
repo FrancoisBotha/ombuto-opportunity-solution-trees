@@ -8,8 +8,13 @@ export interface McpTool {
 const TOOLS: McpTool[] = [
   { name: 'list_products', description: 'Lists the products (with team) the caller may read.' },
   { name: 'get_tree', description: "Returns a team's whole opportunity solution tree, optionally limited to one product." },
-  { name: 'get_node', description: 'Returns one node (outcome, opportunity or solution) by type and id with its details.' },
+  {
+    name: 'get_node',
+    description:
+      'Returns one node by type and id with its details — parent, direct children, links (target, type and title), open questions (text and resolved state, for opportunities), and evidence / comment counts where they apply.',
+  },
   { name: 'list_interviews', description: 'Returns interviews for a product or team with their linked opportunities.' },
+  { name: 'list_node_comments', description: 'Returns the discussion thread on one node — body, author and times, oldest first.' },
 ];
 
 const VERIFIED_CLIENT_NAME = 'Claude Code';

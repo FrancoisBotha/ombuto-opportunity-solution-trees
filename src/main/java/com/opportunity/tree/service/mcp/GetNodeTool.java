@@ -4,9 +4,12 @@ import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.McpNodeReadRepository;
 import com.opportunity.tree.service.TeamAccessDeniedException;
 import com.opportunity.tree.service.TeamAccessService;
+import com.opportunity.tree.service.mcp.dto.LinkDetails;
 import com.opportunity.tree.service.mcp.dto.NodeDetails;
 import com.opportunity.tree.service.mcp.dto.NodeRef;
+import com.opportunity.tree.service.mcp.dto.OpenQuestionDetails;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -38,15 +41,20 @@ public class GetNodeTool {
         name = "get_node",
         description = "Return one tree node by type and id. Prefer this over get_tree when you " +
             "already know the node — it returns only that node's title, description, status, its " +
-            "parent, a summary of its direct children (type, id, title) and counts of related " +
-            "features (links, evidence, comments). The 'parent' field is absent for a PRODUCT " +
-            "(top of a team's tree); 'status' is absent for PRODUCT, OUTCOME and EVIDENCE " +
-            "which have no status field; 'evidenceCount' is only populated for OPPORTUNITY and " +
+            "parent, a summary of its direct children (type, id, title), its 'links' (each with " +
+            "'target' URL, coarse 'type' JIRA/CONFLUENCE/OTHER derived from the URL, and 'title'), " +
+            "and — for an OPPORTUNITY — its 'openQuestions' (each with 'text' and a 'resolved' " +
+            "flag). 'linkCount' is kept alongside 'links' for backward compatibility and equals " +
+            "links.size(). The 'parent' field is absent for a PRODUCT (top of a team's tree); " +
+            "'status' is absent for PRODUCT, OUTCOME and EVIDENCE which have no status field; " +
+            "'openQuestions' is only populated for OPPORTUNITY (the only node type that has an " +
+            "open-questions checklist); 'evidenceCount' is only populated for OPPORTUNITY and " +
             "ASSUMPTION (the two node types evidence can attach to); 'commentCount' is only " +
             "populated for OUTCOME, OPPORTUNITY, SOLUTION, ASSUMPTION and EVIDENCE (a product " +
-            "has no comments). Missing sections are returned as null rather than failing the " +
-            "call. Refuses with an access-denied error if the node belongs to a team the caller " +
-            "is not a member of, with the same error whether the id exists or not."
+            "has no comments). Fields that do not apply are returned as null rather than as a " +
+            "fabricated zero or an empty list. Refuses with an access-denied error if the node " +
+            "belongs to a team the caller is not a member of, with the same error whether the " +
+            "id exists or not."
     )
     public NodeDetails getNode(
         @ToolParam(
@@ -63,7 +71,7 @@ public class GetNodeTool {
         }
         TreeNodeType nodeType;
         try {
-            nodeType = TreeNodeType.valueOf(type.trim().toUpperCase(java.util.Locale.ROOT));
+            nodeType = TreeNodeType.valueOf(type.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException(
                 "Unknown node type '" + type + "'. Expected one of PRODUCT, OUTCOME, OPPORTUNITY, SOLUTION, ASSUMPTION, EVIDENCE."
@@ -102,7 +110,9 @@ public class GetNodeTool {
         NodeRef parent = parentFor(nodeType, id);
         List<NodeRef> children = childrenFor(nodeType, id);
 
-        Long linkCount = linkCountFor(nodeType, id);
+        List<LinkDetails> links = linksFor(nodeType, id);
+        Long linkCount = links == null ? null : (long) links.size();
+        List<OpenQuestionDetails> openQuestions = openQuestionsFor(nodeType, id);
         Long evidenceCount = evidenceCountFor(nodeType, id);
         Long commentCount = commentCountFor(nodeType, id);
 
@@ -114,7 +124,9 @@ public class GetNodeTool {
             status,
             parent,
             children,
+            links,
             linkCount,
+            openQuestions,
             evidenceCount,
             commentCount
         );
@@ -185,15 +197,47 @@ public class GetNodeTool {
             .toList();
     }
 
-    private Long linkCountFor(TreeNodeType type, Long id) {
-        return switch (type) {
-            case PRODUCT -> readRepository.countLinksForProduct(id);
-            case OUTCOME -> readRepository.countLinksForOutcome(id);
-            case OPPORTUNITY -> readRepository.countLinksForOpportunity(id);
-            case SOLUTION -> readRepository.countLinksForSolution(id);
-            case ASSUMPTION -> readRepository.countLinksForAssumption(id);
-            case EVIDENCE -> readRepository.countLinksForEvidence(id);
+    private List<LinkDetails> linksFor(TreeNodeType type, Long id) {
+        List<Object[]> rows = switch (type) {
+            case PRODUCT -> readRepository.findLinksForProduct(id);
+            case OUTCOME -> readRepository.findLinksForOutcome(id);
+            case OPPORTUNITY -> readRepository.findLinksForOpportunity(id);
+            case SOLUTION -> readRepository.findLinksForSolution(id);
+            case ASSUMPTION -> readRepository.findLinksForAssumption(id);
+            case EVIDENCE -> readRepository.findLinksForEvidence(id);
         };
+        return rows.stream().map(GetNodeTool::toLinkDetails).toList();
+    }
+
+    private static LinkDetails toLinkDetails(Object[] row) {
+        String name = (String) row[0];
+        String url = (String) row[1];
+        return new LinkDetails(url, classifyLinkType(url), name);
+    }
+
+    private static String classifyLinkType(String url) {
+        if (url == null) {
+            return "OTHER";
+        }
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (lower.contains("/browse/")) {
+            return "JIRA";
+        }
+        if (lower.contains("/wiki/")) {
+            return "CONFLUENCE";
+        }
+        return "OTHER";
+    }
+
+    private List<OpenQuestionDetails> openQuestionsFor(TreeNodeType type, Long id) {
+        if (type != TreeNodeType.OPPORTUNITY) {
+            return null;
+        }
+        return readRepository
+            .findOpenQuestionsForOpportunity(id)
+            .stream()
+            .map(row -> new OpenQuestionDetails(((Number) row[0]).longValue(), (String) row[1], Boolean.TRUE.equals(row[2])))
+            .toList();
     }
 
     private Long evidenceCountFor(TreeNodeType type, Long id) {

@@ -178,6 +178,27 @@ REDACTED (StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION disabled) …]`. Contrary
   Recommend DB-level `LIMIT/OFFSET` (with a separate count) for interviews and a product-scoped tree
   query. Left as a follow-up ticket to avoid a blind repository refactor.
 
+### Discussion visibility policy (MCPSRV-011, 2026-09-21)
+
+The `list_node_comments` tool exposes comment bodies. Comments are candid internal team
+discussion and may name customers or colleagues — the same class of concern as interview notes,
+where `McpInterviewNotesPolicy` withholds notes from non-members while still returning titles
+and metadata (Epic 7 NFR-014).
+
+**Decision:** `list_node_comments` uses a **stricter policy** than `McpInterviewNotesPolicy`.
+A caller who cannot read the owning team gets nothing — the same
+`TeamAccessDeniedException` shape as `get_node`, with no distinction between "no such node" and
+"cross-team node". There is no metadata-only fallback.
+
+**Reason:** interview notes have useful non-note metadata (title, participant, date, linked
+opportunities) that a title-only reader can still act on. A comment stripped of its body is just
+a count — and `get_node.commentCount` already gives that. Building a title-only comment view
+would add code and error surface for zero information the caller does not already have. If a
+future ROLE_OVERVIEW or similar "read-only across all teams" role lands (Epic 9), it will read
+team comments through the same `TeamAccessService.canReadTeam` gate as the rest of the tree, so
+this decision does not block that path — it just refuses to invent a second policy shape
+without a caller who would benefit.
+
 ### Verified sound (no change needed)
 
 - Per-tool scoping holds for a second identity across all id shapes: cross-team, wrong-type,

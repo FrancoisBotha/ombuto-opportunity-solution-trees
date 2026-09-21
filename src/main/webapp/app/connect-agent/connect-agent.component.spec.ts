@@ -57,14 +57,14 @@ describe('ConnectAgent Component', () => {
     expect(wrapper.find('[data-cy="mcpEndpointUrl"]').text()).toBe('http://localhost:9000/mcp');
   });
 
-  it('lists the four MCP tools with a one-line description each', () => {
+  it('lists the MCP tools with a one-line description each', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     const rows = wrapper.findAll('[data-cy^="mcpTool-"]');
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
     const names = rows.map(r => r.find('[data-cy^="mcpToolName-"]').text());
-    expect(names).toEqual(expect.arrayContaining(['list_products', 'get_tree', 'get_node', 'list_interviews']));
+    expect(names).toEqual(expect.arrayContaining(['list_products', 'get_tree', 'get_node', 'list_interviews', 'list_node_comments']));
     for (const row of rows) {
       const desc = row.find('[data-cy^="mcpToolDescription-"]').text();
       expect(desc.length).toBeGreaterThan(0);
@@ -171,6 +171,17 @@ describe('ConnectAgent Component', () => {
     const endpoint = wrapper.find('[data-cy="mcpEndpointUrl"]').text();
     const path = new URL(endpoint).pathname;
     expect(viteProxyPaths()).toContain(path);
+  });
+
+  it("documents get_node's new open-questions and links fields (MCPSRV-012)", () => {
+    const wrapper = shallowMount(ConnectAgent, {
+      global: { stubs: { 'font-awesome-icon': true } },
+    });
+    const desc = wrapper.find('[data-cy="mcpToolDescription-get_node"]').text().toLowerCase();
+    expect(desc).toContain('open question');
+    expect(desc).toContain('link');
+    expect(desc).toContain('target');
+    expect(desc).toContain('resolved');
   });
 
   it('states that access mirrors the caller team memberships', () => {
