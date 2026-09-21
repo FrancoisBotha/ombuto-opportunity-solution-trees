@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerStreamableHttpProperties;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,14 +39,23 @@ public class McpProtectedResourceMetadataResource {
     static final String METADATA_PATH = "/.well-known/oauth-protected-resource";
 
     private final String issuerUri;
+    private final String mcpEndpoint;
 
-    public McpProtectedResourceMetadataResource(@Value("${spring.security.oauth2.client.provider.oidc.issuer-uri}") String issuerUri) {
+    public McpProtectedResourceMetadataResource(
+        @Value("${spring.security.oauth2.client.provider.oidc.issuer-uri}") String issuerUri,
+        ObjectProvider<McpServerStreamableHttpProperties> streamableProperties
+    ) {
         this.issuerUri = issuerUri;
+        McpServerStreamableHttpProperties properties = streamableProperties.getIfAvailable();
+        this.mcpEndpoint =
+            properties != null && properties.getMcpEndpoint() != null
+                ? properties.getMcpEndpoint()
+                : McpSecurityConfiguration.MCP_DEFAULT_ENDPOINT;
     }
 
     @GetMapping(path = METADATA_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> metadata(HttpServletRequest request) {
-        String resourceUrl = baseUrl(request) + McpSecurityConfiguration.MCP_SSE_PATH;
+        String resourceUrl = baseUrl(request) + mcpEndpoint;
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("resource", resourceUrl);
         body.put("authorization_servers", List.of(issuerUri));

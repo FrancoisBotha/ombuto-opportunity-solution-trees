@@ -109,15 +109,22 @@ describe('ConnectAgent Component', () => {
     expect(instr).toContain('mcp_client');
   });
 
-  it('records a real MCP client end-to-end verification, including a connection held across a token expiry', () => {
+  it('tells the operator how to reproduce a connection held across a token expiry, and points at the IT that pins the server contract', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     const rec = wrapper.find('[data-cy="verificationRecord"]').text();
+    // Names the MCP client the operator should reproduce with, so the how-to is concrete.
     expect(rec).toContain('Claude Code 2.1.278');
+    // Names the refresh behaviour the operator is verifying.
     expect(rec.toLowerCase()).toContain('refresh');
-    // The verification must show the connection surviving past at least one access-token expiry.
+    // Ties the how-to to a real access-token expiry crossing (not a hand-wave).
     expect(rec).toMatch(/expir(y|ed|es)/i);
+    // Anchors the claim to a specific integration test in the repo — no unsubstantiated "verified"
+    // language stands alone in product UI (the previous copy claimed a specific end-to-end
+    // recording that was not backed by any artefact in the repo).
+    expect(rec).toContain('McpProtectedResourceMetadataIT');
+    expect(rec.toLowerCase()).not.toContain('verified end-to-end');
   });
 
   it('registers the icons used by the page and its account-menu entry', () => {

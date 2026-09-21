@@ -208,11 +208,13 @@ file does not need to change.
    reuse the same public client. Access tokens expire on the realm's configured
    lifespan; when a token expires the app answers 401 with the same
    `WWW-Authenticate` challenge, which triggers the client's refresh-token
-   exchange with Keycloak. Operators do not need to touch the connection at
-   expiry; the client survives across it. This has been verified end-to-end
-   against Claude Code 2.1.278 with the realm's access-token lifespan shortened
-   to 60 s (see the `mcpEndpoint_afterAccessTokenExpiry*...` integration test
-   for the server-side proof of the refresh trigger).
+   exchange with Keycloak, so operators do not need to touch the connection at
+   expiry. The server-side contract that shape depends on is pinned by
+   `McpProtectedResourceMetadataIT#mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes`;
+   to observe the refresh with a live client, shorten the realm's access-token
+   lifespan (for example to 60 s) and hold an MCP session open past that
+   boundary. Record the transcript under `docs/Verification/` if you want a
+   repo-local artefact of the run.
 
 7. **Start the rest**: `docker compose -f docker-compose.prod.yml up -d`.
 8. **Verify** `https://<host>/management/health` returns `UP`, then sign in.
