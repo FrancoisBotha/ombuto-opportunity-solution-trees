@@ -52,8 +52,6 @@
           :edit-draft="retry?.key === id ? retry.draft : null"
           :edit-error="retry?.key === id ? retry.error : null"
           :pulse="tree.pulseFor(id)"
-          :evidence-score="evidence.get(id)?.score ?? null"
-          :evidence-tests="evidence.get(id)?.tests ?? 0"
           @add="toggleAddMenu(id)"
           @add-choose="createChild(id, $event)"
           @add-close="closeAddMenu(id)"
@@ -139,17 +137,7 @@ import CanvasLegend from './CanvasLegend.vue';
 import CanvasMinimap from './CanvasMinimap.vue';
 import OstEdge from './OstEdge.vue';
 import OstNode from './OstNode.vue';
-import {
-  childCounts,
-  evidenceBySolution,
-  isDimmed,
-  isDraggable,
-  laidOutNodes,
-  matchesQuery,
-  pinRendered,
-  toFlowEdges,
-  toFlowNodes,
-} from './canvas-model';
+import { childCounts, isDimmed, isDraggable, laidOutNodes, matchesQuery, pinRendered, toFlowEdges, toFlowNodes } from './canvas-model';
 import { attachTargets, canAttach, clientToFlow, dropTargetAt, insideRect, legalParents } from './edit-rules';
 import { focusIsLost, restoreFocusAfterRename, typingElsewhere } from './rename-focus';
 import { ZOOM_MAX, ZOOM_MIN, type Point, useViewport, wheelZoom } from './useViewport';
@@ -177,10 +165,8 @@ const keepRendered = computed<ReadonlySet<string>>(() => {
 });
 const flowNodes = computed(() => toFlowNodes(visible.value, tree.placed, n => isDraggable(n, tree.canEdit) && ui.editingId !== n.id));
 const flowEdges = computed(() => toFlowEdges(visible.value, tree.placed));
-// One pass each over the nodes, shared by every node body (no per-node scans). Each node gets the
-// score and test count as primitives, so a confidence change only re-renders the solution it moved.
+// One pass over the nodes, shared by every node body (no per-node scans).
 const kidCounts = computed(() => childCounts(tree.nodes));
-const evidence = computed(() => evidenceBySolution(tree.nodes));
 
 watch(zoom, z => emit('zoom', z), { immediate: true });
 

@@ -93,12 +93,9 @@ describe('OstNode', () => {
       expect(wrapper.find('[data-cy="ost-node-value"]').exists()).toBe(false);
     });
 
-    it('solutions show their tests and derived evidence strength when tested (prototype: "1 test · 40% evidence")', () => {
+    it('solutions show no metric: the evidence roll-up was dropped from the card and lives in the detail panel', () => {
       const solution = node('solution-1', 'opportunity-1', { status: 'building' });
-      const metric = (props: Record<string, unknown>) => mountNode(solution, props).get('[data-cy="ost-node-metric"]').text();
-      expect(metric({ evidenceScore: 40, evidenceTests: 1 })).toBe('1 test · 40% evidence');
-      expect(metric({ evidenceScore: 55, evidenceTests: 3 })).toBe('3 tests · 55% evidence');
-      expect(mountNode(solution, { evidenceScore: null, evidenceTests: 0 }).find('[data-cy="ost-node-metric"]').exists()).toBe(false);
+      expect(mountNode(solution).find('[data-cy="ost-node-metric"]').exists()).toBe(false);
     });
 
     it('outcomes and evidence show no metric', () => {
