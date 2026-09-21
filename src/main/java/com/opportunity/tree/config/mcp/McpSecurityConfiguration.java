@@ -62,7 +62,7 @@ public class McpSecurityConfiguration {
     @Order(Ordered.HIGHEST_PRECEDENCE + 5)
     public SecurityFilterChain mcpMetadataSecurityFilterChain(HttpSecurity http) throws Exception {
         http
-            .securityMatcher(McpProtectedResourceMetadataResource.METADATA_PATH)
+            .securityMatcher(McpProtectedResourceMetadataResource.METADATA_PATH, McpProtectedResourceMetadataResource.MCP_METADATA_PATH)
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz.anyRequest().permitAll());

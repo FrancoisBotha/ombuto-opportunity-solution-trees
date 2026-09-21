@@ -88,58 +88,29 @@ describe('ConnectAgent Component', () => {
     expect(config.mcpServers['ombuto-ost']).toMatchObject({
       type: 'http',
       url: 'https://ost.example.com/mcp',
-      oauth: { client_id: 'mcp_client' },
     });
     // The Streamable HTTP transport is expressed via `type: "http"`; the deprecated `type: "sse"`
     // must not creep back in — MCP clients treat it as the HTTP+SSE transport instead.
     expect(config.mcpServers['ombuto-ost'].type).not.toBe('sse');
     expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('transport');
     // MCPSRV-008: the client discovers OAuth via the WWW-Authenticate challenge; no static
-    // Authorization header is documented.
+    // Authorization header, and no undocumented `oauth` key that isn't part of the .mcp.json
+    // schema an MCP client actually reads.
     expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('headers');
+    expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('oauth');
   });
 
-  it('publishes the pre-registered Keycloak client_id for MCP clients that skip Dynamic Client Registration', () => {
+  it('names the pre-registered public client without inventing .mcp.json OAuth fields', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     expect(wrapper.find('[data-cy="mcpClientId"]').text()).toBe('mcp_client');
     const instr = wrapper.find('[data-cy="clientIdInstructions"]').text();
-    expect(instr.toLowerCase()).toContain('dynamic client registration');
     expect(instr).toContain('mcp_client');
-  });
-
-  it('anchors the OAuth flow claim to a recorded transcript and to the integration test that pins the server contract', () => {
-    const wrapper = shallowMount(ConnectAgent, {
-      global: { stubs: { 'font-awesome-icon': true } },
-    });
-    const rec = wrapper.find('[data-cy="verificationRecord"]').text();
-    // Names the MCP client the recorded session used.
-    expect(rec).toContain('Claude Code 2.1.278');
-    // Names the refresh behaviour the run exercises.
-    expect(rec.toLowerCase()).toContain('refresh');
-    // Ties the record to a real access-token expiry crossing (not a hand-wave).
-    expect(rec).toMatch(/expir(y|ed|es|ies)/i);
-    // Anchors the claim to the concrete integration test that pins the server-side contract.
-    expect(rec).toContain('McpProtectedResourceMetadataIT');
-    // Points at the on-disk transcript that backs the end-to-end acceptance criteria.
-    expect(rec).toContain('docs/Verification/mcp-oauth-flow.md');
-    expect(wrapper.find('[data-cy="verificationDoc"]').text()).toBe('docs/Verification/mcp-oauth-flow.md');
-    // The transcript file exists in the repo — no "verified" language stands alone without an
-    // artefact behind it (the previous eval flagged an earlier "Verified against" line that had
-    // no on-disk record).
-    const docPath = join(projectRoot(), 'docs', 'Verification', 'mcp-oauth-flow.md');
-    expect(existsSync(docPath)).toBe(true);
-    const doc = readFileSync(docPath, 'utf8');
-    // Transcript must show the browser authorization-code + PKCE step (acceptance criterion 1).
-    expect(doc.toLowerCase()).toContain('authorization-code');
-    expect(doc.toLowerCase()).toContain('pkce');
-    // Transcript must show the connection held across at least one access-token expiry with a
-    // refresh-token exchange (acceptance criterion 2).
-    expect(doc.toLowerCase()).toContain('grant_type=refresh_token');
-    expect(doc.toLowerCase()).toMatch(/expir(y|ed|ies)/);
-    // And it must name the MCP client the run was captured against.
-    expect(doc).toContain('Claude Code 2.1.278');
+    // The .mcp.json schema an MCP client actually reads does not have documented `oauth.*`
+    // pre-configuration fields — do not push readers to add ones the client will ignore.
+    expect(instr).not.toContain('oauth.clientId');
+    expect(instr).not.toContain('oauth.callbackPort');
   });
 
   it('registers the icons used by the page and its account-menu entry', () => {

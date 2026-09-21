@@ -52,9 +52,6 @@ export default defineComponent({
           'ombuto-ost': {
             type: TRANSPORT_TYPE,
             url: endpointUrl.value,
-            oauth: {
-              client_id: MCP_CLIENT_ID,
-            },
           },
         },
       };

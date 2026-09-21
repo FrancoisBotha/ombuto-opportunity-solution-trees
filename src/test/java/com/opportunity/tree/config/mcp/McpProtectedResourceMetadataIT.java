@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -32,7 +33,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * <ul>
  *   <li>{@code GET /.well-known/oauth-protected-resource} returns 200 with a JSON body that names
  *       the MCP resource URL and the Keycloak authorization-server issuer;</li>
- *   <li>{@code GET /mcp} without an {@code Authorization} header returns 401 with a
+ *   <li>{@code POST /mcp} without an {@code Authorization} header returns 401 with a
  *       {@code WWW-Authenticate: Bearer resource_metadata="..."} header that points at that
  *       metadata endpoint.</li>
  * </ul>
@@ -46,8 +47,8 @@ import org.springframework.test.web.servlet.MvcResult;
         "spring.ai.mcp.server.version=0.0.1",
         "spring.ai.mcp.server.type=SYNC",
         "spring.ai.mcp.server.stdio=false",
-        "spring.ai.mcp.server.sse-endpoint=/mcp",
-        "spring.ai.mcp.server.sse-message-endpoint=/mcp/message",
+        "spring.ai.mcp.server.protocol=STREAMABLE",
+        "spring.ai.mcp.server.streamable-http.mcp-endpoint=/mcp",
         "spring.ai.mcp.server.capabilities.tool=true",
         "spring.ai.mcp.server.capabilities.resource=false",
         "spring.ai.mcp.server.capabilities.prompt=false",
@@ -79,19 +80,26 @@ class McpProtectedResourceMetadataIT {
     }
 
     @Test
+    void pathDerivedProtectedResourceMetadata_isPubliclyReadableForClaudeCodeDiscovery() throws Exception {
+        mvc
+            .perform(get("/.well-known/oauth-protected-resource/mcp").accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.resource").value(org.hamcrest.Matchers.endsWith("/mcp")))
+            .andExpect(jsonPath("$.authorization_servers[0]").value("http://DO_NOT_CALL:9080/realms/jhipster"));
+    }
+
+    @Test
     void mcpEndpoint_missingAuthorization_returns401WithResourceMetadataChallenge() throws Exception {
-        MvcResult result = mvc.perform(get("/mcp")).andReturn();
+        MvcResult result = mvc.perform(post("/mcp")).andReturn();
 
         assertThat(result.getResponse().getStatus()).isEqualTo(401);
         String challenge = result.getResponse().getHeader(HttpHeaders.WWW_AUTHENTICATE);
         assertThat(challenge).as("MCP authorization spec requires a WWW-Authenticate challenge on 401").isNotBlank();
-        assertThat(challenge).startsWith("Bearer ");
-        assertThat(challenge).contains("resource_metadata=\"");
-        assertThat(challenge).contains("/.well-known/oauth-protected-resource");
+        assertThat(challenge).isEqualTo("Bearer resource_metadata=\"http://localhost/.well-known/oauth-protected-resource\"");
     }
 
     /**
-     * The refresh-across-expiry contract: the MCP client keeps its SSE connection open past the
+     * The refresh-across-expiry contract: the MCP client keeps its Streamable HTTP session past the
      * access-token lifetime by retrying against the same 401 + {@code WWW-Authenticate} challenge
      * once its refresh-token exchange produces a fresh access token. That retry only works if the
      * server answers a request bearing an <em>expired</em> token with the same challenge shape a
@@ -108,7 +116,7 @@ class McpProtectedResourceMetadataIT {
             )
         );
 
-        MvcResult result = mvc.perform(get("/mcp").header("Authorization", "Bearer expired.token.value")).andReturn();
+        MvcResult result = mvc.perform(post("/mcp").header("Authorization", "Bearer expired.token.value")).andReturn();
 
         assertThat(result.getResponse().getStatus()).isEqualTo(401);
         String challenge = result.getResponse().getHeader(HttpHeaders.WWW_AUTHENTICATE);

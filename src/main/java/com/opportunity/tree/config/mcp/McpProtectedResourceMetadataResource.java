@@ -37,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class McpProtectedResourceMetadataResource {
 
     static final String METADATA_PATH = "/.well-known/oauth-protected-resource";
+    static final String MCP_METADATA_PATH = METADATA_PATH + McpSecurityConfiguration.MCP_DEFAULT_ENDPOINT;
 
     private final String issuerUri;
     private final String mcpEndpoint;
@@ -53,7 +54,7 @@ public class McpProtectedResourceMetadataResource {
                 : McpSecurityConfiguration.MCP_DEFAULT_ENDPOINT;
     }
 
-    @GetMapping(path = METADATA_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(path = { METADATA_PATH, MCP_METADATA_PATH }, produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> metadata(HttpServletRequest request) {
         String resourceUrl = baseUrl(request) + mcpEndpoint;
         Map<String, Object> body = new LinkedHashMap<>();

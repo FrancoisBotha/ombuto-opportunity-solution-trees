@@ -149,6 +149,7 @@ file does not need to change.
    built most recently, so it cannot answer which build is running, and pulling it
    again can silently change the application. The compose file refuses to start
    without `APP_IMAGE` set for this reason.
+
 2. **Install Docker and the Compose plugin** on the instance, and copy the repo's
    `deploy/` directory to `/opt/ombuto-ost/deploy`.
 3. **Place the TLS certificate** at `deploy/tls/server.crt` and `server.key`.
@@ -206,26 +207,26 @@ file does not need to change.
    **Client identifier for MCP clients**: RFC 9728 protected-resource metadata
    does not carry a `client_id`, so a desktop MCP client either learns one via
    Dynamic Client Registration (RFC 7591) or is told one out of band. In this
-   deployment the client*id is the static, pre-registered public client
-   `mcp_client` and is documented on the in-app Connect an agent page, which
-   emits a `.mcp.json` snippet with `oauth.client_id: "mcp_client"`. Anonymous
-   Dynamic Client Registration is **not** enabled on the production realm —
-   the realm's `trusted-hosts` anonymous policy denies unregistered hosts by
-   default and there is no reason to open it up when every MCP caller can
-   reuse the same public client. Access tokens expire on the realm's configured
-   lifespan; when a token expires the app answers 401 with the same
-   `WWW-Authenticate` challenge, which triggers the client's refresh-token
-   exchange with Keycloak, so operators do not need to touch the connection at
-   expiry. The server-side contract that shape depends on is pinned by
+   deployment the client id is the static, pre-registered public client
+   `mcp_client`, documented on the in-app Connect an agent page. The
+   `.mcp.json` snippet the page emits carries only the transport type and the
+   server URL — it does not push `oauth.*` fields into `.mcp.json`, because
+   those are not documented fields of the config file an MCP client actually
+   reads. Anonymous Dynamic Client Registration is **not** enabled on the
+   production realm — the realm's `trusted-hosts` anonymous policy denies
+   unregistered hosts by default and there is no reason to open it up when
+   every MCP caller can reuse the same public client. Access tokens expire on
+   the realm's configured lifespan; when a token expires the app answers 401
+   with the same `WWW-Authenticate` challenge, which triggers the client's
+   refresh-token exchange with Keycloak, so operators do not need to touch the
+   connection at expiry. The server-side contract that shape depends on is
+   pinned by
    `McpProtectedResourceMetadataIT#mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes`.
-   The live end-to-end run — Claude Code 2.1.278 connecting with no bearer
-   token, completing authorization-code + PKCE in the browser, then holding a
-   single MCP session across two access-token expiries with the client's
-   refresh-token exchange firing on each 401 — is recorded under
-   [`docs/Verification/mcp-oauth-flow.md`](../Verification/mcp-oauth-flow.md).
-   To reproduce against your production realm, shorten its access-token
-   lifespan (for example to 60 s) and follow the reproduction steps in that
-   transcript.
+   See [Verifying the MCP OAuth flow](../Verification/mcp-oauth-flow.md) for
+   the manual runbook to prove browser sign-in and refresh across expiry
+   against a live deployment (it is a runbook, not a canned transcript — an
+   automated build cannot drive a desktop browser sign-in, so this step is
+   operator-owned).
 
 7. **Start the rest**: `docker compose -f docker-compose.prod.yml up -d`.
 8. **Verify** `https://<host>/management/health` returns `UP`, then sign in.

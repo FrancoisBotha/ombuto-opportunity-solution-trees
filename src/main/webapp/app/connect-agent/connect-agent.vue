@@ -27,10 +27,10 @@
     <section class="card p-3 mb-3">
       <h4>Client configuration</h4>
       <p class="text-muted small mb-2">
-        Verified against <strong data-cy="verifiedClient">{{ verifiedClientName }} {{ verifiedClientVersion }}</strong> over the Streamable
-        HTTP transport. Save this as <code>.mcp.json</code> in your project, then start Claude Code and approve the project server when
-        prompted. The client opens your browser to sign in with Keycloak the first time and refreshes tokens on its own — no bearer token to
-        paste and no expiry to manage.
+        Configuration for <strong data-cy="verifiedClient">{{ verifiedClientName }} {{ verifiedClientVersion }}+</strong> over the
+        Streamable HTTP transport. Save this as <code>.mcp.json</code> in your project, then start Claude Code and approve the project
+        server when prompted. The client opens your browser to sign in with Keycloak the first time and refreshes tokens on its own — no
+        bearer token to paste and no expiry to manage.
       </p>
       <div class="d-flex align-items-start gap-2">
         <pre class="p-2 bg-light border rounded flex-grow-1 mb-0" data-cy="clientConfigSnippet">{{ clientConfigSnippet }}</pre>
@@ -61,22 +61,12 @@
         complete the browser step. Direct-access (password) grants are <strong>not required</strong> and are turned off in production.
       </p>
       <p class="mb-0" data-cy="clientIdInstructions">
-        The
-        <code>oauth.client_id</code>
-        field in the configuration above pins the client to <code>{{ mcpClientId }}</code
-        >. MCP clients that support Dynamic Client Registration (RFC 7591) can ignore it and register themselves; clients that expect a
-        pre-registered client use this value.
-      </p>
-      <p class="small text-muted mb-0" data-cy="verificationRecord">
-        <strong>Recorded run.</strong> The captured session with {{ verifiedClientName }} {{ verifiedClientVersion }} —
-        <code>.mcp.json</code> with no bearer token, browser authorization-code + PKCE step, and a single MCP session held past two
-        access-token expiries with the client's refresh-token exchange firing on each 401 — is captured under
-        <code data-cy="verificationDoc">docs/Verification/mcp-oauth-flow.md</code>. The server-side contract that shape depends on (the 401
-        + <code>WWW-Authenticate</code> + <code>resource_metadata</code> challenge stays the same whether the request had no token or an
-        expired one) is pinned by the integration test
-        <code
-          >McpProtectedResourceMetadataIT#mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes</code
-        >.
+        The <code>.mcp.json</code> snippet above carries only the transport type and the server URL — no bearer token, no static
+        <code>Authorization</code> header, no client secret. The MCP client learns everything else (authorization server, scopes, and the
+        pre-registered public client id <code>mcp_client</code>) from the <code>WWW-Authenticate</code> challenge and the protected-resource
+        metadata document; the browser sign-in is opened against a loopback redirect URI Keycloak already accepts for
+        <code>mcp_client</code>. Claude Code stores the resulting tokens and refreshes them automatically, so the connection survives past
+        an access token's lifetime with no manual intervention.
       </p>
     </section>
 
