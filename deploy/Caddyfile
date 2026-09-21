@@ -1,0 +1,51 @@
+# Reverse proxy for the internal deployment. Terminates TLS and is the only
+# service bound to the host.
+#
+# TLS: the instance is internal-only, so a public ACME challenge will not work.
+# Use a certificate from the company's internal CA, mounted at deploy/tls/.
+# To use a self-signed certificate while testing, replace the tls line with
+# `tls internal` and accept Caddy's local CA on each client.
+{
+	# No public ACME account is needed for an internal certificate.
+	auto_https disable_redirects
+}
+
+{$PUBLIC_HOST} {
+	tls /etc/caddy/tls/server.crt /etc/caddy/tls/server.key
+
+	# Keycloak must keep its own path prefix so issuer URLs stay consistent.
+	handle /realms/* {
+		reverse_proxy keycloak:9080
+	}
+	handle /resources/* {
+		reverse_proxy keycloak:9080
+	}
+	# The admin console. Restrict it further here if only some clients should reach it.
+	handle /admin/master/* {
+		reverse_proxy keycloak:9080
+	}
+
+	handle {
+		reverse_proxy app:8080 {
+			# Live collaboration uses STOMP over WebSocket, and the MCP endpoint
+			# streams SSE. Both need long-lived, unbuffered connections.
+			flush_interval -1
+			transport http {
+				read_timeout 0
+				write_timeout 0
+			}
+		}
+	}
+
+	# Admin backup archives are uploaded whole; the app caps them at 256MB.
+	request_body {
+		max_size 256MB
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 10MB
+			roll_keep 5
+		}
+	}
+}

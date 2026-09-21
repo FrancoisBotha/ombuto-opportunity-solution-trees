@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the database backup nightly
+
+[Timer]
+# 02:00 UTC. RandomizedDelaySec keeps the S3 write off the top of the hour.
+OnCalendar=*-*-* 02:00:00 UTC
+RandomizedDelaySec=900
+# If the instance was off at 02:00, back up as soon as it is on again.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

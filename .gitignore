@@ -116,7 +116,11 @@ Desktop.ini
 # Directories
 ######################
 /bin/
-/deploy/
+# /deploy/ holds the hand-written production deployment files and IS tracked.
+# Only its secrets and certificates stay out of the repository.
+/deploy/.env
+/deploy/backup.env
+/deploy/tls/
 
 ######################
 # Logs

@@ -1,0 +1,111 @@
+# Production compose for the internal single-instance deployment.
+# See docs/Deployment/aws-internal-single-instance.md for the full procedure.
+#
+# Differences from src/main/docker/*.yml, which are development-only:
+#   - PostgreSQL requires a password and keeps its data on a named volume
+#   - Keycloak runs `start` (not `start-dev`) against PostgreSQL, not a dev file
+#   - nothing is published to the host except the reverse proxy
+#   - every credential comes from deploy/.env, which is never committed
+name: ombuto-ost
+
+services:
+  app:
+    image: ${APP_IMAGE:-ombuto-ost:latest}
+    restart: unless-stopped
+    environment:
+      - _JAVA_OPTIONS=-Xmx1024m -Xms512m
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql:5432/${APP_DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${APP_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${APP_DB_PASSWORD}
+      - SPRING_LIQUIBASE_URL=jdbc:postgresql://postgresql:5432/${APP_DB_NAME}
+      - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_OIDC_ISSUER_URI=${OIDC_ISSUER_URI}
+      - SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_ID=${OIDC_CLIENT_ID}
+      - SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      # The app sits behind the reverse proxy, so it must trust X-Forwarded-* to build
+      # correct redirect URIs. Without this, OIDC login redirects to http://app:8080.
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/management/health']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+  postgresql:
+    image: postgres:18.3
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${APP_DB_USER}
+      - POSTGRES_PASSWORD=${APP_DB_PASSWORD}
+      - POSTGRES_DB=${APP_DB_NAME}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Creates the second database Keycloak needs, on first start only.
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5.5
+    restart: unless-stopped
+    # `start`, not `start-dev`: dev mode disables HTTPS requirements and caching.
+    # --optimized skips the build step; drop it if you change build-time options.
+    command: ['start', '--optimized']
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgresql:5432/${KC_DB_NAME}
+      - KC_DB_USERNAME=${KC_DB_USER}
+      - KC_DB_PASSWORD=${KC_DB_PASSWORD}
+      - KC_HOSTNAME=${PUBLIC_URL}
+      - KC_HTTP_ENABLED=true
+      - KC_HTTP_PORT=9080
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HEALTH_ENABLED=true
+      - KC_HTTP_MANAGEMENT_PORT=9990
+      # Bootstrap admin: used only to create the first console account. Remove these
+      # two lines and restart once a named admin user exists.
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KC_ADMIN_USER}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KC_ADMIN_PASSWORD}
+    volumes:
+      - ../src/main/docker/realm-config/keycloak-health-check.sh:/opt/keycloak/health-check.sh:ro
+      - ../src/main/docker/keycloak-themes/ost:/opt/keycloak/themes/ost:ro
+    healthcheck:
+      test: 'bash /opt/keycloak/health-check.sh'
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '443:443'
+      - '80:80'
+    environment:
+      - PUBLIC_HOST=${PUBLIC_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./tls:/etc/caddy/tls:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

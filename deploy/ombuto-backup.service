@@ -1,0 +1,12 @@
+[Unit]
+Description=Nightly database backup to S3
+# Pointless to run before Docker is up; the dump runs inside the Postgres container.
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ombuto-backup
+# A run that hangs on the network must not block the next night's run forever.
+TimeoutStartSec=1800
+User=root
