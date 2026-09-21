@@ -95,14 +95,15 @@ class TreeCommentResourceIT {
                 .andExpect(jsonPath("$.authorName").value("Ari Reyes"))
                 .andExpect(jsonPath("$.createdDate").isNotEmpty())
                 .andExpect(jsonPath("$.editedDate").value(nullValue()))
-                .andExpect(jsonPath("$.mine").value(true));
+                .andExpect(jsonPath("$.mine").doesNotExist());
 
             mvc
                 .perform(get(COMMENTS, path(type), id).with(who(VIEWER)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].body").value("Hello there"))
-                .andExpect(jsonPath("$[0].mine").value(false));
+                .andExpect(jsonPath("$[0].authorLogin").value(EDITOR))
+                .andExpect(jsonPath("$[0].mine").doesNotExist());
 
             List<NodeHistory> h = history(type, id);
             assertThat(h).hasSize(1);
@@ -114,19 +115,21 @@ class TreeCommentResourceIT {
     }
 
     @Test
-    void threadIsOldestFirstWithMineFlag() throws Exception {
+    void threadIsOldestFirstAndCarriesAuthorLoginPerMessage() throws Exception {
         Instant t0 = Instant.parse("2026-09-01T10:00:00Z");
         persistComment(f.owner, "second", t0.plusSeconds(60));
         persistComment(f.editor, "first", t0);
         persistComment(f.owner, "third", t0.plusSeconds(120));
 
+        // Ownership is derived per viewer, not carried in the payload (CHAT-001).
         mvc
             .perform(get(COMMENTS, "opportunity", f.opportunity.getId()).with(who(OWNER)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[*].body", contains("first", "second", "third")))
-            .andExpect(jsonPath("$[*].mine", contains(false, true, true)))
+            .andExpect(jsonPath("$[*].authorLogin", contains(EDITOR, OWNER, OWNER)))
             .andExpect(jsonPath("$[*].authorInitials", contains("AR", "KP", "KP")))
-            .andExpect(jsonPath("$[0].authorName").value("Ari Reyes"));
+            .andExpect(jsonPath("$[0].authorName").value("Ari Reyes"))
+            .andExpect(jsonPath("$[0].mine").doesNotExist());
     }
 
     @Test
@@ -137,7 +140,8 @@ class TreeCommentResourceIT {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.body").value("fixed"))
             .andExpect(jsonPath("$.editedDate").isNotEmpty())
-            .andExpect(jsonPath("$.mine").value(true));
+            .andExpect(jsonPath("$.authorLogin").value(EDITOR))
+            .andExpect(jsonPath("$.mine").doesNotExist());
         em.flush();
         em.clear();
         Comment reloaded = em.find(Comment.class, c.getId());
@@ -223,11 +227,12 @@ class TreeCommentResourceIT {
 
         mvc.perform(json(patch("/api/tree/comments/{id}", c.getId()), "{\"body\":\"edit\"}", EDITOR)).andExpect(status().isForbidden());
         mvc.perform(delete("/api/tree/comments/{id}", c.getId()).with(who(EDITOR)).with(csrf())).andExpect(status().isForbidden());
-        // Still readable; "mine" reflects authorship only (the client hides edit controls for viewers).
+        // Still readable; author-only edit is enforced server-side, viewers get no edit controls client-side.
         mvc
             .perform(get(COMMENTS, "opportunity", f.opportunity.getId()).with(who(EDITOR)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].mine").value(true));
+            .andExpect(jsonPath("$[0].authorLogin").value(EDITOR))
+            .andExpect(jsonPath("$[0].mine").doesNotExist());
         assertThat(commentCountOnOpportunity()).isEqualTo(1);
     }
 

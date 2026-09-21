@@ -24,7 +24,6 @@ export function comment(id: number, login: string, createdDate: string, extra: P
     authorName: who.name,
     createdDate,
     editedDate: null,
-    mine: login === 'user',
     ...extra,
   };
 }

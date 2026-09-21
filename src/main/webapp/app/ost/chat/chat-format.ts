@@ -17,6 +17,11 @@ export const BOTTOM_SLACK_PX = 24;
 
 export interface ThreadItem {
   comment: CommentDTO;
+  /**
+   * True when the viewing user is the author. Derived here from {@code currentUserLogin}, never
+   * carried on the DTO — the same broadcast payload reaches many viewers (CHAT-001).
+   */
+  mine: boolean;
   /** first message of a run (author change, or a pause > RUN_GAP_MS) */
   runStart: boolean;
   /** date-time stamp to show above this message, or null */
@@ -64,8 +69,14 @@ export const initialsOf = (c: CommentDTO) =>
     .slice(0, 2)
     .toUpperCase();
 
-/** Messages (oldest first) → display items with run starts, stamps and initials. */
-export function groupThread(comments: CommentDTO[], now: Date = new Date()): ThreadItem[] {
+/**
+ * Messages (oldest first) → display items with run starts, stamps and initials.
+ *
+ * Ownership is derived from {@code currentUserLogin} rather than a per-message flag: the store's
+ * live-applied payload comes from a team topic and cannot carry per-viewer state (CHAT-001).
+ * A {@code null} login (no team loaded yet) means nothing is mine.
+ */
+export function groupThread(comments: CommentDTO[], currentUserLogin: string | null, now: Date = new Date()): ThreadItem[] {
   let prevStamp: string | null = null;
   return comments.map((comment, i) => {
     const prev = comments[i - 1];
@@ -73,8 +84,9 @@ export function groupThread(comments: CommentDTO[], now: Date = new Date()): Thr
     const label = formatStamp(comment.createdDate, now);
     const stamp = runStart && label !== prevStamp ? label : null;
     if (runStart) prevStamp = label;
-    const who = runStart && !comment.mine ? initialsOf(comment) : null;
-    return { comment, runStart, stamp, who };
+    const mine = !!currentUserLogin && comment.authorLogin === currentUserLogin;
+    const who = runStart && !mine ? initialsOf(comment) : null;
+    return { comment, mine, runStart, stamp, who };
   });
 }
 

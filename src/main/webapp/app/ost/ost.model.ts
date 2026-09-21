@@ -101,6 +101,12 @@ export interface MoveNodeResponse {
   siblings: { key: string; sortOrder: number }[];
 }
 
+/**
+ * A chat message on a tree node. Ownership is NOT on the DTO: it is derived per viewer by
+ * comparing {@link authorLogin} to the store's {@code team.currentUserLogin}. A per-viewer flag on
+ * a payload broadcast to a team topic would attribute someone else's message to every recipient
+ * (CHAT-001).
+ */
 export interface CommentDTO {
   id: number;
   body: string;
@@ -109,7 +115,6 @@ export interface CommentDTO {
   authorName: string | null;
   createdDate: string;
   editedDate: string | null;
-  mine: boolean;
 }
 
 export interface HistoryEntryDTO {
