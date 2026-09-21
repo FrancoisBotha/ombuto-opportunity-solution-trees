@@ -96,7 +96,9 @@ could not go there.
 - **Build and test config**:
   - `package.json`: the `node mvnw.cjs` scripts (see above) and the OST dependencies.
   - `vite.config.ts`: `optimizeDeps.include` for the OST packages, guarded by
-    `app/ost/vite-optimize-deps.spec.ts`.
+    `app/ost/vite-optimize-deps.spec.ts`; and `/mcp` in the dev-server `proxy` list so the
+    Connect an agent page's endpoint (`window.location.origin + /mcp`) reaches the backend in
+    development, guarded by `app/connect-agent/connect-agent.component.spec.ts`.
   - `playwright.config.ts`: the `cleanup` teardown project.
   - `src/main/webapp/app/test-setup.ts`: the localStorage / sessionStorage shim.
   - `eslint.config.ts`: `.ombutocode` and `docs/` ignored.

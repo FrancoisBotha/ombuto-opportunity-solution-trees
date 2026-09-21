@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { findIconDefinition } from '@fortawesome/fontawesome-svg-core';
@@ -5,6 +8,18 @@ import { shallowMount } from '@vue/test-utils';
 
 import { initFortAwesome } from '@/shared/config/config';
 import ConnectAgent from './connect-agent.vue';
+
+function projectRoot(): string {
+  let dir = process.cwd();
+  while (!existsSync(join(dir, 'vite.config.ts')) && dirname(dir) !== dir) dir = dirname(dir);
+  return dir;
+}
+
+function viteProxyPaths(): string[] {
+  const config = readFileSync(join(projectRoot(), 'vite.config.ts'), 'utf8');
+  const match = /proxy:[\s\S]*?\[([^\]]*)\]\.map/.exec(config);
+  return match ? [...match[1].matchAll(/'([^']+)'/g)].map(m => m[1]) : [];
+}
 
 describe('ConnectAgent Component', () => {
   beforeEach(() => {
@@ -104,6 +119,19 @@ describe('ConnectAgent Component', () => {
     expect(curl).toContain('http://localhost:9080/realms/jhipster/protocol/openid-connect/token');
     expect(curl).not.toContain('/auth/realms/');
     expect(curl).toContain('scope=openid profile email roles');
+  });
+
+  it('routes the displayed dev endpoint to the backend via the Vite proxy', () => {
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { origin: 'http://localhost:9000' } as Location,
+    });
+    const wrapper = shallowMount(ConnectAgent, {
+      global: { stubs: { 'font-awesome-icon': true } },
+    });
+    const endpoint = wrapper.find('[data-cy="mcpEndpointUrl"]').text();
+    const path = new URL(endpoint).pathname;
+    expect(viteProxyPaths()).toContain(path);
   });
 
   it('states that access mirrors the caller team memberships', () => {
