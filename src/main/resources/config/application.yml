@@ -254,4 +254,13 @@ jhipster:
 # https://www.jhipster.tech/common-application-properties/
 # ===================================================================
 
-# application:
+# The MCP filter chain accepts only tokens whose `aud` claim includes one of these values. Kept
+# out of jhipster.security.oauth2.audience above so widening the session chain's audience (for
+# example, adding another API's client audience) does not silently widen /mcp too. Keycloak's
+# `mcp_client` in src/main/docker/realm-config/jhipster-realm.json is configured to inject
+# `mcp-server` via an oidc-audience-mapper; the web `web_app` client never carries this audience,
+# so a session token is refused at /mcp.
+application:
+  mcp:
+    audience:
+      - mcp-server

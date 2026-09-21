@@ -1,5 +1,7 @@
 package com.opportunity.tree.config;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -15,6 +17,8 @@ public class ApplicationProperties {
 
     private final Seed seed = new Seed();
 
+    private final Mcp mcp = new Mcp();
+
     // jhipster-needle-application-properties-property
 
     public Liquibase getLiquibase() {
@@ -23,6 +27,10 @@ public class ApplicationProperties {
 
     public Seed getSeed() {
         return seed;
+    }
+
+    public Mcp getMcp() {
+        return mcp;
     }
 
     // jhipster-needle-application-properties-property-getter
@@ -54,6 +62,26 @@ public class ApplicationProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+    }
+
+    /**
+     * MCP-specific configuration. {@code application.mcp.audience} is the list of JWT audiences the
+     * MCP filter chain will accept — it is deliberately independent of
+     * {@code jhipster.security.oauth2.audience} (the session chain's list) so widening one cannot
+     * silently widen the other. Only tokens issued to a client that carries one of these audiences
+     * are accepted at {@code /mcp} and {@code /mcp/message}.
+     */
+    public static class Mcp {
+
+        private List<String> audience = new ArrayList<>(List.of("mcp-server"));
+
+        public List<String> getAudience() {
+            return audience;
+        }
+
+        public void setAudience(List<String> audience) {
+            this.audience = audience;
         }
     }
 

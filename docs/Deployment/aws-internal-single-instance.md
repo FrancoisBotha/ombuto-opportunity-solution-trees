@@ -149,6 +149,30 @@ file does not need to change.
    `groups` claim. The development realm export under
    `src/main/docker/realm-config/` is the reference for what the app expects; do
    not import it as-is, as it carries development-only clients and users.
+
+   Also create the **`mcp_client`** public client used by LLM agent tools. The MCP
+   filter chain (`application.mcp.audience`, defaults to `mcp-server`) refuses any
+   token whose `aud` claim does not include one of the configured MCP audiences —
+   `web_app`'s session tokens do not carry it, so they are rejected at `/mcp`. In
+   the admin console:
+   - **Clients → Create client** → Client type OpenID Connect, Client ID `mcp_client`.
+   - **Capability config**: enable _Direct access grants_ (`password` grant) so the
+     "Connect an agent" page's one-shot `curl` works, disable _Client authentication_
+     (public client), enable _Standard flow_ (Authorization Code + PKCE) for
+     interactive clients.
+   - **Login settings → Valid redirect URIs**: `http://127.0.0.1:*`,
+     `http://localhost:*` (and any HTTPS loopback variants your clients need).
+   - **Advanced → Proof Key for Code Exchange**: `S256`.
+   - **Client scopes → mcp_client-dedicated → Add mapper → By configuration →
+     Audience**: name `audience-mcp-server`, leave _Included Client Audience_ empty,
+     set _Included Custom Audience_ to `mcp-server`, _Add to access token_ on,
+     _Add to ID token_ off. This is the audience the app validates at `/mcp`; do
+     NOT add the same mapper to `web_app`.
+
+   The dev realm export at `src/main/docker/realm-config/jhipster-realm.json`
+   (client `mcp_client`, mapper `audience-mcp-server`) is the reference — replicate
+   its shape, not its secret or redirect URIs.
+
 7. **Start the rest**: `docker compose -f docker-compose.prod.yml up -d`.
 8. **Verify** `https://<host>/management/health` returns `UP`, then sign in.
 9. **Install the backup job**:

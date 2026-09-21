@@ -183,6 +183,8 @@ class McpSecurityIT {
             .claim("sub", "user-uuid")
             .claim("preferred_username", "alice")
             .claim("roles", List.of(AuthoritiesConstants.USER))
+            // MCPSRV-007: the MCP filter chain refuses tokens without the `mcp-server` audience.
+            .audience(List.of("mcp-server"))
             .issuedAt(Instant.now().minusSeconds(60))
             .expiresAt(Instant.now().plusSeconds(300))
             .build();

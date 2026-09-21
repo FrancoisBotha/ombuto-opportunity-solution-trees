@@ -848,12 +848,12 @@
       "protocolMappers": [
         {
           "id": "b3a8f5a7-2c1b-4f2c-a2ea-9a2f3f8ac101",
-          "name": "audience-account",
+          "name": "audience-mcp-server",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "account",
+            "included.custom.audience": "mcp-server",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
