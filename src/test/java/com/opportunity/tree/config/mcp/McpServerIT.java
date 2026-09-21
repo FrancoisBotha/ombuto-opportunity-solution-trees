@@ -8,8 +8,8 @@ import io.modelcontextprotocol.server.McpSyncServer;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerProperties;
-import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
-import org.springframework.ai.mcp.server.webmvc.transport.WebMvcSseServerTransportProvider;
+import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerStreamableHttpProperties;
+import org.springframework.ai.mcp.server.webmvc.transport.WebMvcStreamableServerTransportProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationContext;
@@ -18,11 +18,11 @@ import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
 
 /**
- * MCPSRV-001 AC 5: the Spring context starts with the MCP server starter on the classpath, the
- * MCP endpoint is bound to the dedicated {@code /mcp} path, and the read-only probe tool reaches
- * the MCP server's tool registry (not just the {@code ToolCallbackProvider} bean this ticket
- * declares — that would prove nothing about the hand-off through
- * {@code ToolCallbackConverterAutoConfiguration}).
+ * MCPSRV-001 AC 5 (updated in MCPSRV-009 for the Streamable HTTP transport): the Spring context
+ * starts with the MCP server starter on the classpath, the MCP endpoint is bound to the dedicated
+ * {@code /mcp} path over Streamable HTTP, and the read-only probe tool reaches the MCP server's
+ * tool registry (not just the {@code ToolCallbackProvider} bean this ticket declares — that would
+ * prove nothing about the hand-off through {@code ToolCallbackConverterAutoConfiguration}).
  *
  * The MCP block from {@code src/main/resources/config/application.yml} is repeated here as
  * {@code @TestPropertySource} because the JHipster test profile replaces the main
@@ -37,8 +37,8 @@ import org.springframework.web.servlet.function.ServerResponse;
         "spring.ai.mcp.server.version=0.0.1",
         "spring.ai.mcp.server.type=SYNC",
         "spring.ai.mcp.server.stdio=false",
-        "spring.ai.mcp.server.sse-endpoint=/mcp",
-        "spring.ai.mcp.server.sse-message-endpoint=/mcp/message",
+        "spring.ai.mcp.server.protocol=STREAMABLE",
+        "spring.ai.mcp.server.streamable-http.mcp-endpoint=/mcp",
         "spring.ai.mcp.server.capabilities.tool=true",
         "spring.ai.mcp.server.capabilities.resource=false",
         "spring.ai.mcp.server.capabilities.prompt=false",
@@ -54,14 +54,14 @@ class McpServerIT {
     private McpServerProperties mcpServerProperties;
 
     @Autowired
-    private McpServerSseProperties mcpServerSseProperties;
+    private McpServerStreamableHttpProperties mcpServerStreamableHttpProperties;
 
     @Autowired
-    private WebMvcSseServerTransportProvider webMvcSseServerTransportProvider;
+    private WebMvcStreamableServerTransportProvider webMvcStreamableServerTransportProvider;
 
     @Autowired
-    @Qualifier("webMvcSseServerRouterFunction")
-    private RouterFunction<ServerResponse> webMvcSseServerRouterFunction;
+    @Qualifier("webMvcStreamableServerRouterFunction")
+    private RouterFunction<ServerResponse> webMvcStreamableServerRouterFunction;
 
     @Autowired
     private McpSyncServer mcpSyncServer;
@@ -72,17 +72,16 @@ class McpServerIT {
 
     @Test
     void mcpEndpointIsMappedOnTheDedicatedPath() {
-        // AC 3 + AC 5: the transport is actually mapped on /mcp — the WebMvc SSE transport
-        // provider is present, its bound endpoint is /mcp, and the RouterFunction the starter
-        // registers to serve it is a bean in the context.
+        // AC 3 + AC 5: the transport is actually mapped on /mcp — the WebMvc Streamable HTTP
+        // transport provider is present, its bound endpoint is /mcp, and the RouterFunction the
+        // starter registers to serve it is a bean in the context.
         assertThat(mcpServerProperties.isEnabled()).isTrue();
         assertThat(mcpServerProperties.isStdio()).isFalse();
-        assertThat(mcpServerSseProperties.getSseEndpoint()).isEqualTo("/mcp");
-        assertThat(mcpServerSseProperties.getSseMessageEndpoint()).isEqualTo("/mcp/message");
+        assertThat(mcpServerStreamableHttpProperties.getMcpEndpoint()).isEqualTo("/mcp");
 
-        assertThat(context.getBeanNamesForType(WebMvcSseServerTransportProvider.class)).isNotEmpty();
-        assertThat(webMvcSseServerTransportProvider).isNotNull();
-        assertThat(webMvcSseServerRouterFunction).isNotNull();
+        assertThat(context.getBeanNamesForType(WebMvcStreamableServerTransportProvider.class)).isNotEmpty();
+        assertThat(webMvcStreamableServerTransportProvider).isNotNull();
+        assertThat(webMvcStreamableServerRouterFunction).isNotNull();
     }
 
     @Test

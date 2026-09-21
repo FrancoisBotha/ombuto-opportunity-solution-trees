@@ -181,8 +181,14 @@ spring:
         version: 0.0.1
         type: SYNC
         stdio: false
-        sse-endpoint: /mcp
-        sse-message-endpoint: /mcp/message
+        # Streamable HTTP is the current MCP transport; HTTP+SSE was deprecated in the spec.
+        # Every JSON-RPC message travels as a POST to /mcp; server-to-client push (when the
+        # client opens a listening stream) is served on GET /mcp. Removal of the SSE transport
+        # (previously /mcp + /mcp/message) is a deliberate decision documented in
+        # docs/Epics/epic_10_MCP_SERVER.md §15.
+        protocol: STREAMABLE
+        streamable-http:
+          mcp-endpoint: /mcp
         instructions: 'Ombuto OST MCP server. Read-only tools only.'
         capabilities:
           tool: true

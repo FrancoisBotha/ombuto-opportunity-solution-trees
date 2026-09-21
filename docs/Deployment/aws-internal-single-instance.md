@@ -124,6 +124,14 @@ Two settings are load-bearing and easy to miss:
   issued tokens carry the public issuer. The app validates the issuer, so a
   mismatch here fails every login with a token that looks superficially fine.
 
+**MCP transport at the proxy.** The MCP server uses the Streamable HTTP transport
+on `POST /mcp` (short JSON-RPC request/response) and `GET /mcp` (optional
+server-to-client listening stream, framed as SSE). The `Caddyfile` keeps
+`flush_interval -1` and zeroed read/write timeouts on the app upstream so the
+listening stream is not buffered or terminated by the proxy; short JSON-RPC
+POSTs are unaffected by those settings. There is no separate message endpoint —
+the earlier HTTP+SSE transport (`/mcp` + `/mcp/message`) is gone.
+
 If the company would rather not keep secrets in a file on disk, move `.env` to
 AWS Secrets Manager and render it at boot from the instance profile. The compose
 file does not need to change.

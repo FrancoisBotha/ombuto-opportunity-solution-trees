@@ -12,7 +12,7 @@
     <section class="card p-3 mb-3">
       <h4>MCP endpoint</h4>
       <p class="text-muted small mb-2">
-        The server exposes an MCP endpoint over Server-Sent Events (SSE). The URL below is derived from the current origin, so it works
+        The server exposes an MCP endpoint over the Streamable HTTP transport. The URL below is derived from the current origin, so it works
         whether you are running on localhost, a preview environment or production.
       </p>
       <div class="d-flex align-items-center gap-2">
@@ -27,9 +27,9 @@
     <section class="card p-3 mb-3">
       <h4>Client configuration</h4>
       <p class="text-muted small mb-2">
-        Verified against <strong data-cy="verifiedClient">{{ verifiedClientName }} {{ verifiedClientVersion }}</strong> over SSE transport.
-        Save this as <code>.mcp.json</code> in your project, replace the token placeholder, then start Claude Code and approve the project
-        server when prompted.
+        Verified against <strong data-cy="verifiedClient">{{ verifiedClientName }} {{ verifiedClientVersion }}</strong> over the Streamable
+        HTTP transport. Save this as <code>.mcp.json</code> in your project, replace the token placeholder, then start Claude Code and
+        approve the project server when prompted.
       </p>
       <div class="d-flex align-items-start gap-2">
         <pre class="p-2 bg-light border rounded flex-grow-1 mb-0" data-cy="clientConfigSnippet">{{ clientConfigSnippet }}</pre>

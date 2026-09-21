@@ -1,20 +1,11 @@
 package com.opportunity.tree.config.mcp;
 
-import jakarta.servlet.AsyncEvent;
-import jakarta.servlet.AsyncListener;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletOutputStream;
-import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletResponseWrapper;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,138 +14,106 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Binds every MCP SSE session to the principal that opened it and refuses any JSON-RPC message
- * posted to that session by a different principal.
+ * Binds every MCP session to the principal that opened it and refuses any request against a
+ * session id that belongs to somebody else.
  *
  * <h3>Why</h3>
- * The Spring AI MCP starter owns the transport ({@code McpServerSseWebMvcAutoConfiguration} /
- * {@code WebMvcSseServerTransportProvider}) and routes a POST to {@code /mcp/message} by its
- * {@code sessionId} query parameter alone. The tool then runs under the <em>poster's</em> identity
- * while its result is written into the stream of the user who opened that session. An authenticated
- * user could therefore push data from their own teams — teams the stream's owner is denied — into
- * another user's MCP stream. The starter is not forked: this filter sits in the dedicated MCP
- * security chain, after authentication, and wraps the two endpoints from the outside.
+ * The Spring AI MCP Streamable HTTP starter ({@code McpServerStreamableHttpWebMvcAutoConfiguration}
+ * / {@code WebMvcStreamableServerTransportProvider}) owns the transport and routes each incoming
+ * request by the {@code Mcp-Session-Id} header — not by who is calling. A tool call therefore runs
+ * under the <em>poster's</em> identity while its result is written into the stream of whoever
+ * initialised that session. An authenticated user could push data from their own teams — teams
+ * the session's owner is denied — into another user's stream (the MCPSRV-002 hijack, in
+ * Streamable HTTP form). This filter sits after authentication in the dedicated MCP security
+ * chain and wraps every request against {@code /mcp} from the outside.
  *
  * <h3>How</h3>
  * <ul>
- *   <li><b>GET {@code /mcp}</b> — the session id is minted inside the transport and only ever
- *   appears in the {@code endpoint} SSE event it writes. The response is therefore wrapped and the
- *   outgoing bytes are scanned for {@code sessionId=<uuid>}; the binding is recorded <em>before</em>
- *   those bytes are handed to the container, so the id can never be usable before it is bound. The
- *   binding is released when the connection completes, times out or errors.</li>
- *   <li><b>POST {@code /mcp/message}</b> — the {@code sessionId} must be bound to the caller.
- *   Anything else is refused.</li>
+ *   <li><b>POST /mcp with no session header</b> — the JSON-RPC initialize call. The transport
+ *   mints a new session id and returns it in the {@code Mcp-Session-Id} response header. The
+ *   response is wrapped so the id is bound to the current caller <em>before</em> the header is
+ *   flushed to the client, closing the "id exists but is unbound" window.</li>
+ *   <li><b>Any request that carries an {@code Mcp-Session-Id} header</b> — POST tool call, GET
+ *   listening stream or DELETE — is refused unless the header value is bound to the caller.
+ *   Because the check keys off a request header (not a URL substring), no path-spelling variant
+ *   (percent-encoding, matrix parameters, trailing slash) can bypass it.</li>
+ *   <li><b>DELETE /mcp</b> is the Streamable HTTP session-termination request; after the
+ *   transport has processed it the id will no longer be routed, so the filter releases the
+ *   binding once the chain completes. The transport itself never notifies the registry, so
+ *   without this call the registry would leak an entry per terminated session.</li>
  * </ul>
  *
  * <h3>Status code</h3>
  * A refusal is <b>404 Not Found</b> with an empty body, deliberately identical to the transport's
- * own answer for a session id that does not exist ({@code WebMvcSseServerTransportProvider}
- * answers {@code 404 "Session not found"}). A 403 would confirm to the caller that the id they
- * guessed or stole is a live session belonging to someone else; 404 leaks nothing at all, and
- * expiry and hijacking are indistinguishable from the client's point of view.
+ * own answer for a session id it does not know. A 403 would confirm to the caller that the id
+ * they guessed or stole belongs to a live session; 404 leaks nothing at all, and expiry and
+ * hijacking are indistinguishable from the client's point of view.
  */
 public class McpSessionPrincipalFilter extends OncePerRequestFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(McpSessionPrincipalFilter.class);
 
-    static final String SESSION_ID_PARAM = "sessionId";
+    /**
+     * Header name for the session id in the MCP Streamable HTTP transport (spec-defined, so the
+     * casing is fixed). We match case-insensitively when reading incoming request headers because
+     * {@link HttpServletRequest#getHeader(String)} is case-insensitive by contract.
+     */
+    static final String SESSION_ID_HEADER = "Mcp-Session-Id";
 
-    /** The endpoint event carries {@code …?sessionId=<uuid>}; the transport mints a random UUID. */
-    private static final Pattern SESSION_ID_IN_STREAM = Pattern.compile(
-        "sessionId=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+    /** RFC-4122 uuid, the shape the Spring AI transport mints for session ids. */
+    private static final Pattern SESSION_ID_VALUE = Pattern.compile(
+        "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
     );
 
-    /** Enough to hold the endpoint event; the scan stops as soon as an id is found. */
-    private static final int MAX_SNIFF_CHARS = 8192;
-
     private final McpSessionRegistry registry;
-    private final String ssePath;
 
-    public McpSessionPrincipalFilter(McpSessionRegistry registry, String ssePath, String messagePath) {
-        // messagePath is accepted for symmetry with the configured endpoints but is deliberately
-        // NOT used to detect a message: the transport routes a JSON-RPC message by its sessionId
-        // query parameter alone, so we key the owner check off that parameter (see below) rather
-        // than off an exact path string. Matching a decoded literal against the raw request URI
-        // let a percent-encoded path (e.g. /mcp/messag%65) that the dispatcher still resolves to
-        // /mcp/message slip past the check entirely.
+    public McpSessionPrincipalFilter(McpSessionRegistry registry) {
         this.registry = registry;
-        this.ssePath = ssePath;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
         throws ServletException, IOException {
-        String path = pathWithinApplication(request);
         String principal = currentPrincipal();
+        String sessionId = request.getHeader(SESSION_ID_HEADER);
 
-        // Any request that carries a sessionId query parameter is a JSON-RPC message the transport
-        // will route by that id, no matter how the path is spelled (percent-encoding, matrix
-        // parameters, trailing slash). It must belong to the caller. The SSE open (GET /mcp) never
-        // carries a sessionId — the id is minted inside the transport — so this branch cannot
-        // swallow it.
-        String sessionId = request.getParameter(SESSION_ID_PARAM);
-        if (sessionId != null) {
+        if (sessionId != null && !sessionId.isEmpty()) {
+            // Any request that carries a session id must belong to the caller. The check is
+            // header-driven, not path-driven, so a percent-encoded path variant (e.g. /mc%70)
+            // cannot bypass it.
             if (!registry.isOwnedBy(sessionId, principal)) {
                 // Same answer as an unknown session: never confirm that the id belongs to someone else.
-                LOG.warn("Refused MCP message for a session the caller did not open (principal={})", principal);
+                LOG.warn("Refused MCP request for a session the caller did not open (principal={})", principal);
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.setContentLength(0);
                 response.flushBuffer();
                 return;
             }
-            chain.doFilter(request, response);
-            return;
-        }
-
-        if (ssePath.equals(path) && "GET".equalsIgnoreCase(request.getMethod()) && principal != null) {
-            SessionIdBindingResponse wrapper = new SessionIdBindingResponse(response, principal);
             try {
-                chain.doFilter(request, wrapper);
+                chain.doFilter(request, response);
             } finally {
-                releaseWhenConnectionEnds(request, wrapper);
+                // DELETE /mcp is the Streamable HTTP session-termination request: once the
+                // transport has processed it the id will no longer be routed, so release the
+                // binding here (the transport never notifies us on its own). Anything other
+                // than a client/transport error means the session is gone as far as the
+                // server is concerned.
+                if ("DELETE".equalsIgnoreCase(request.getMethod()) && response.getStatus() < 500) {
+                    registry.unbind(sessionId);
+                }
             }
             return;
         }
 
-        chain.doFilter(request, response);
-    }
-
-    /** Frees the binding once the SSE connection is over (or immediately, if it never went async). */
-    private void releaseWhenConnectionEnds(HttpServletRequest request, SessionIdBindingResponse wrapper) {
-        if (!request.isAsyncStarted()) {
-            registry.unbind(wrapper.sessionId());
+        // No session header on the way in: this is the initialize call (or an unrelated GET).
+        // Wrap the response so a session id the transport announces via the response header is
+        // bound to the caller before that header reaches the client.
+        if (principal != null) {
+            SessionBindingResponseWrapper wrapper = new SessionBindingResponseWrapper(response, principal);
+            chain.doFilter(request, wrapper);
             return;
         }
-        try {
-            request
-                .getAsyncContext()
-                .addListener(
-                    new AsyncListener() {
-                        @Override
-                        public void onComplete(AsyncEvent event) {
-                            registry.unbind(wrapper.sessionId());
-                        }
 
-                        @Override
-                        public void onTimeout(AsyncEvent event) {
-                            registry.unbind(wrapper.sessionId());
-                        }
-
-                        @Override
-                        public void onError(AsyncEvent event) {
-                            registry.unbind(wrapper.sessionId());
-                        }
-
-                        @Override
-                        public void onStartAsync(AsyncEvent event) {
-                            // nothing to do
-                        }
-                    }
-                );
-        } catch (IllegalStateException e) {
-            // The connection already finished — release straight away.
-            registry.unbind(wrapper.sessionId());
-        }
+        chain.doFilter(request, response);
     }
 
     private static String currentPrincipal() {
@@ -165,117 +124,49 @@ public class McpSessionPrincipalFilter extends OncePerRequestFilter {
         return authentication.getName();
     }
 
-    private static String pathWithinApplication(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        String contextPath = request.getContextPath();
-        if (contextPath != null && !contextPath.isEmpty() && uri.startsWith(contextPath)) {
-            uri = uri.substring(contextPath.length());
-        }
-        return uri;
-    }
-
     /**
-     * Response wrapper that watches the outgoing SSE bytes for the transport's {@code endpoint}
-     * event and binds the session id it announces to the principal of this request, before those
-     * bytes reach the container.
+     * Wraps the response so any {@code Mcp-Session-Id} header the transport writes is bound to
+     * the request's principal before the header is committed. Only the first setHeader/addHeader
+     * that carries a session-id-shaped value is honoured; subsequent writes with the same value
+     * are a no-op (the transport writes it once, but we defend against any future double-write).
      */
-    private final class SessionIdBindingResponse extends HttpServletResponseWrapper {
+    private final class SessionBindingResponseWrapper extends HttpServletResponseWrapper {
 
         private final String principal;
-        private final StringBuilder sniffed = new StringBuilder();
+        private volatile String boundSessionId;
 
-        private volatile String sessionId;
-        private ServletOutputStream outputStream;
-        private PrintWriter writer;
-
-        private SessionIdBindingResponse(HttpServletResponse delegate, String principal) {
+        private SessionBindingResponseWrapper(HttpServletResponse delegate, String principal) {
             super(delegate);
             this.principal = principal;
         }
 
-        String sessionId() {
-            return sessionId;
+        @Override
+        public void setHeader(String name, String value) {
+            maybeBind(name, value);
+            super.setHeader(name, value);
         }
 
         @Override
-        public ServletOutputStream getOutputStream() throws IOException {
-            if (outputStream == null) {
-                ServletOutputStream delegate = super.getOutputStream();
-                outputStream = new ServletOutputStream() {
-                    @Override
-                    public boolean isReady() {
-                        return delegate.isReady();
-                    }
-
-                    @Override
-                    public void setWriteListener(WriteListener listener) {
-                        delegate.setWriteListener(listener);
-                    }
-
-                    @Override
-                    public void write(int b) throws IOException {
-                        observe(new byte[] { (byte) b }, 0, 1);
-                        delegate.write(b);
-                    }
-
-                    @Override
-                    public void write(byte[] b, int off, int len) throws IOException {
-                        observe(b, off, len);
-                        delegate.write(b, off, len);
-                    }
-
-                    @Override
-                    public void write(byte[] b) throws IOException {
-                        write(b, 0, b.length);
-                    }
-
-                    @Override
-                    public void flush() throws IOException {
-                        delegate.flush();
-                    }
-
-                    @Override
-                    public void close() throws IOException {
-                        delegate.close();
-                    }
-                };
-            }
-            return outputStream;
+        public void addHeader(String name, String value) {
+            maybeBind(name, value);
+            super.addHeader(name, value);
         }
 
-        @Override
-        public PrintWriter getWriter() throws IOException {
-            if (writer == null) {
-                String encoding = getCharacterEncoding();
-                Charset charset = encoding == null ? StandardCharsets.UTF_8 : Charset.forName(encoding);
-                writer = new PrintWriter(new OutputStreamWriter(getOutputStream(), charset), false);
-            }
-            return writer;
-        }
-
-        /**
-         * Scans bytes on their way out. The binding is recorded before the completing bytes are
-         * written through, so a client can never use an id the server has not bound yet.
-         */
-        private void observe(byte[] bytes, int off, int len) {
-            if (sessionId != null || len <= 0) {
+        private void maybeBind(String name, String value) {
+            if (name == null || value == null || value.isEmpty()) {
                 return;
             }
-            synchronized (sniffed) {
-                if (sessionId != null) {
-                    return;
-                }
-                sniffed.append(new String(bytes, off, len, StandardCharsets.UTF_8));
-                Matcher matcher = SESSION_ID_IN_STREAM.matcher(sniffed);
-                if (matcher.find()) {
-                    sessionId = matcher.group(1);
-                    registry.bind(sessionId, principal);
-                    sniffed.setLength(0);
-                } else if (sniffed.length() > MAX_SNIFF_CHARS) {
-                    // Keep only a tail long enough to hold an id split across writes.
-                    sniffed.delete(0, sniffed.length() - 128);
-                }
+            if (!SESSION_ID_HEADER.equalsIgnoreCase(name)) {
+                return;
             }
+            if (boundSessionId != null) {
+                return;
+            }
+            if (!SESSION_ID_VALUE.matcher(value).matches()) {
+                return;
+            }
+            boundSessionId = value;
+            registry.bind(value, principal);
         }
     }
 }

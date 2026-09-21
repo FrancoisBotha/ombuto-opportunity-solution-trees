@@ -1,7 +1,7 @@
 package com.opportunity.tree.config.mcp;
 
 import com.opportunity.tree.config.ApplicationProperties;
-import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerSseProperties;
+import org.springframework.ai.mcp.server.common.autoconfigure.properties.McpServerStreamableHttpProperties;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,13 +16,20 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 /**
- * A stateless, CSRF-exempt filter chain isolated to the MCP endpoint paths that authenticates
+ * A stateless, CSRF-exempt filter chain isolated to the MCP endpoint path that authenticates
  * callers by Keycloak bearer token (OAuth2 resource server, JWT).
  *
+ * <p>The MCP transport is Streamable HTTP: every JSON-RPC message is a POST/GET/DELETE against
+ * a single URL ({@code /mcp}), and per-session identity is carried in the {@code Mcp-Session-Id}
+ * HTTP header (both request and response) rather than in a path segment or query parameter.
+ * This removes the URL-spelling attack surface that the previous {@code /mcp/message} path had:
+ * the session id can no longer be smuggled through a percent-encoded path variant because it is
+ * not in the path at all.
+ *
  * <p>Registered with {@link Order} ahead of the session-based {@code SecurityConfiguration#filterChain}
- * and restricted with {@link HttpSecurity#securityMatcher} to {@code /mcp} and {@code /mcp/**} so
- * that the existing web login, CSRF ({@code CookieCsrfTokenRepository} +
- * {@code SpaCsrfTokenRequestHandler}) and REST API rules stay untouched for every other path.
+ * and restricted with {@link HttpSecurity#securityMatcher} to {@code /mcp} so that the existing
+ * web login, CSRF ({@code CookieCsrfTokenRepository} + {@code SpaCsrfTokenRequestHandler}) and
+ * REST API rules stay untouched for every other path.
  *
  * <p>The JWT decoder ({@code SecurityConfiguration#jwtDecoder}) shared with the session chain
  * validates the token's signature against the Keycloak JWK set and enforces issuer and expiry;
@@ -42,9 +49,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 @Configuration
 public class McpSecurityConfiguration {
 
-    static final String MCP_SSE_PATH = "/mcp";
-    static final String MCP_MESSAGE_PATH_PATTERN = "/mcp/**";
-    static final String MCP_DEFAULT_MESSAGE_PATH = "/mcp/message";
+    static final String MCP_DEFAULT_ENDPOINT = "/mcp";
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -52,16 +57,15 @@ public class McpSecurityConfiguration {
         HttpSecurity http,
         Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
         McpSessionRegistry mcpSessionRegistry,
-        ObjectProvider<McpServerSseProperties> sseProperties,
+        ObjectProvider<McpServerStreamableHttpProperties> streamableProperties,
         ApplicationProperties applicationProperties
     ) throws Exception {
         McpAuthenticationEntryPoint entryPoint = new McpAuthenticationEntryPoint();
-        McpServerSseProperties properties = sseProperties.getIfAvailable();
-        String ssePath = properties != null ? properties.getSseEndpoint() : MCP_SSE_PATH;
-        String messagePath = properties != null ? properties.getSseMessageEndpoint() : MCP_DEFAULT_MESSAGE_PATH;
+        McpServerStreamableHttpProperties properties = streamableProperties.getIfAvailable();
+        String endpoint = properties != null && properties.getMcpEndpoint() != null ? properties.getMcpEndpoint() : MCP_DEFAULT_ENDPOINT;
         McpAudienceFilter audienceFilter = new McpAudienceFilter(applicationProperties.getMcp().getAudience(), entryPoint);
         http
-            .securityMatcher(MCP_SSE_PATH, MCP_MESSAGE_PATH_PATTERN)
+            .securityMatcher(endpoint)
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz.anyRequest().authenticated())
@@ -72,9 +76,10 @@ public class McpSecurityConfiguration {
             // Before AuthorizationFilter: reject a token that is not scoped to the MCP server as
             // 401 (invalid_token), matching every other bearer-token failure on this chain.
             .addFilterBefore(audienceFilter, AuthorizationFilter.class)
-            // After AuthorizationFilter: the caller is authenticated, so the SSE session can be
-            // bound to them and a message posted to somebody else's session can be refused.
-            .addFilterAfter(new McpSessionPrincipalFilter(mcpSessionRegistry, ssePath, messagePath), AuthorizationFilter.class);
+            // After AuthorizationFilter: the caller is authenticated, so the MCP session id
+            // (Mcp-Session-Id header) can be bound to them and any request that carries somebody
+            // else's session id can be refused.
+            .addFilterAfter(new McpSessionPrincipalFilter(mcpSessionRegistry), AuthorizationFilter.class);
         return http.build();
     }
 }

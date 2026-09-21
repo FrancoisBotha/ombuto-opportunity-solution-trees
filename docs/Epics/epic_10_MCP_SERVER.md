@@ -9,6 +9,7 @@ Depends On: epic_07_INTERVIEWS_AS_EVIDENCE
 ---
 
 ## 1. Purpose
+
 Make the tree available to LLM agent tools. A read-only MCP server inside the
 monolith exposes trees and interviews through the same services — and therefore
 the same team scoping — as the web UI.
@@ -21,11 +22,13 @@ their Keycloak identity and have it read their teams' products, trees, nodes and
 interviews — and nothing they are not allowed to see.
 
 ## 2. User Story
+
 As a member of a product trio, I want my AI assistant to read our opportunity
 solution tree, So that I can ask it questions and draft work grounded in our
 actual discovery data.
 
 ## 3. Scope
+
 - **In Scope:** Spring AI MCP server starter (WebMVC) in the same application;
   read-only tools `list_products`, `get_tree`, `get_node`, `list_interviews`;
   Keycloak bearer-token authentication on the MCP endpoint; scoping through
@@ -36,6 +39,7 @@ actual discovery data.
   per-tool permissions or API keys managed in the app; a separate MCP process.
 
 ## 4. Functional Requirements
+
 1. FR-054 — The application exposes an MCP endpoint served by the same Spring Boot process using Spring AI's MCP server starter (WebMVC).
 2. FR-055 — The MCP endpoint authenticates callers by Keycloak bearer token and resolves them to the same application user as the web UI; calls without a valid token are refused.
 3. FR-056 — `list_products` returns the products (with team) the caller may read; `get_tree` returns a team's whole tree, optionally limited to one product.
@@ -44,11 +48,13 @@ actual discovery data.
 6. FR-059 — A "Connect an agent" page in the app shows the MCP endpoint URL and copy-paste client configuration, including how to obtain a token.
 
 ## 5. Non-Functional Requirements
+
 1. NFR-019 — Security: the MCP server exposes no tool that modifies data, and every tool call goes through `TeamAccessService`.
 2. NFR-020 — Security: bearer tokens are validated for signature, issuer, audience and expiry; the MCP endpoint is stateless and exempt from CSRF without weakening CSRF for the session-based API.
 3. NFR-021 — Robustness: tool responses are structured JSON with bounded size (large trees can be requested per product) and tool descriptions are clear enough for an agent to choose correctly.
 
 ## 6. UI/UX Notes
+
 - "Connect an agent" page under the user menu: endpoint URL, example
   configuration snippets, the list of tools with one-line descriptions, and a
   note that access mirrors the user's team memberships.
@@ -56,9 +62,11 @@ actual discovery data.
   answer in the user's vocabulary.
 
 ## 7. Data Model Impact
+
 None.
 
 ## 8. Integration Impact
+
 - New dependency: Spring AI MCP server starter (approved by the Architecture
   document).
 - `SecurityConfiguration`: a second, stateless resource-server filter chain for
@@ -67,6 +75,7 @@ None.
 - Tools call the existing tree and interview services.
 
 ## 9. Acceptance Criteria
+
 - [ ] The application builds and runs, and a user can connect their LLM agent tool to Ombuto OST with their Keycloak identity and have it read their teams' products, trees, nodes and interviews — and nothing they are not allowed to see, end to end without any other epic being complete
 - [ ] A real MCP client (documented in the ticket notes) connects and successfully calls all four tools
 - [ ] Calls without a token, or with an expired or wrong-audience token, are refused
@@ -76,6 +85,7 @@ None.
 - [ ] Integration tests cover each tool's scoping; the "Connect an agent" page exists
 
 ## 10. Risks & Unknowns
+
 - Spring AI MCP starter and transport (streamable HTTP vs. SSE) versions move
   quickly; pin a version compatible with the JHipster 9 Spring Boot line.
 - How desktop MCP clients obtain a Keycloak token (OAuth flow support vs.
@@ -85,15 +95,18 @@ None.
   exposure.
 
 ## 11. Dependencies
+
 Epic 7 (interviews for `list_interviews`); transitively Epics 1 and 2. Richer
 output appears automatically as Epics 4, 6, 8 and 9 land, but none is required.
 
 ## 12. References
+
 - prd: docs/Product Requirements Document/PRD.md
 - architecture: docs/Architecture/Architecture.md
 - epic: epic_10_MCP_SERVER.md
 
 ## 13. Implementation Notes
+
 Before modifying a module, use `docs/Code Map/codemap.json` to answer three questions:
 
 1. What calls it?
@@ -103,6 +116,7 @@ Before modifying a module, use `docs/Code Map/codemap.json` to answer three ques
 Do NOT regenerate the code map inside a feature ticket. Mid-epic the map is expected to lag the code, and that drift is normal. If the map is missing, stale, or cannot answer the three questions, read the affected code directly and record in the ticket notes which questions it could not answer. The epic's final closeout ticket regenerates `codemap.html`, `codemap.json`, and `codemap.lock` together.
 
 Suggested ticket breakdown (complexity: medium-high):
+
 1. Backend: add the MCP starter, endpoint up with a trivial tool, version pinned (FR-054).
 2. Backend: bearer-token filter chain and Keycloak realm client; user resolution (FR-055, NFR-020).
 3. Backend: `list_products` and `get_tree` tools (FR-056, NFR-019, NFR-021).
@@ -117,6 +131,7 @@ regression tests in `McpSessionHijackIT` that fail on the pre-fix code); the res
 because they need a Keycloak realm change or a repository refactor that should not land blind.
 
 ### Fixed
+
 - **F1 (blocker) — session-hijack fix was bypassable by URL-encoding the message path.**
   `McpSessionPrincipalFilter` matched the message endpoint with
   `request.getRequestURI().equals("/mcp/message")`, but `getRequestURI()` is **not** percent-decoded.
@@ -132,13 +147,14 @@ because they need a Keycloak realm change or a repository refactor that should n
 - **F2 (minor) — Jackson parser internals leaked in tool errors.** An out-of-range or wrong-type id
   (e.g. `get_node id=9223372036854776000`) fails Spring AI argument binding and the MCP adapter
   copies the raw exception message into the tool result: `… out of range of `long` … at [Source:
-  REDACTED (StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION disabled) …]`. Contrary to NFR-021 /
+REDACTED (StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION disabled) …]`. Contrary to NFR-021 /
   error-hygiene. **Fix:** `McpToolErrorSanitizer` (a `BeanPostProcessor` wrapping every
   `ToolCallbackProvider`) rewrites binding/deserialization failures to a generic, actionable hint
   while passing the tools' own validation messages ("Unknown node type…", "Access denied") through
   unchanged.
 
 ### Written up (not landed here)
+
 - **W1 (major) — audience validation is a no-op for the MCP chain (NFR-020).** The MCP filter chain
   reuses the session `jwtDecoder`, whose `AudienceValidator` accepts `account`. Every Keycloak realm
   client emits `account` in `aud`, so any realm token (including a web token) is accepted on `/mcp`,
@@ -154,7 +170,7 @@ because they need a Keycloak realm change or a repository refactor that should n
   `list_products` returns `{total:0}` and every scoped call returns "Access denied", with no
   explanation. Fail-closed and safe, but confusing. Consider surfacing a clear "no Ombuto account
   linked to this identity" message. Access-control call; coordinate with S3.
-- **W3 (minor) — `list_interviews` and `get_tree` bound the *response* but not the *DB read*
+- **W3 (minor) — `list_interviews` and `get_tree` bound the _response_ but not the _DB read_
   (NFR-021).** `findInterviewsByProductId/ByTeamId` fetch **all** matching interviews (eagerly
   joining product + interviewer) and paginate in memory; `get_tree` assembles the entire team tree
   before applying `NODE_CEILING`. Output is capped (page ≤50; tree ceiling 1000), so a caller cannot
@@ -163,6 +179,7 @@ because they need a Keycloak realm change or a repository refactor that should n
   query. Left as a follow-up ticket to avoid a blind repository refactor.
 
 ### Verified sound (no change needed)
+
 - Per-tool scoping holds for a second identity across all id shapes: cross-team, wrong-type,
   nonexistent, negative, and huge ids all return "Access denied" or a clear validation error with
   **no existence leak** (missing and cross-team ids return the identical `TeamAccessDeniedException`).
@@ -173,3 +190,39 @@ because they need a Keycloak realm change or a repository refactor that should n
 - MCPSRV-006 "Connect an agent" page: the documented direct-grant token flow
   (`mcp_client` @ `:9080`) succeeds against the **running** Keycloak and all four tools answer; the
   endpoint URL is derived from the origin as `${origin}/mcp`.
+
+## 15. Transport migration — Streamable HTTP (MCPSRV-009, 2026-09-21)
+
+The MCP specification deprecated the HTTP+SSE transport in favour of Streamable HTTP.
+Spring AI 2.0.1 supports both, but the two auto-configurations are mutually exclusive
+(`spring.ai.mcp.server.protocol` picks one). MCPSRV-009 switches Ombuto OST to
+`protocol: STREAMABLE` on `/mcp` and removes the SSE transport (`/mcp` + `/mcp/message`)
+entirely — a deliberate decision under AC 2 of the ticket.
+
+Rationale:
+
+- The HTTP+SSE transport required a per-client, always-open connection to `/mcp` with a
+  companion POST endpoint at `/mcp/message?sessionId=…`. That kept a socket per client and
+  put session routing in the URL, which is why the earlier fix had to defend against
+  percent-encoded path variants (`/mcp/messag%65`) that resolved back to the same handler.
+- Streamable HTTP moves every JSON-RPC exchange to short POSTs against `/mcp`, with session
+  identity carried in the `Mcp-Session-Id` request/response header. Path spelling is no
+  longer a routing signal, so no path-encoding variant can bypass the session-owner check.
+- The security chain (`McpSecurityConfiguration`) still targets a single path (`/mcp`) with
+  the same bearer-token authentication and the same `Converter<Jwt, AbstractAuthenticationToken>`
+  as the web login. `McpSessionPrincipalFilter` was rewritten to key off the
+  `Mcp-Session-Id` header (request check on subsequent calls, response sniffer on initialize)
+  instead of the `sessionId` query parameter.
+- `McpEndpointSecurityScopingIT` now drives the real Streamable HTTP transport via
+  `HttpClientStreamableHttpTransport`; the cross-team scoping and refusal-shape assertions
+  therefore cover the new transport, not just the removed one.
+- `McpSessionHijackIT` was ported to the same transport, including a regression test that
+  posts to `/mc%70` (a percent-encoded path spelling of `/mcp`) with the victim's session
+  id and asserts the owner check still fires.
+- The "Connect an agent" page emits `"type": "http"` (the MCP client convention for
+  Streamable HTTP) instead of the old `"type": "sse"`.
+- The `Caddyfile` still needs `flush_interval -1` and zeroed timeouts because the optional
+  `GET /mcp` listening stream is framed as SSE; short POST/JSON-RPC exchanges are unaffected.
+
+Clients that only understood the old HTTP+SSE transport will need to upgrade (Claude Code
+2.1.278, verified against the running app, speaks Streamable HTTP).

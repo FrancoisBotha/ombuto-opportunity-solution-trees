@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Registers the read-only MCP tool set. The MCP server itself is auto-configured by the
  * spring-ai-starter-mcp-server-webmvc starter and served on the path configured in
- * application.yml (spring.ai.mcp.server.sse-endpoint = /mcp).
+ * application.yml (spring.ai.mcp.server.streamable-http.mcp-endpoint = /mcp).
  */
 @Configuration
 public class McpServerConfiguration {

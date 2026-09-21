@@ -7,18 +7,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Remembers which principal opened each MCP SSE session.
+ * Remembers which principal opened each MCP session.
  *
- * <p>The SSE transport routes an incoming JSON-RPC message purely by the {@code sessionId} query
- * parameter of {@code /mcp/message}: whoever posts a message with that id has their tool call
- * executed under <em>their own</em> identity but the result delivered into the stream of whoever
- * opened the session. Without an owner check any authenticated user who learns (or guesses) another
- * user's session id can push data of their own teams into that user's stream. This registry is the
- * server-side binding {@link McpSessionPrincipalFilter} enforces.
+ * <p>The Streamable HTTP transport routes every JSON-RPC request by its {@code Mcp-Session-Id}
+ * header: whoever posts a message with that id has their tool call executed under <em>their own</em>
+ * identity but the result delivered into the response (or listening stream) of whoever initialised
+ * the session. Without an owner check any authenticated user who learns (or guesses) another
+ * user's session id can push data from their own teams into that user's stream. This registry is
+ * the server-side binding {@link McpSessionPrincipalFilter} enforces.
  *
- * <p>Entries are added when the endpoint event of a new SSE connection is written and removed when
- * that connection completes, times out or errors, so the map holds at most one entry per live SSE
- * connection.
+ * <p>Entries are added the first time the transport announces a session id in the
+ * {@code Mcp-Session-Id} response header (on initialize) and are bounded by {@link #MAX_SESSIONS}
+ * as a safety valve if the transport ever forgets to notify us of a closed session.
  */
 @Component
 public class McpSessionRegistry {
@@ -43,7 +43,7 @@ public class McpSessionRegistry {
         LOG.debug("Bound MCP session {} to its opening principal", sessionId);
     }
 
-    /** Forgets a session whose SSE connection has ended. */
+    /** Forgets a session whose Streamable HTTP {@code DELETE /mcp} has terminated it. */
     public void unbind(String sessionId) {
         if (sessionId != null && owners.remove(sessionId) != null) {
             LOG.debug("Released MCP session {}", sessionId);

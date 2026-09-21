@@ -14,6 +14,7 @@ const TOOLS: McpTool[] = [
 
 const VERIFIED_CLIENT_NAME = 'Claude Code';
 const VERIFIED_CLIENT_VERSION = '2.1.278';
+const TRANSPORT_TYPE = 'http';
 
 const DEV_KEYCLOAK_ORIGIN = 'http://localhost:9080';
 
@@ -42,7 +43,7 @@ export default defineComponent({
       const cfg = {
         mcpServers: {
           'ombuto-ost': {
-            type: 'sse',
+            type: TRANSPORT_TYPE,
             url: endpointUrl.value,
             headers: {
               Authorization: 'Bearer <paste-access-token-here>',

@@ -181,3 +181,41 @@ The body was empty (zero bytes), matching Spring Security's `BearerTokenAuthenti
 ## Ticket notes summary
 
 Verified the official MCP Java SDK 2.0.0 over SSE against the local app with a bearer token from Keycloak's `mcp_client`. Discovery returned `ping` plus the four product tools. `list_products`, `get_tree`, `get_node`, and `list_interviews` all returned the caller's Team Jupiter data. Removing the token made SDK initialization fail and produced HTTP 401 with an empty body and a Bearer challenge. The page's `.mcp.json` shape was generated and accepted by Claude Code 2.1.278.
+
+---
+
+# MCP client verification note — Streamable HTTP transport (MCPSRV-009)
+
+Addendum for MCPSRV-009, verifying the current MCP transport. The **HTTP+SSE** verification above is kept as-is for history; it describes the deprecated transport that MCPSRV-009 removed.
+
+## Environment for this pass
+
+- Date: 21 September 2026
+- App: `main` at the MCPSRV-009 commit, running via `npm run app:start` on `http://localhost:8080`
+- Keycloak dev realm: running via `npm run docker:keycloak:up` on `http://localhost:9080`
+- MCP transport: **Streamable HTTP** on `POST/GET/DELETE /mcp`; session identity carried in the `Mcp-Session-Id` header. There is no `/mcp/message` endpoint anymore.
+- Client used to verify: official MCP Java SDK `io.modelcontextprotocol.sdk:mcp:2.0.0` via `HttpClientStreamableHttpTransport` (this is what `McpEndpointSecurityScopingIT` drives on every CI run).
+
+## Discovery + all four tools
+
+`initialize`, `tools/list` and `tools/call` for `ping`, `list_products`, `get_tree`, `get_node` and `list_interviews` all succeed against the running app, with the same authorisation semantics as the HTTP+SSE pass above. Because the transport now runs against a single URL and keys sessions off a request header, an unauthenticated `POST /mcp` returns 401 from the security chain (identical body to the SSE case above), and a cross-principal request that carries somebody else's `Mcp-Session-Id` header returns 404 from `McpSessionPrincipalFilter` — indistinguishable from an unknown session, as covered by `McpSessionHijackIT`.
+
+## Claude Code `.mcp.json`
+
+Claude Code 2.1.278 accepts the following configuration for the Streamable HTTP transport (this is exactly the snippet the "Connect an agent" page emits):
+
+```json
+{
+  "mcpServers": {
+    "ombuto-ost": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer <paste-access-token-here>"
+      }
+    }
+  }
+}
+```
+
+The `"type": "http"` value tells Claude Code to speak Streamable HTTP; the previous `"type": "sse"` value would have selected the removed HTTP+SSE transport.

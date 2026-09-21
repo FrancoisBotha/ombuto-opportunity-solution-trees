@@ -28,7 +28,10 @@
 	handle {
 		reverse_proxy app:8080 {
 			# Live collaboration uses STOMP over WebSocket, and the MCP endpoint
-			# streams SSE. Both need long-lived, unbuffered connections.
+			# uses the Streamable HTTP transport — POST /mcp for JSON-RPC (short
+			# request/response) and GET /mcp for the optional server-to-client
+			# listening stream, which the transport keeps open with SSE framing.
+			# Both need long-lived, unbuffered connections.
 			flush_interval -1
 			transport http {
 				read_timeout 0

@@ -131,30 +131,37 @@ registry of subscriptions to revoke on removal) — see epic 5 FR-034 / FR-037.
 
 ## MCP endpoint
 
-MCPSRV-001 wires the Spring AI MCP server starter (WebMVC / SSE transport,
+MCPSRV-001 wires the Spring AI MCP server starter (WebMVC,
 `org.springframework.ai:spring-ai-starter-mcp-server-webmvc`, pinned to Spring AI **2.0.1**
-via the `spring-ai-bom` in `pom.xml`) into the same Spring Boot process. Endpoint path is
-`/mcp` (SSE) with message posts on `/mcp/message`, configured in `application.yml` under
-`spring.ai.mcp.server`. Capabilities are locked down to **tools only** — resources, prompts and
-completions are all disabled. The only tool registered in this ticket is `ping`, a trivial
+via the `spring-ai-bom` in `pom.xml`) into the same Spring Boot process. MCPSRV-009 switched
+the transport from the deprecated HTTP+SSE (which needed a companion `/mcp/message` endpoint)
+to the current **Streamable HTTP** transport, configured under `spring.ai.mcp.server` with
+`protocol: STREAMABLE` and `streamable-http.mcp-endpoint: /mcp`. Every JSON-RPC message travels
+as a `POST /mcp`; the optional server-to-client listening stream is served on `GET /mcp` and
+per-session identity is carried in the `Mcp-Session-Id` HTTP header (both request and response),
+not in a URL segment. Capabilities are locked down to **tools only** — resources, prompts and
+completions are all disabled. The only tool registered in MCPSRV-001 is `ping`, a trivial
 read-only probe that exposes no application data; it exists to prove tool discovery and
 invocation over the transport. A dedicated, stateless, CSRF-exempt `SecurityFilterChain` in
-`McpSecurityConfiguration` isolates `/mcp/**` from the session-based `SecurityConfiguration` so
+`McpSecurityConfiguration` isolates `/mcp` from the session-based `SecurityConfiguration` so
 the existing web login, CSRF and REST API rules are untouched.
 
 MCPSRV-002 replaces the placeholder permit-all rule on that chain with an OAuth2 resource-server
 JWT authentication step. The chain is `SessionCreationPolicy.STATELESS`, has CSRF disabled for
-`/mcp/**` only, and reuses the shared `JwtDecoder` bean (Keycloak JWK set, `JwtValidators`
+`/mcp` only, and reuses the shared `JwtDecoder` bean (Keycloak JWK set, `JwtValidators`
 issuer + expiry, `AudienceValidator`) and the shared
 `Converter<Jwt, AbstractAuthenticationToken>` (`JwtAuthenticationConverter` +
 `SecurityUtils.extractAuthorityFromClaims`) so the caller resolves to the same application user
 and authorities the session login produces. `TeamAccessService` and any other REST code that
-reads the `SecurityContext` work unchanged from an MCP tool.
+reads the `SecurityContext` work unchanged from an MCP tool. `McpSessionPrincipalFilter` binds
+every session id the transport mints (announced in the `Mcp-Session-Id` response header of the
+initialize call) to the caller that opened it, and refuses any subsequent request that carries
+a session id belonging to somebody else — indistinguishably from an unknown session. Because the
+check is header-driven, no path-encoding variant (e.g. `/mc%70`) can bypass it.
 
-| Endpoint       | Verb | Transport                | Protection                                                                                                                      |
-| -------------- | ---- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `/mcp`         | GET  | SSE stream (MCP)         | Keycloak bearer JWT (`Authorization: Bearer …`); signature, issuer, audience, expiry validated. No token / invalid token → 401. |
-| `/mcp/message` | POST | JSON-RPC message channel | Same as above. CSRF is disabled on this chain only; the session-based chain keeps `CookieCsrfTokenRepository` for `/api/**`.    |
+| Endpoint | Verb            | Transport                       | Protection                                                                                                                                                                                                                                                                                                                                                                                |
+| -------- | --------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/mcp`   | POST/GET/DELETE | Streamable HTTP (MCP, JSON-RPC) | Keycloak bearer JWT (`Authorization: Bearer …`); signature, issuer, audience, expiry validated. No token / invalid token → 401. `Mcp-Session-Id` header on any request other than `initialize` must belong to the caller (404 otherwise, same shape as an unknown session). CSRF is disabled on this chain only; the session-based chain keeps `CookieCsrfTokenRepository` for `/api/**`. |
 
 ### Token acquisition for MCP callers (dev realm)
 

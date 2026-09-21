@@ -39,7 +39,7 @@ import com.opportunity.tree.service.mcp.TreeTool;
 import com.opportunity.tree.web.rest.OstTreeTestCleanup;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
-import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
+import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema;
@@ -133,8 +133,8 @@ import org.springframework.transaction.support.TransactionTemplate;
         "spring.ai.mcp.server.version=0.0.1",
         "spring.ai.mcp.server.type=SYNC",
         "spring.ai.mcp.server.stdio=false",
-        "spring.ai.mcp.server.sse-endpoint=/mcp",
-        "spring.ai.mcp.server.sse-message-endpoint=/mcp/message",
+        "spring.ai.mcp.server.protocol=STREAMABLE",
+        "spring.ai.mcp.server.streamable-http.mcp-endpoint=/mcp",
         "spring.ai.mcp.server.capabilities.tool=true",
         "spring.ai.mcp.server.capabilities.resource=false",
         "spring.ai.mcp.server.capabilities.prompt=false",
@@ -690,8 +690,8 @@ class McpEndpointSecurityScopingIT {
 
     private McpSyncClient openClientAs(String login) {
         String bearer = TOKEN_PREFIX + login;
-        HttpClientSseClientTransport transport = HttpClientSseClientTransport.builder("http://localhost:" + port)
-            .sseEndpoint("/mcp")
+        HttpClientStreamableHttpTransport transport = HttpClientStreamableHttpTransport.builder("http://localhost:" + port)
+            .endpoint("/mcp")
             .requestBuilder(HttpRequest.newBuilder().header("Authorization", "Bearer " + bearer))
             .build();
         McpSyncClient client = McpClient.sync(transport)

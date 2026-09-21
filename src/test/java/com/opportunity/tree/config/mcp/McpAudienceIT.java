@@ -11,7 +11,6 @@ import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.security.AuthoritiesConstants;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,8 +29,8 @@ import org.springframework.test.web.servlet.MvcResult;
  * the shared {@link com.opportunity.tree.security.oauth2.AudienceValidator} configured with
  * {@code account} + {@code api://default} — a list that accepts essentially every realm token.
  *
- * <p>Drives both the SSE handshake ({@code GET /mcp}) and a JSON-RPC POST
- * ({@code POST /mcp/message}) so the check holds on every entrypoint the transport exposes.
+ * <p>Drives both the Streamable HTTP handshake ({@code GET /mcp}) and a JSON-RPC POST
+ * ({@code POST /mcp}) so the check holds on every entrypoint the transport exposes.
  */
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -42,8 +41,8 @@ import org.springframework.test.web.servlet.MvcResult;
         "spring.ai.mcp.server.version=0.0.1",
         "spring.ai.mcp.server.type=SYNC",
         "spring.ai.mcp.server.stdio=false",
-        "spring.ai.mcp.server.sse-endpoint=/mcp",
-        "spring.ai.mcp.server.sse-message-endpoint=/mcp/message",
+        "spring.ai.mcp.server.protocol=STREAMABLE",
+        "spring.ai.mcp.server.streamable-http.mcp-endpoint=/mcp",
         "spring.ai.mcp.server.capabilities.tool=true",
         "spring.ai.mcp.server.capabilities.resource=false",
         "spring.ai.mcp.server.capabilities.prompt=false",
@@ -89,16 +88,19 @@ class McpAudienceIT {
     }
 
     @Test
-    void postMcpMessage_withRealmTokenLackingMcpAudience_isRefusedWith401() throws Exception {
+    void postMcp_withRealmTokenLackingMcpAudience_isRefusedWith401() throws Exception {
         when(jwtDecoder.decode(anyString())).thenReturn(webAppSessionTokenWithoutMcpAudience());
 
         MvcResult result = mvc
             .perform(
-                post("/mcp/message")
-                    .param("sessionId", UUID.randomUUID().toString())
+                post("/mcp")
                     .header("Authorization", "Bearer valid.web-app.session.token")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")
+                    .content(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"," +
+                            "\"params\":{\"protocolVersion\":\"2024-11-05\"," +
+                            "\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1\"}}}"
+                    )
             )
             .andReturn();
 

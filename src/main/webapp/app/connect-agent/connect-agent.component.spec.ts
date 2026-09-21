@@ -79,17 +79,20 @@ describe('ConnectAgent Component', () => {
     expect(wrapper.find('[data-cy="verifiedClient"]').text().length).toBeGreaterThan(0);
   });
 
-  it('shows a valid Claude Code SSE configuration', () => {
+  it('shows a valid Claude Code Streamable HTTP configuration', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     const config = JSON.parse(wrapper.find('[data-cy="clientConfigSnippet"]').text());
     expect(wrapper.find('[data-cy="verifiedClient"]').text()).toContain('Claude Code 2.1.278');
     expect(config.mcpServers['ombuto-ost']).toMatchObject({
-      type: 'sse',
+      type: 'http',
       url: 'https://ost.example.com/mcp',
       headers: { Authorization: 'Bearer <paste-access-token-here>' },
     });
+    // The Streamable HTTP transport is expressed via `type: "http"`; the deprecated `type: "sse"`
+    // must not creep back in — MCP clients treat it as the HTTP+SSE transport instead.
+    expect(config.mcpServers['ombuto-ost'].type).not.toBe('sse');
     expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('transport');
   });
 
