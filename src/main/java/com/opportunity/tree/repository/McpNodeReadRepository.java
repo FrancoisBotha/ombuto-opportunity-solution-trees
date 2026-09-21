@@ -139,4 +139,35 @@ public interface McpNodeReadRepository extends org.springframework.data.reposito
 
     @Query("select i.product.team.id from Interview i where i.id = :id")
     Optional<Long> findTeamIdOfInterview(@Param("id") Long id);
+
+    // Comments on a node: [id, body, authorLogin, createdDate, editedDate], oldest first.
+    @Query(
+        "select c.id, c.body, c.author.login, c.createdDate, c.editedDate from Comment c" +
+            " where c.outcome.id = :id order by c.createdDate asc, c.id asc"
+    )
+    List<Object[]> findCommentsForOutcome(@Param("id") Long id);
+
+    @Query(
+        "select c.id, c.body, c.author.login, c.createdDate, c.editedDate from Comment c" +
+            " where c.opportunity.id = :id order by c.createdDate asc, c.id asc"
+    )
+    List<Object[]> findCommentsForOpportunity(@Param("id") Long id);
+
+    @Query(
+        "select c.id, c.body, c.author.login, c.createdDate, c.editedDate from Comment c" +
+            " where c.solution.id = :id order by c.createdDate asc, c.id asc"
+    )
+    List<Object[]> findCommentsForSolution(@Param("id") Long id);
+
+    @Query(
+        "select c.id, c.body, c.author.login, c.createdDate, c.editedDate from Comment c" +
+            " where c.assumption.id = :id order by c.createdDate asc, c.id asc"
+    )
+    List<Object[]> findCommentsForAssumption(@Param("id") Long id);
+
+    @Query(
+        "select c.id, c.body, c.author.login, c.createdDate, c.editedDate from Comment c" +
+            " where c.evidence.id = :id order by c.createdDate asc, c.id asc"
+    )
+    List<Object[]> findCommentsForEvidence(@Param("id") Long id);
 }
