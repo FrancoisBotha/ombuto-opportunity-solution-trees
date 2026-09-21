@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { layoutTree } from '../domain/layout';
-import { evidenceStrength } from '../domain/rules';
 import { node, sampleNodes } from '../domain/fixtures.test-util';
 
 import {
   childCounts,
   edgeKind,
-  evidenceBySolution,
   isDimmed,
   isDraggable,
   laidOutNodes,
@@ -201,15 +199,11 @@ describe('canvas-model', () => {
     expect(edgeKind('evidence')).toBe('evidence');
   });
 
-  it('counts direct children and derives evidence strength in one pass, matching the domain rule', () => {
+  it('counts direct children in one pass', () => {
     const counts = childCounts(nodes);
     expect(counts.get('opportunity-1')).toBe(3);
     expect(counts.get('solution-1')).toBe(3);
     expect(counts.get('evidence-1')).toBeUndefined();
-    const strength = evidenceBySolution(nodes);
-    const rule = evidenceStrength('solution-1', nodes);
-    expect(strength.get('solution-1')).toEqual({ tests: rule.tests, score: rule.score });
-    expect(strength.has('opportunity-1')).toBe(false);
   });
 
   it('search matches title + notes case-insensitively; empty query dims nothing', () => {

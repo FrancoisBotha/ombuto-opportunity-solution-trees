@@ -108,22 +108,8 @@ export function childCounts(nodes: OstNode[]): Map<string, number> {
   return counts;
 }
 
-/**
- * Evidence strength of every tested solution in one pass (same rule as rules.evidenceStrength:
- * supported → 100, refuted → 0, otherwise the assumption's confidence; mean, rounded).
- * Solutions without assumptions are absent.
- */
-export function evidenceBySolution(nodes: OstNode[]): Map<string, { tests: number; score: number }> {
-  const acc = new Map<string, { tests: number; sum: number }>();
-  for (const n of nodes) {
-    if (n.type !== 'assumption' || !n.parent) continue;
-    const a = acc.get(n.parent) ?? { tests: 0, sum: 0 };
-    a.tests += 1;
-    a.sum += n.status === 'supported' ? 100 : n.status === 'refuted' ? 0 : n.conf;
-    acc.set(n.parent, a);
-  }
-  return new Map([...acc].map(([key, a]) => [key, { tests: a.tests, score: Math.round(a.sum / a.tests) }]));
-}
+// Evidence strength per solution used to be rolled up here for the node card. The card no longer
+// shows it (2026-09-21); the detail panel computes it from domain/derive.evidenceStrength instead.
 
 // ---- overview map (prototype: Ombuto OST.dc.html "mini") ------------------------------------------
 
