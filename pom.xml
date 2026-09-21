@@ -5,7 +5,7 @@
 
     <groupId>com.opportunity.tree</groupId>
     <artifactId>opportunity-solution-tree</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Opportunity Solution Tree</name>
     <description>Collaborative Opportunity Solution Trees for continuous product discovery</description>
@@ -700,7 +700,13 @@
                             </platforms>
                         </from>
                         <to>
-                            <image>opportunitysolutiontree:latest</image>
+                            <!-- Tag every image with the project version. `latest` is kept for
+                                 convenience, but a deployment should pin the version tag so that
+                                 "which build is running" has an answer. -->
+                            <image>opportunitysolutiontree:${project.version}</image>
+                            <tags>
+                                <tag>latest</tag>
+                            </tags>
                         </to>
                         <container>
                             <entrypoint>

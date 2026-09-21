@@ -17,7 +17,7 @@
           v-for="item in items"
           :key="item.comment.id"
           class="ost-chat__item"
-          :class="{ 'is-mine': item.comment.mine, 'is-run-start': item.runStart }"
+          :class="{ 'is-mine': item.mine, 'is-run-start': item.runStart }"
         >
           <div v-if="item.stamp" class="ost-chat__stamp" data-cy="ost-chat-stamp">{{ item.stamp }}</div>
           <div
@@ -32,7 +32,7 @@
             class="ost-chat__bubble"
             :class="{ 'is-editing': editingId === item.comment.id }"
             :data-cy="`ost-chat-msg-${item.comment.id}`"
-            :data-mine="item.comment.mine ? 'true' : 'false'"
+            :data-mine="item.mine ? 'true' : 'false'"
             :title="exactTime(item.comment.createdDate)"
           >
             <span class="ost-chat__text">{{ item.comment.body }}</span
@@ -45,7 +45,7 @@
               (edited)</span
             >
           </div>
-          <div v-if="item.comment.mine && canEdit" class="ost-chat__own">
+          <div v-if="item.mine && canEdit" class="ost-chat__own">
             <button
               type="button"
               class="ost-chat__own-btn ost-tap"
@@ -178,7 +178,9 @@ const readonlyId = `ost-chat-ro-${Math.random().toString(36).slice(2, 9)}`;
 
 const canEdit = computed(() => tree.canEdit);
 const comments = computed<CommentDTO[]>(() => tree.comments[props.nodeKey] ?? []);
-const items = computed(() => groupThread(comments.value));
+const currentUserLogin = computed(() => tree.team?.currentUserLogin ?? null);
+const items = computed(() => groupThread(comments.value, currentUserLogin.value));
+const isMine = (c: CommentDTO) => !!currentUserLogin.value && c.authorLogin === currentUserLogin.value;
 const ready = computed(() => canEdit.value && !busy.value && draft.value.trim().length > 0);
 
 const exactTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : '');
@@ -219,7 +221,7 @@ watch(
   async (now, before) => {
     if (now <= before) return;
     const last = comments.value.at(-1);
-    if (atBottom.value || last?.mine) {
+    if (atBottom.value || (last && isMine(last))) {
       await nextTick();
       scrollToEnd(false);
     }
@@ -278,7 +280,7 @@ async function focusInput() {
 
 function startEdit(comment: CommentDTO) {
   // Not while a send / save / delete is in flight: its completion would clear the new edit's draft.
-  if (!canEdit.value || !comment.mine || busy.value) return;
+  if (!canEdit.value || !isMine(comment) || busy.value) return;
   editingId.value = comment.id;
   draft.value = comment.body;
   error.value = null;

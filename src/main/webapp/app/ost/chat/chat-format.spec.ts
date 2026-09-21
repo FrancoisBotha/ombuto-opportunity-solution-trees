@@ -37,24 +37,37 @@ describe('chat-format', () => {
           comment(5, 'user', t(10, 30)), // pause > 5 min: new run
           comment(6, 'admin', t(10, 30)), // author change, same minute: run, stamp suppressed
         ],
+        'user',
         NOW,
       );
       expect(items.map(i => i.runStart)).toEqual([true, false, true, false, true, true]);
       expect(items.map(i => i.stamp)).toEqual(['Today 10:00', null, 'Today 10:03', null, 'Today 10:30', null]);
       expect(items.map(i => i.who)).toEqual(['AR', null, null, null, null, 'AR']);
+      expect(items.map(i => i.mine)).toEqual([false, false, true, true, true, false]);
     });
 
     it('a pause of exactly RUN_GAP_MS keeps the run', () => {
       const start = new Date(2026, 8, 20, 10, 0).getTime();
       const items = groupThread(
         [comment(1, 'admin', new Date(start).toISOString()), comment(2, 'admin', new Date(start + RUN_GAP_MS).toISOString())],
+        'user',
         NOW,
       );
       expect(items.map(i => i.runStart)).toEqual([true, false]);
     });
 
     it('is empty for no messages', () => {
-      expect(groupThread([], NOW)).toEqual([]);
+      expect(groupThread([], 'user', NOW)).toEqual([]);
+    });
+
+    it('ownership follows the viewer, not any field on the payload (CHAT-001)', () => {
+      const list = [comment(1, 'admin', local(2026, 8, 20, 10, 0)), comment(2, 'user', local(2026, 8, 20, 10, 1))];
+      // The same broadcast payload rendered by two different viewers attributes each message to
+      // its real author — no message is ever "mine" for a viewer who did not write it.
+      expect(groupThread(list, 'user', NOW).map(i => i.mine)).toEqual([false, true]);
+      expect(groupThread(list, 'admin', NOW).map(i => i.mine)).toEqual([true, false]);
+      // Without a known viewer, nothing is mine.
+      expect(groupThread(list, null, NOW).map(i => i.mine)).toEqual([false, false]);
     });
   });
 

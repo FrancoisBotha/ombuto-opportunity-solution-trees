@@ -103,11 +103,7 @@ public class TreeCommentService {
             case EVIDENCE -> collaborationRepository.findCommentsOfEvidence(nodeId);
             case PRODUCT -> throw new IllegalStateException("unreachable");
         };
-        String me = SecurityUtils.getCurrentUserLogin().orElse(null);
-        return comments
-            .stream()
-            .map(c -> toDto(c, me))
-            .collect(Collectors.toList());
+        return comments.stream().map(TreeCommentService::toDto).collect(Collectors.toList());
     }
 
     /** Posts a message as the current user. History: COMMENT_ADDED "Comment added". */
@@ -133,7 +129,7 @@ public class TreeCommentService {
         comment = commentRepository.save(comment);
         historyRecorder.record(type, nodeId, HistoryEventType.COMMENT_ADDED, "Comment added");
         em.flush();
-        TreeCommentDTO dto = toDto(comment, author.getLogin());
+        TreeCommentDTO dto = toDto(comment);
         changePublisher.publish(
             TreeChangeType.COMMENT_ADDED,
             teamId,
@@ -152,7 +148,7 @@ public class TreeCommentService {
         comment.setEditedDate(Instant.now());
         comment = commentRepository.save(comment);
         em.flush();
-        TreeCommentDTO dto = toDto(comment, comment.getAuthor().getLogin());
+        TreeCommentDTO dto = toDto(comment);
         changePublisher.publish(
             TreeChangeType.COMMENT_UPDATED,
             teamId,
@@ -234,7 +230,7 @@ public class TreeCommentService {
         return body;
     }
 
-    private static TreeCommentDTO toDto(Comment c, String currentLogin) {
+    private static TreeCommentDTO toDto(Comment c) {
         User author = c.getAuthor();
         String login = author == null ? null : author.getLogin();
         String name =
@@ -255,8 +251,7 @@ public class TreeCommentService {
             author == null ? null : TeamTreeService.initials(author),
             name,
             c.getCreatedDate(),
-            c.getEditedDate(),
-            login != null && login.equals(currentLogin)
+            c.getEditedDate()
         );
     }
 }

@@ -298,8 +298,18 @@ test.describe('OST realtime collaboration — two sessions', () => {
     const commentRes = await user.api('post', `/api/tree/nodes/opportunity/${op.id}/comments`, { body: 'Live chat message' });
     expect(commentRes.status()).toBe(201);
     const comment = (await commentRes.json()) as { id: number };
-    await expect(observing.getByTestId(`ost-chat-msg-${comment.id}`)).toContainText('Live chat message');
+    const bubble = observing.getByTestId(`ost-chat-msg-${comment.id}`);
+    await expect(bubble).toContainText('Live chat message');
     await expect(observing.getByTestId('ost-tab-badge-chat')).toHaveText('1');
+    // CHAT-001: a message live-delivered from `user` must be attributed to `user` on the
+    // observing `admin` session — not styled as the viewer's own, no Edit/Delete offered,
+    // author initials shown on the run-start bubble.
+    await expect(bubble).toHaveAttribute('data-mine', 'false');
+    const item = bubble.locator('..');
+    await expect(item).not.toHaveClass(/\bis-mine\b/);
+    await expect(item.getByTestId('ost-chat-who')).toHaveText(userInitials);
+    await expect(observing.getByTestId(`ost-chat-edit-${comment.id}`)).toHaveCount(0);
+    await expect(observing.getByTestId(`ost-chat-delete-${comment.id}`)).toHaveCount(0);
 
     // --- move (re-parent) -----------------------------------------------------------------------
     // Fit first: the canvas only renders what is in view (only-render-visible-elements), so the

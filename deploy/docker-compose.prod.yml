@@ -10,7 +10,7 @@ name: ombuto-ost
 
 services:
   app:
-    image: ${APP_IMAGE:-ombuto-ost:latest}
+    image: ${APP_IMAGE:?set APP_IMAGE to a version-tagged image in deploy/.env}
     restart: unless-stopped
     environment:
       - _JAVA_OPTIONS=-Xmx1024m -Xms512m

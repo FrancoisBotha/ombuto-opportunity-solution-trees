@@ -462,7 +462,6 @@ describe('OST tree store', () => {
         authorName: 'Kira',
         createdDate: '',
         editedDate: null,
-        mine: true,
       };
       service.listComments.resolves([comment]);
       await tree.loadComments('opportunity-1');
@@ -579,7 +578,6 @@ describe('OST tree store', () => {
         authorName: 'Kira',
         createdDate: '',
         editedDate: null,
-        mine: true,
       };
       service.listComments.resolves([comment]);
       await tree.loadComments('solution-1');
@@ -603,7 +601,6 @@ describe('OST tree store', () => {
         authorName: 'Kira',
         createdDate: '',
         editedDate: null,
-        mine: true,
       };
       const other = { ...comment, id: 2, body: 'second' };
       service.listComments.resolves([comment, other]);

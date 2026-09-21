@@ -130,7 +130,6 @@ describe('OST tree store — realtime event application (RTC-005)', () => {
       authorName: 'Admin',
       createdDate: '2026-09-20T10:00:00Z',
       editedDate: null,
-      mine: false,
     };
     tree.applyEvents([{ type: 'COMMENT_ADDED', actingUserLogin: 'admin', key: 'solution-1', comment, commentCount: 1 } as OstTreeEvent]);
     expect(tree.byId('solution-1')?.commentCount).toBe(1);
@@ -155,7 +154,6 @@ describe('OST tree store — realtime event application (RTC-005)', () => {
       authorName: 'Admin',
       createdDate: '2026-09-20T10:00:00Z',
       editedDate: null,
-      mine: false,
     };
     tree.applyEvents([{ type: 'COMMENT_ADDED', actingUserLogin: 'admin', key: 'solution-1', comment } as OstTreeEvent]);
     expect(tree.comments['solution-1']).toHaveLength(1);
@@ -180,7 +178,6 @@ describe('OST tree store — realtime event application (RTC-005)', () => {
       authorName: 'User',
       createdDate: '2026-09-20T10:00:00Z',
       editedDate: null,
-      mine: true,
     });
     await tree.addComment('opportunity-1', 'hi');
     expect(service.addComment.firstCall.args[3]).toEqual(expect.any(String));
@@ -250,7 +247,6 @@ describe('OST tree store — realtime event application (RTC-005)', () => {
             authorName: 'Admin',
             createdDate: now,
             editedDate: null,
-            mine: false,
           },
           commentCount: 1,
         },

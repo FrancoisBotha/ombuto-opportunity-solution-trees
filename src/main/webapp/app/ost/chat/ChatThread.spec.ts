@@ -204,6 +204,96 @@ describe('ChatThread', () => {
     });
   });
 
+  describe('live-applied ownership (CHAT-001)', () => {
+    it('a live COMMENT_ADDED from another author shows their initials, no edit / delete', async () => {
+      // The viewer is `user` (setupStores default). A message posted by `admin` on this thread
+      // must render as `admin`'s, not the viewer's — even though the DTO carries no `mine` flag
+      // and the payload came off a team topic shared with every subscriber.
+      const { wrapper, tree } = await mountThread();
+      tree.applyEvents([
+        {
+          type: 'COMMENT_ADDED',
+          actingUserLogin: 'admin',
+          key: 'opportunity-1',
+          comment: comment(101, 'admin', new Date().toISOString(), { body: 'Live from admin' }),
+          commentCount: 6,
+        } as any,
+      ]);
+      await flushPromises();
+      const bubble = wrapper.get('[data-cy="ost-chat-msg-101"]');
+      expect(bubble.attributes('data-mine')).toBe('false');
+      expect(bubble.element.parentElement?.classList.contains('is-mine')).toBe(false);
+      // Author's initials appear on the run-start bubble (CHAT-001: attribution proof).
+      expect(bubble.element.parentElement?.querySelector('[data-cy="ost-chat-who"]')?.textContent).toBe('AR');
+      // Full author name is inspectable on hover (title attribute).
+      expect(bubble.element.parentElement?.querySelector('[data-cy="ost-chat-who"]')?.getAttribute('title')).toBe('Ana R');
+      expect(wrapper.find('[data-cy="ost-chat-edit-101"]').exists()).toBe(false);
+      expect(wrapper.find('[data-cy="ost-chat-delete-101"]').exists()).toBe(false);
+    });
+
+    it("the viewer's own message applied live still renders as theirs, editable and deletable", async () => {
+      // Own tab echo: `authorLogin` matches the viewer's login, so ownership must resolve true.
+      const { wrapper, tree } = await mountThread();
+      tree.applyEvents([
+        {
+          type: 'COMMENT_ADDED',
+          actingUserLogin: 'user',
+          key: 'opportunity-1',
+          comment: comment(102, 'user', new Date().toISOString(), { body: 'From another tab of mine' }),
+          commentCount: 6,
+        } as any,
+      ]);
+      await flushPromises();
+      const bubble = wrapper.get('[data-cy="ost-chat-msg-102"]');
+      expect(bubble.attributes('data-mine')).toBe('true');
+      expect(wrapper.find('[data-cy="ost-chat-edit-102"]').exists()).toBe(true);
+      expect(wrapper.find('[data-cy="ost-chat-delete-102"]').exists()).toBe(true);
+    });
+
+    it('a live COMMENT_UPDATED broadcast by its author does not flip ownership for anyone else', async () => {
+      // Ticket criterion 4: an edit must not turn someone else's message into "mine".
+      const { wrapper, tree } = await mountThread();
+      const original = comment(1, 'admin', new Date().toISOString(), { body: 'original' });
+      tree.applyEvents([
+        { type: 'COMMENT_ADDED', actingUserLogin: 'admin', key: 'opportunity-1', comment: original, commentCount: 5 } as any,
+      ]);
+      await flushPromises();
+      tree.applyEvents([
+        {
+          type: 'COMMENT_UPDATED',
+          actingUserLogin: 'admin',
+          key: 'opportunity-1',
+          comment: { ...original, body: 'edited', editedDate: new Date().toISOString() },
+          commentCount: 5,
+        } as any,
+      ]);
+      await flushPromises();
+      const bubble = wrapper.get('[data-cy="ost-chat-msg-1"]');
+      expect(bubble.attributes('data-mine')).toBe('false');
+      expect(wrapper.find('[data-cy="ost-chat-edit-1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-cy="ost-chat-delete-1"]').exists()).toBe(false);
+    });
+
+    it('viewers stay read-only for a live message from another author (no composer, no edit / delete)', async () => {
+      const { wrapper, tree } = await mountThread(THREAD, { canEdit: false, currentUserRole: 'VIEWER' });
+      tree.applyEvents([
+        {
+          type: 'COMMENT_ADDED',
+          actingUserLogin: 'admin',
+          key: 'opportunity-1',
+          comment: comment(103, 'admin', new Date().toISOString(), { body: 'from admin' }),
+          commentCount: 6,
+        } as any,
+      ]);
+      await flushPromises();
+      const bubble = wrapper.get('[data-cy="ost-chat-msg-103"]');
+      expect(bubble.attributes('data-mine')).toBe('false');
+      expect(wrapper.find('[data-cy="ost-chat-edit-103"]').exists()).toBe(false);
+      expect(wrapper.find('[data-cy="ost-chat-delete-103"]').exists()).toBe(false);
+      expect(input(wrapper).attributes('disabled')).toBeDefined();
+    });
+  });
+
   it('viewer: reads the thread, composer disabled with a note, no edit / delete even on own messages', async () => {
     const { wrapper, service } = await mountThread(THREAD, { canEdit: false, currentUserRole: 'VIEWER' });
     expect(bubbles(wrapper)).toHaveLength(5);
