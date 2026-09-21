@@ -196,6 +196,24 @@ file does not need to change.
    public JSON document — do not require an authenticated bearer token in front
    of it.
 
+   **Client identifier for MCP clients**: RFC 9728 protected-resource metadata
+   does not carry a `client_id`, so a desktop MCP client either learns one via
+   Dynamic Client Registration (RFC 7591) or is told one out of band. In this
+   deployment the client*id is the static, pre-registered public client
+   `mcp_client` and is documented on the in-app Connect an agent page, which
+   emits a `.mcp.json` snippet with `oauth.client_id: "mcp_client"`. Anonymous
+   Dynamic Client Registration is **not** enabled on the production realm —
+   the realm's `trusted-hosts` anonymous policy denies unregistered hosts by
+   default and there is no reason to open it up when every MCP caller can
+   reuse the same public client. Access tokens expire on the realm's configured
+   lifespan; when a token expires the app answers 401 with the same
+   `WWW-Authenticate` challenge, which triggers the client's refresh-token
+   exchange with Keycloak. Operators do not need to touch the connection at
+   expiry; the client survives across it. This has been verified end-to-end
+   against Claude Code 2.1.278 with the realm's access-token lifespan shortened
+   to 60 s (see the `mcpEndpoint_afterAccessTokenExpiry*...` integration test
+   for the server-side proof of the refresh trigger).
+
 7. **Start the rest**: `docker compose -f docker-compose.prod.yml up -d`.
 8. **Verify** `https://<host>/management/health` returns `UP`, then sign in.
 9. **Install the backup job**:

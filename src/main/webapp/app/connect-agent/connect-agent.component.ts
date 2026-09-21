@@ -15,6 +15,7 @@ const TOOLS: McpTool[] = [
 const VERIFIED_CLIENT_NAME = 'Claude Code';
 const VERIFIED_CLIENT_VERSION = '2.1.278';
 const TRANSPORT_TYPE = 'http';
+const MCP_CLIENT_ID = 'mcp_client';
 
 const DEV_KEYCLOAK_ORIGIN = 'http://localhost:9080';
 
@@ -46,6 +47,9 @@ export default defineComponent({
           'ombuto-ost': {
             type: TRANSPORT_TYPE,
             url: endpointUrl.value,
+            oauth: {
+              client_id: MCP_CLIENT_ID,
+            },
           },
         },
       };
@@ -76,6 +80,7 @@ export default defineComponent({
       copy,
       verifiedClientName: VERIFIED_CLIENT_NAME,
       verifiedClientVersion: VERIFIED_CLIENT_VERSION,
+      mcpClientId: MCP_CLIENT_ID,
     };
   },
 });

@@ -1,16 +1,24 @@
 package com.opportunity.tree.config.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.opportunity.tree.IntegrationTest;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -51,6 +59,14 @@ class McpProtectedResourceMetadataIT {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private JwtDecoder jwtDecoder;
+
+    @BeforeEach
+    void resetDecoderMock() {
+        reset(jwtDecoder);
+    }
+
     @Test
     void protectedResourceMetadata_isPubliclyReadableAndNamesTheAuthorizationServer() throws Exception {
         mvc
@@ -72,5 +88,35 @@ class McpProtectedResourceMetadataIT {
         assertThat(challenge).startsWith("Bearer ");
         assertThat(challenge).contains("resource_metadata=\"");
         assertThat(challenge).contains("/.well-known/oauth-protected-resource");
+    }
+
+    /**
+     * The refresh-across-expiry contract: the MCP client keeps its SSE connection open past the
+     * access-token lifetime by retrying against the same 401 + {@code WWW-Authenticate} challenge
+     * once its refresh-token exchange produces a fresh access token. That retry only works if the
+     * server answers a request bearing an <em>expired</em> token with the same challenge shape a
+     * missing-token request gets — same {@code Bearer}, same {@code resource_metadata=...} pointing
+     * at the discovery document, plus the OAuth2 {@code invalid_token} / expired hint the client
+     * uses to distinguish "refresh me" from other failure modes. This test pins that contract.
+     */
+    @Test
+    void mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes() throws Exception {
+        when(jwtDecoder.decode(anyString())).thenThrow(
+            new JwtValidationException(
+                "Jwt expired",
+                List.of(new OAuth2Error("invalid_token", "Jwt expired at 2026-09-21T09:00:00Z", null))
+            )
+        );
+
+        MvcResult result = mvc.perform(get("/mcp").header("Authorization", "Bearer expired.token.value")).andReturn();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(401);
+        String challenge = result.getResponse().getHeader(HttpHeaders.WWW_AUTHENTICATE);
+        assertThat(challenge).as("expiry must produce the same challenge shape as a missing token").isNotBlank();
+        assertThat(challenge).startsWith("Bearer ");
+        assertThat(challenge).contains("resource_metadata=\"");
+        assertThat(challenge).contains("/.well-known/oauth-protected-resource");
+        assertThat(challenge).contains("error=\"invalid_token\"");
+        assertThat(challenge).containsIgnoringCase("expired");
     }
 }

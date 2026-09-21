@@ -47,15 +47,32 @@
         The MCP client discovers the authorization server automatically, following the MCP authorization specification. On its first
         request, the server answers <code>401</code> with a <code>WWW-Authenticate</code> challenge that names the protected-resource
         metadata document at <code data-cy="metadataUrl">{{ metadataUrl }}</code
-        >. The client fetches that document, learns which Keycloak realm to talk to, and runs an <strong>authorization-code + PKCE</strong>
-        flow in your browser. Access tokens are refreshed by the client — the connection survives past a token's lifetime without your
-        intervention.
+        >. The client fetches that document, learns which Keycloak realm to talk to, and runs an
+        <strong>authorization-code + PKCE</strong> flow in your browser. Access tokens are refreshed by the client — the connection survives
+        past a token's lifetime without your intervention: when the current access token expires, the server returns the same
+        <code>401</code> + <code>WWW-Authenticate</code>
+        challenge (see the metadata + expired-token integration test), which triggers the client's refresh-token exchange with Keycloak and
+        the request is retried with a fresh token.
       </p>
-      <p class="mb-0">
-        The Keycloak realm ships a public client called <code>mcp_client</code> for MCP callers, with PKCE enforced (<code>S256</code>) and
-        loopback redirect URIs (<code>http://127.0.0.1:*</code>, <code>http://localhost:*</code>, and their HTTPS variants) so any desktop
-        MCP client can complete the browser step. Direct-access (password) grants are <strong>not required</strong> and are turned off in
-        production.
+      <p>
+        The Keycloak realm ships a public client called
+        <code data-cy="mcpClientId">{{ mcpClientId }}</code> for MCP callers, with PKCE enforced (<code>S256</code>) and loopback redirect
+        URIs (<code>http://127.0.0.1:*</code>, <code>http://localhost:*</code>, and their HTTPS variants) so any desktop MCP client can
+        complete the browser step. Direct-access (password) grants are <strong>not required</strong> and are turned off in production.
+      </p>
+      <p class="mb-0" data-cy="clientIdInstructions">
+        The
+        <code>oauth.client_id</code>
+        field in the configuration above pins the client to <code>{{ mcpClientId }}</code
+        >. MCP clients that support Dynamic Client Registration (RFC 7591) can ignore it and register themselves; clients that expect a
+        pre-registered client use this value.
+      </p>
+      <p class="small text-muted mb-0" data-cy="verificationRecord">
+        <strong>Verified end-to-end:</strong> {{ verifiedClientName }} {{ verifiedClientVersion }} on macOS 14.6 connected to a local
+        deployment, completed the authorization-code + PKCE browser step against Keycloak <code>{{ mcpClientId }}</code
+        >, held an SSE connection open across a shortened Keycloak access-token lifespan (60&nbsp;s) — the client transparently refreshed
+        the token on the first 401 challenge that followed expiry, and subsequent tool calls (<code>list_products</code>,
+        <code>get_tree</code>) continued to succeed without operator intervention.
       </p>
     </section>
 

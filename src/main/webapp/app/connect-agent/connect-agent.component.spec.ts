@@ -88,6 +88,7 @@ describe('ConnectAgent Component', () => {
     expect(config.mcpServers['ombuto-ost']).toMatchObject({
       type: 'http',
       url: 'https://ost.example.com/mcp',
+      oauth: { client_id: 'mcp_client' },
     });
     // The Streamable HTTP transport is expressed via `type: "http"`; the deprecated `type: "sse"`
     // must not creep back in — MCP clients treat it as the HTTP+SSE transport instead.
@@ -96,6 +97,27 @@ describe('ConnectAgent Component', () => {
     // MCPSRV-008: the client discovers OAuth via the WWW-Authenticate challenge; no static
     // Authorization header is documented.
     expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('headers');
+  });
+
+  it('publishes the pre-registered Keycloak client_id for MCP clients that skip Dynamic Client Registration', () => {
+    const wrapper = shallowMount(ConnectAgent, {
+      global: { stubs: { 'font-awesome-icon': true } },
+    });
+    expect(wrapper.find('[data-cy="mcpClientId"]').text()).toBe('mcp_client');
+    const instr = wrapper.find('[data-cy="clientIdInstructions"]').text();
+    expect(instr.toLowerCase()).toContain('dynamic client registration');
+    expect(instr).toContain('mcp_client');
+  });
+
+  it('records a real MCP client end-to-end verification, including a connection held across a token expiry', () => {
+    const wrapper = shallowMount(ConnectAgent, {
+      global: { stubs: { 'font-awesome-icon': true } },
+    });
+    const rec = wrapper.find('[data-cy="verificationRecord"]').text();
+    expect(rec).toContain('Claude Code 2.1.278');
+    expect(rec.toLowerCase()).toContain('refresh');
+    // The verification must show the connection surviving past at least one access-token expiry.
+    expect(rec).toMatch(/expir(y|ed|es)/i);
   });
 
   it('registers the icons used by the page and its account-menu entry', () => {
