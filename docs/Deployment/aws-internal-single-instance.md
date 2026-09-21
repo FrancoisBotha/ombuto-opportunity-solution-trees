@@ -139,9 +139,16 @@ file does not need to change.
 ## First deployment
 
 1. **Build the image** on a workstation: `npm run java:docker:prod`. This runs
-   jib and produces `ombuto-ost:latest` on `eclipse-temurin:21-jre-noble`. Either
-   push it to ECR and set `APP_IMAGE` to that repository, or
-   `docker save | ssh`-equivalent it onto the instance through SSM.
+   jib and produces `opportunitysolutiontree:<version>` on
+   `eclipse-temurin:21-jre-noble`, also tagged `latest`. Either push it to ECR and
+   set `APP_IMAGE` to that repository, or `docker save | ssh`-equivalent it onto
+   the instance through SSM.
+
+   **Set `APP_IMAGE` to the version tag, never `latest`.** A deployment you cannot
+   name is one you cannot reason about afterwards: `latest` refers to whatever was
+   built most recently, so it cannot answer which build is running, and pulling it
+   again can silently change the application. The compose file refuses to start
+   without `APP_IMAGE` set for this reason.
 2. **Install Docker and the Compose plugin** on the instance, and copy the repo's
    `deploy/` directory to `/opt/ombuto-ost/deploy`.
 3. **Place the TLS certificate** at `deploy/tls/server.crt` and `server.key`.
@@ -183,6 +190,9 @@ file does not need to change.
 
 7. **Start the rest**: `docker compose -f docker-compose.prod.yml up -d`.
 8. **Verify** `https://<host>/management/health` returns `UP`, then sign in.
+   `https://<host>/management/info` names exactly what is running — the build
+   version and the git commit it was built from. That pair is the only reliable
+   answer to "is this change live?", so record it with each deployment.
 9. **Install the backup job**:
    ```bash
    sudo install -m 0755 backup-to-s3.sh    /usr/local/bin/ombuto-backup

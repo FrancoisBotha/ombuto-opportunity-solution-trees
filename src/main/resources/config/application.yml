@@ -178,7 +178,9 @@ spring:
       server:
         enabled: true
         name: opportunity-solution-tree-mcp
-        version: 0.0.1
+        # Filtered by Maven at build time, so a connected MCP client is told the real build
+        # version instead of a literal that nobody remembers to bump.
+        version: '@project.version@'
         type: SYNC
         stdio: false
         # Streamable HTTP is the current MCP transport; HTTP+SSE was deprecated in the spec.
@@ -234,7 +236,9 @@ jhipster:
     management-include-pattern: /management/**
     title: Opportunity Solution Tree API
     description: Opportunity Solution Tree API documentation
-    version: 0.0.1
+    # Filtered by Maven, like the MCP server version: the OpenAPI document should say
+    # which build produced it.
+    version: '@project.version@'
     terms-of-service-url:
     contact-name:
     contact-url:
