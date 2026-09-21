@@ -51,6 +51,24 @@ public class McpSecurityConfiguration {
 
     static final String MCP_DEFAULT_ENDPOINT = "/mcp";
 
+    /**
+     * A stateless, CSRF-exempt filter chain isolated to the OAuth 2.0 protected-resource metadata
+     * document (RFC 9728 / MCP authorization spec). The MCP client fetches this document, without a
+     * token, to discover the authorization server(s) after a 401 challenge — gating it on a token
+     * would defeat the discovery step. Registered ahead of the MCP chain so its
+     * {@link HttpSecurity#securityMatcher} wins for the metadata path only.
+     */
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE + 5)
+    public SecurityFilterChain mcpMetadataSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher(McpProtectedResourceMetadataResource.METADATA_PATH)
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(authz -> authz.anyRequest().permitAll());
+        return http.build();
+    }
+
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 10)
     public SecurityFilterChain mcpSecurityFilterChain(

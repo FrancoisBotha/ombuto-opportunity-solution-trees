@@ -28,8 +28,9 @@
       <h4>Client configuration</h4>
       <p class="text-muted small mb-2">
         Verified against <strong data-cy="verifiedClient">{{ verifiedClientName }} {{ verifiedClientVersion }}</strong> over the Streamable
-        HTTP transport. Save this as <code>.mcp.json</code> in your project, replace the token placeholder, then start Claude Code and
-        approve the project server when prompted.
+        HTTP transport. Save this as <code>.mcp.json</code> in your project, then start Claude Code and approve the project server when
+        prompted. The client opens your browser to sign in with Keycloak the first time and refreshes tokens on its own — no bearer token to
+        paste and no expiry to manage.
       </p>
       <div class="d-flex align-items-start gap-2">
         <pre class="p-2 bg-light border rounded flex-grow-1 mb-0" data-cy="clientConfigSnippet">{{ clientConfigSnippet }}</pre>
@@ -40,18 +41,35 @@
       </div>
     </section>
 
-    <section class="card p-3 mb-3" data-cy="tokenInstructions">
-      <h4>Obtain a bearer token</h4>
+    <section class="card p-3 mb-3" data-cy="authFlowInstructions">
+      <h4>How authorization works</h4>
       <p>
-        The MCP endpoint accepts a Keycloak-issued OAuth2 access token as an <code>Authorization: Bearer</code> header. Use the dev-realm
-        public client <code>mcp_client</code> (added in ticket MCPSRV-002) — it has direct-access grants enabled and PKCE, and matches the
-        audience the endpoint validates.
+        The MCP client discovers the authorization server automatically, following the MCP authorization specification. On its first
+        request, the server answers <code>401</code> with a <code>WWW-Authenticate</code> challenge that names the protected-resource
+        metadata document at <code data-cy="metadataUrl">{{ metadataUrl }}</code
+        >. The client fetches that document, learns which Keycloak realm to talk to, and runs an <strong>authorization-code + PKCE</strong>
+        flow in your browser. Access tokens are refreshed by the client — the connection survives past a token's lifetime without your
+        intervention.
+      </p>
+      <p class="mb-0">
+        The Keycloak realm ships a public client called <code>mcp_client</code> for MCP callers, with PKCE enforced (<code>S256</code>) and
+        loopback redirect URIs (<code>http://127.0.0.1:*</code>, <code>http://localhost:*</code>, and their HTTPS variants) so any desktop
+        MCP client can complete the browser step. Direct-access (password) grants are <strong>not required</strong> and are turned off in
+        production.
+      </p>
+    </section>
+
+    <section class="card p-3 mb-3" data-cy="tokenInstructions">
+      <h4>Local-development fallback: mint a token by hand</h4>
+      <p class="text-warning small mb-2">
+        <strong>Local development only.</strong> Use this only if your MCP client cannot yet run the authorization-code flow. It relies on
+        the direct-access-grant capability of the dev realm, which is disabled in production; the pasted token expires in five minutes and
+        the client will not refresh it.
       </p>
       <p>
         Keycloak runs on its own host and port (in dev,
         <code data-cy="keycloakOrigin">{{ keycloakOrigin }}</code
-        >). Quickest path for a desktop client that cannot yet do interactive OAuth is a one-shot direct-access-grant call against the
-        realm's token endpoint:
+        >). Run the one-shot direct-access-grant curl against the realm's token endpoint:
       </p>
       <pre class="p-2 bg-light border rounded" data-cy="tokenCurl">
 curl -s -X POST \
@@ -63,8 +81,8 @@ curl -s -X POST \
   -d 'password=&lt;your keycloak password&gt;'</pre
       >
       <p class="small text-muted mb-0">
-        Copy the <code>access_token</code> field from the response into the <code>Authorization</code> header of your MCP client
-        configuration. Tokens expire; refresh when your client reports a 401.
+        Copy the <code>access_token</code> field from the response into an <code>Authorization: Bearer</code> header in your MCP client
+        config. This is a temporary workaround; prefer the OAuth flow above.
       </p>
     </section>
 

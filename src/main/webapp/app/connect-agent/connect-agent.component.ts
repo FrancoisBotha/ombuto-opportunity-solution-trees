@@ -35,6 +35,7 @@ export default defineComponent({
   setup() {
     const origin = ref(typeof window !== 'undefined' ? window.location.origin : '');
     const endpointUrl = computed(() => `${origin.value}/mcp`);
+    const metadataUrl = computed(() => `${origin.value}/.well-known/oauth-protected-resource`);
     const keycloakOrigin = computed(() => deriveKeycloakOrigin(origin.value));
     const tokenUrl = computed(() => `${keycloakOrigin.value}/realms/jhipster/protocol/openid-connect/token`);
     const copyState = ref<{ endpoint: boolean; config: boolean }>({ endpoint: false, config: false });
@@ -45,9 +46,6 @@ export default defineComponent({
           'ombuto-ost': {
             type: TRANSPORT_TYPE,
             url: endpointUrl.value,
-            headers: {
-              Authorization: 'Bearer <paste-access-token-here>',
-            },
           },
         },
       };
@@ -70,6 +68,7 @@ export default defineComponent({
       tools: TOOLS,
       origin,
       endpointUrl,
+      metadataUrl,
       keycloakOrigin,
       tokenUrl,
       clientConfigSnippet,

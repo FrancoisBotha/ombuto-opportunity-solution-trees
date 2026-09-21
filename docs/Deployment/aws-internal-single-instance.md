@@ -164,12 +164,19 @@ file does not need to change.
    `web_app`'s session tokens do not carry it, so they are rejected at `/mcp`. In
    the admin console:
    - **Clients → Create client** → Client type OpenID Connect, Client ID `mcp_client`.
-   - **Capability config**: enable _Direct access grants_ (`password` grant) so the
-     "Connect an agent" page's one-shot `curl` works, disable _Client authentication_
-     (public client), enable _Standard flow_ (Authorization Code + PKCE) for
-     interactive clients.
+   - **Capability config**: disable _Client authentication_ (public client),
+     enable _Standard flow_ (Authorization Code + PKCE — this is the documented
+     path for MCP clients), and leave _Direct access grants_ **off**. The
+     password grant is not required — the MCP client discovers the authorization
+     server from the `WWW-Authenticate` challenge on a 401 and runs
+     authorization-code + PKCE in the browser (RFC 9728 / MCP authorization
+     specification). Leaving direct-access grants off in production removes a
+     password-grant recipe from the deployment surface entirely.
    - **Login settings → Valid redirect URIs**: `http://127.0.0.1:*`,
-     `http://localhost:*` (and any HTTPS loopback variants your clients need).
+     `http://localhost:*` (and their HTTPS loopback variants). Loopback URIs are
+     what desktop MCP clients (Claude Code, Claude Desktop, and similar) open a
+     browser against to complete the authorization step; the server never
+     forwards a browser to them itself.
    - **Advanced → Proof Key for Code Exchange**: `S256`.
    - **Client scopes → mcp_client-dedicated → Add mapper → By configuration →
      Audience**: name `audience-mcp-server`, leave _Included Client Audience_ empty,
@@ -178,8 +185,16 @@ file does not need to change.
      NOT add the same mapper to `web_app`.
 
    The dev realm export at `src/main/docker/realm-config/jhipster-realm.json`
-   (client `mcp_client`, mapper `audience-mcp-server`) is the reference — replicate
-   its shape, not its secret or redirect URIs.
+   (client `mcp_client`, mapper `audience-mcp-server`) is the reference for the
+   client shape and audience mapper — replicate those, but not its secret,
+   redirect URIs, or the dev-only `directAccessGrantsEnabled: true` flag it
+   carries for the local-development curl fallback.
+
+   The app publishes the OAuth 2.0 protected-resource metadata at
+   `https://<host>/.well-known/oauth-protected-resource`; MCP clients fetch it
+   after a 401 challenge to learn which realm to authenticate against. It is a
+   public JSON document — do not require an authenticated bearer token in front
+   of it.
 
 7. **Start the rest**: `docker compose -f docker-compose.prod.yml up -d`.
 8. **Verify** `https://<host>/management/health` returns `UP`, then sign in.
