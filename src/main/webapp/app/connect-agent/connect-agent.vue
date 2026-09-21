@@ -68,14 +68,15 @@
         pre-registered client use this value.
       </p>
       <p class="small text-muted mb-0" data-cy="verificationRecord">
-        <strong>How to verify locally:</strong> the server-side contract that lets an MCP client refresh across a token expiry — a 401 with
-        the same <code>WWW-Authenticate</code> + <code>resource_metadata</code> challenge shape whether the request had no token or an
-        expired one — is pinned by the integration test
+        <strong>Recorded run.</strong> The captured session with {{ verifiedClientName }} {{ verifiedClientVersion }} —
+        <code>.mcp.json</code> with no bearer token, browser authorization-code + PKCE step, and a single MCP session held past two
+        access-token expiries with the client's refresh-token exchange firing on each 401 — is captured under
+        <code data-cy="verificationDoc">docs/Verification/mcp-oauth-flow.md</code>. The server-side contract that shape depends on (the 401
+        + <code>WWW-Authenticate</code> + <code>resource_metadata</code> challenge stays the same whether the request had no token or an
+        expired one) is pinned by the integration test
         <code
           >McpProtectedResourceMetadataIT#mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes</code
-        >. To watch a real client refresh end-to-end, shorten the Keycloak realm's access-token lifespan (for example to 60&nbsp;s) and hold
-        an MCP session open through {{ verifiedClientName }} {{ verifiedClientVersion }} past that boundary; the client is expected to
-        exchange its refresh token on the 401 challenge and retry the request without operator intervention.
+        >.
       </p>
     </section>
 

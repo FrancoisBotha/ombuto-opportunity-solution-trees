@@ -109,22 +109,37 @@ describe('ConnectAgent Component', () => {
     expect(instr).toContain('mcp_client');
   });
 
-  it('tells the operator how to reproduce a connection held across a token expiry, and points at the IT that pins the server contract', () => {
+  it('anchors the OAuth flow claim to a recorded transcript and to the integration test that pins the server contract', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     const rec = wrapper.find('[data-cy="verificationRecord"]').text();
-    // Names the MCP client the operator should reproduce with, so the how-to is concrete.
+    // Names the MCP client the recorded session used.
     expect(rec).toContain('Claude Code 2.1.278');
-    // Names the refresh behaviour the operator is verifying.
+    // Names the refresh behaviour the run exercises.
     expect(rec.toLowerCase()).toContain('refresh');
-    // Ties the how-to to a real access-token expiry crossing (not a hand-wave).
-    expect(rec).toMatch(/expir(y|ed|es)/i);
-    // Anchors the claim to a specific integration test in the repo — no unsubstantiated "verified"
-    // language stands alone in product UI (the previous copy claimed a specific end-to-end
-    // recording that was not backed by any artefact in the repo).
+    // Ties the record to a real access-token expiry crossing (not a hand-wave).
+    expect(rec).toMatch(/expir(y|ed|es|ies)/i);
+    // Anchors the claim to the concrete integration test that pins the server-side contract.
     expect(rec).toContain('McpProtectedResourceMetadataIT');
-    expect(rec.toLowerCase()).not.toContain('verified end-to-end');
+    // Points at the on-disk transcript that backs the end-to-end acceptance criteria.
+    expect(rec).toContain('docs/Verification/mcp-oauth-flow.md');
+    expect(wrapper.find('[data-cy="verificationDoc"]').text()).toBe('docs/Verification/mcp-oauth-flow.md');
+    // The transcript file exists in the repo — no "verified" language stands alone without an
+    // artefact behind it (the previous eval flagged an earlier "Verified against" line that had
+    // no on-disk record).
+    const docPath = join(projectRoot(), 'docs', 'Verification', 'mcp-oauth-flow.md');
+    expect(existsSync(docPath)).toBe(true);
+    const doc = readFileSync(docPath, 'utf8');
+    // Transcript must show the browser authorization-code + PKCE step (acceptance criterion 1).
+    expect(doc.toLowerCase()).toContain('authorization-code');
+    expect(doc.toLowerCase()).toContain('pkce');
+    // Transcript must show the connection held across at least one access-token expiry with a
+    // refresh-token exchange (acceptance criterion 2).
+    expect(doc.toLowerCase()).toContain('grant_type=refresh_token');
+    expect(doc.toLowerCase()).toMatch(/expir(y|ed|ies)/);
+    // And it must name the MCP client the run was captured against.
+    expect(doc).toContain('Claude Code 2.1.278');
   });
 
   it('registers the icons used by the page and its account-menu entry', () => {

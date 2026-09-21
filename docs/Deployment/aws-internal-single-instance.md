@@ -217,11 +217,15 @@ file does not need to change.
    `WWW-Authenticate` challenge, which triggers the client's refresh-token
    exchange with Keycloak, so operators do not need to touch the connection at
    expiry. The server-side contract that shape depends on is pinned by
-   `McpProtectedResourceMetadataIT#mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes`;
-   to observe the refresh with a live client, shorten the realm's access-token
-   lifespan (for example to 60 s) and hold an MCP session open past that
-   boundary. Record the transcript under `docs/Verification/` if you want a
-   repo-local artefact of the run.
+   `McpProtectedResourceMetadataIT#mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes`.
+   The live end-to-end run — Claude Code 2.1.278 connecting with no bearer
+   token, completing authorization-code + PKCE in the browser, then holding a
+   single MCP session across two access-token expiries with the client's
+   refresh-token exchange firing on each 401 — is recorded under
+   [`docs/Verification/mcp-oauth-flow.md`](../Verification/mcp-oauth-flow.md).
+   To reproduce against your production realm, shorten its access-token
+   lifespan (for example to 60 s) and follow the reproduction steps in that
+   transcript.
 
 7. **Start the rest**: `docker compose -f docker-compose.prod.yml up -d`.
 8. **Verify** `https://<host>/management/health` returns `UP`, then sign in.
