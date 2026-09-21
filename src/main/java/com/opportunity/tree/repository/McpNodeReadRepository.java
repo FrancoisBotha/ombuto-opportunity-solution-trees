@@ -85,24 +85,6 @@ public interface McpNodeReadRepository extends org.springframework.data.reposito
     List<Object[]> findAssumptionChildren(@Param("id") Long id);
 
     // Counts.
-    @Query("select count(l) from NodeLink l where l.product.id = :id")
-    long countLinksForProduct(@Param("id") Long id);
-
-    @Query("select count(l) from NodeLink l where l.outcome.id = :id")
-    long countLinksForOutcome(@Param("id") Long id);
-
-    @Query("select count(l) from NodeLink l where l.opportunity.id = :id")
-    long countLinksForOpportunity(@Param("id") Long id);
-
-    @Query("select count(l) from NodeLink l where l.solution.id = :id")
-    long countLinksForSolution(@Param("id") Long id);
-
-    @Query("select count(l) from NodeLink l where l.assumption.id = :id")
-    long countLinksForAssumption(@Param("id") Long id);
-
-    @Query("select count(l) from NodeLink l where l.evidence.id = :id")
-    long countLinksForEvidence(@Param("id") Long id);
-
     @Query("select count(c) from Comment c where c.outcome.id = :id")
     long countCommentsForOutcome(@Param("id") Long id);
 
@@ -123,6 +105,29 @@ public interface McpNodeReadRepository extends org.springframework.data.reposito
 
     @Query("select count(e) from Evidence e where e.assumption.id = :id")
     long countEvidenceForAssumption(@Param("id") Long id);
+
+    // Links: [name, url], ordered by sort_order.
+    @Query("select l.name, l.url from NodeLink l where l.product.id = :id order by l.sortOrder asc, l.id asc")
+    List<Object[]> findLinksForProduct(@Param("id") Long id);
+
+    @Query("select l.name, l.url from NodeLink l where l.outcome.id = :id order by l.sortOrder asc, l.id asc")
+    List<Object[]> findLinksForOutcome(@Param("id") Long id);
+
+    @Query("select l.name, l.url from NodeLink l where l.opportunity.id = :id order by l.sortOrder asc, l.id asc")
+    List<Object[]> findLinksForOpportunity(@Param("id") Long id);
+
+    @Query("select l.name, l.url from NodeLink l where l.solution.id = :id order by l.sortOrder asc, l.id asc")
+    List<Object[]> findLinksForSolution(@Param("id") Long id);
+
+    @Query("select l.name, l.url from NodeLink l where l.assumption.id = :id order by l.sortOrder asc, l.id asc")
+    List<Object[]> findLinksForAssumption(@Param("id") Long id);
+
+    @Query("select l.name, l.url from NodeLink l where l.evidence.id = :id order by l.sortOrder asc, l.id asc")
+    List<Object[]> findLinksForEvidence(@Param("id") Long id);
+
+    // Open questions on an opportunity: [id, questionText, done], ordered by sort_order.
+    @Query("select q.id, q.questionText, q.done from OpenQuestion q where q.opportunity.id = :id order by q.sortOrder asc, q.id asc")
+    List<Object[]> findOpenQuestionsForOpportunity(@Param("id") Long id);
 
     // Interviews: page by product or by team, ordered by date desc then id desc for stability.
     @Query(

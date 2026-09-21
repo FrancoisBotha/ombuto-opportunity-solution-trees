@@ -137,6 +137,17 @@ describe('ConnectAgent Component', () => {
     expect(viteProxyPaths()).toContain(path);
   });
 
+  it("documents get_node's new open-questions and links fields (MCPSRV-012)", () => {
+    const wrapper = shallowMount(ConnectAgent, {
+      global: { stubs: { 'font-awesome-icon': true } },
+    });
+    const desc = wrapper.find('[data-cy="mcpToolDescription-get_node"]').text().toLowerCase();
+    expect(desc).toContain('open question');
+    expect(desc).toContain('link');
+    expect(desc).toContain('target');
+    expect(desc).toContain('resolved');
+  });
+
   it('states that access mirrors the caller team memberships', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },

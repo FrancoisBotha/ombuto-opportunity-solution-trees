@@ -7,6 +7,8 @@ import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Assumption;
 import com.opportunity.tree.domain.Evidence;
 import com.opportunity.tree.domain.Interview;
+import com.opportunity.tree.domain.NodeLink;
+import com.opportunity.tree.domain.OpenQuestion;
 import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.Outcome;
 import com.opportunity.tree.domain.Product;
@@ -165,10 +167,104 @@ class McpToolsIT {
         assertThat(details.parent().id()).isEqualTo(outcomeA.getId());
         assertThat(details.parent().title()).isEqualTo("Grow WAU");
         assertThat(details.children()).extracting("type").contains("SOLUTION", "EVIDENCE");
-        // Counts: opportunityA has 1 evidence child, no comments, no links.
+        // AC #6: node with neither open questions nor links — both come back as empty lists
+        // (opportunities always report both, even when empty; only inapplicable node types
+        // return null, per AC #3 / the NodeDetails convention).
+        assertThat(details.links()).isNotNull().isEmpty();
         assertThat(details.linkCount()).isEqualTo(0L);
+        assertThat(details.openQuestions()).isNotNull().isEmpty();
+        // Counts: opportunityA has 1 evidence child, no comments, no links.
         assertThat(details.evidenceCount()).isEqualTo(1L);
         assertThat(details.commentCount()).isEqualTo(0L);
+    }
+
+    @Test
+    void getNode_opportunityReturnsOpenQuestionsAndLinksWhenBothPresent() {
+        // Seed open questions and links directly, then read back through get_node. Covers AC
+        // #1 (open questions with text and resolved state), #2 (links with target/type/title),
+        // and the "node with both" case in AC #6.
+        Instant now = Instant.now();
+        Opportunity managed = em.find(Opportunity.class, opportunityA.getId());
+        OpenQuestion q1 = new OpenQuestion()
+            .questionText("How often do users retry onboarding?")
+            .done(false)
+            .sortOrder(0)
+            .createdDate(now)
+            .opportunity(managed);
+        OpenQuestion q2 = new OpenQuestion()
+            .questionText("Which step do they abandon on?")
+            .done(true)
+            .sortOrder(1)
+            .createdDate(now)
+            .opportunity(managed);
+        em.persist(q1);
+        em.persist(q2);
+
+        NodeLink jira = new NodeLink().name("Jira Epic").url("https://ombuto.atlassian.net/browse/DISC-42").sortOrder(0).createdDate(now);
+        jira.setOpportunity(managed);
+        NodeLink confluence = new NodeLink()
+            .name("Confluence")
+            .url("https://ombuto.atlassian.net/wiki/discovery/opportunity-1")
+            .sortOrder(1)
+            .createdDate(now);
+        confluence.setOpportunity(managed);
+        NodeLink other = new NodeLink().name("Notion page").url("https://example.com/notes").sortOrder(2).createdDate(now);
+        other.setOpportunity(managed);
+        em.persist(jira);
+        em.persist(confluence);
+        em.persist(other);
+        em.flush();
+        em.clear();
+
+        authenticate(alice);
+        NodeDetails details = getNodeTool.getNode("OPPORTUNITY", opportunityA.getId());
+
+        assertThat(details.openQuestions()).hasSize(2);
+        assertThat(details.openQuestions().get(0).text()).isEqualTo("How often do users retry onboarding?");
+        assertThat(details.openQuestions().get(0).resolved()).isFalse();
+        assertThat(details.openQuestions().get(1).text()).isEqualTo("Which step do they abandon on?");
+        assertThat(details.openQuestions().get(1).resolved()).isTrue();
+
+        assertThat(details.links()).hasSize(3);
+        assertThat(details.linkCount()).isEqualTo(3L);
+        assertThat(details.links()).extracting("title").containsExactly("Jira Epic", "Confluence", "Notion page");
+        assertThat(details.links())
+            .extracting("target")
+            .containsExactly(
+                "https://ombuto.atlassian.net/browse/DISC-42",
+                "https://ombuto.atlassian.net/wiki/discovery/opportunity-1",
+                "https://example.com/notes"
+            );
+        assertThat(details.links()).extracting("type").containsExactly("JIRA", "CONFLUENCE", "OTHER");
+    }
+
+    @Test
+    void getNode_openQuestionsIsNullForNonOpportunityNodeTypes() {
+        // AC #3: fields that do not apply stay null, not fabricated as an empty list.
+        authenticate(alice);
+        assertThat(getNodeTool.getNode("PRODUCT", productA.getId()).openQuestions()).isNull();
+        assertThat(getNodeTool.getNode("OUTCOME", outcomeA.getId()).openQuestions()).isNull();
+        assertThat(getNodeTool.getNode("SOLUTION", solutionA.getId()).openQuestions()).isNull();
+        assertThat(getNodeTool.getNode("ASSUMPTION", assumptionA.getId()).openQuestions()).isNull();
+        assertThat(getNodeTool.getNode("EVIDENCE", evidenceA.getId()).openQuestions()).isNull();
+    }
+
+    @Test
+    void getNode_nonMemberSeesNeitherOpenQuestionsNorLinks() {
+        // AC #4 / #6 non-member row: even after we seed both, a caller who is not a member of
+        // the owning team is refused at the TeamAccessService layer — the get_node call throws
+        // instead of leaking any of the data.
+        Instant now = Instant.now();
+        Opportunity managed = em.find(Opportunity.class, opportunityA.getId());
+        em.persist(new OpenQuestion().questionText("secret?").done(false).sortOrder(0).createdDate(now).opportunity(managed));
+        NodeLink link = new NodeLink().name("Jira").url("https://ombuto.atlassian.net/browse/DISC-1").sortOrder(0).createdDate(now);
+        link.setOpportunity(managed);
+        em.persist(link);
+        em.flush();
+        em.clear();
+
+        authenticate(bob); // bob is only in teamB
+        assertThatThrownBy(() -> getNodeTool.getNode("OPPORTUNITY", opportunityA.getId())).isInstanceOf(TeamAccessDeniedException.class);
     }
 
     @Test
@@ -182,6 +278,8 @@ class McpToolsIT {
         assertThat(details.status()).isNull();
         assertThat(details.evidenceCount()).isNull();
         assertThat(details.commentCount()).isNull();
+        assertThat(details.openQuestions()).isNull();
+        assertThat(details.links()).isNotNull().isEmpty();
         assertThat(details.linkCount()).isEqualTo(0L);
         assertThat(details.children()).extracting("id").contains(outcomeA.getId());
     }
