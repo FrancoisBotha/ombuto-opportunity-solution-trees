@@ -18,6 +18,38 @@ Two acceptance criteria of MCPSRV-008 are only meaningful end-to-end:
 Both are operator-owned checks against a live app + Keycloak. Do them before
 declaring MCPSRV-008 done in a real environment.
 
+## Local end-to-end evidence (2026-09-22)
+
+The flow was exercised against the app built from `5c37f8c6f589d1578741e59b9f20b102e3653e21`
+on `http://127.0.0.1:8080/mcp`, with the local Keycloak realm at
+`http://localhost:9080/realms/jhipster` and Claude Code 2.1.278. The CLI was
+configured with `--transport http --client-id mcp_client --callback-port 3334`.
+
+Claude Code's `mcp login --no-browser` generated an authorization-code request
+with an `S256` PKCE challenge. A headless browser signed in to the dev realm as
+its seeded admin user, followed the redirect to `http://localhost:3334/callback`,
+and received Claude Code's "Authentication successful" confirmation. The CLI
+then printed `Authenticated with "ombuto-doctor"`; `mcp get` reported
+`Status: Connected`. No bearer token was minted or pasted by the operator.
+
+To check a tool call without an Anthropic account in the isolated CLI profile,
+the local verification probe used the access token Claude Code had stored and
+opened a Streamable HTTP MCP session. It called `list_products` in that session
+at **11:34:28 UTC**: success, 4 products. Claude Code's stored credential gave
+the original access token an expiry of **11:38:03 UTC**. At **11:38:04 UTC**, a
+second `mcp get` reported `Status: Connected` without another browser sign-in;
+the stored credential now expired at **11:43:11 UTC**, showing that the client
+had refreshed it. At **11:38:14 UTC**, the probe called `list_products` again
+with the **same MCP session ID** and Claude Code's refreshed access token:
+success, 4 products. The probe and CLI credential files were kept under the
+ignored `target/` directory, and no token or authorization code is recorded
+here.
+
+This check uses Claude Code for the browser authorization and refresh, and a
+small local probe for the two tool calls on one MCP session. A production
+release should still repeat Steps 2 and 3 against its own Keycloak realm and
+deployment, especially if its token lifetime or redirect URI differs.
+
 ## Preconditions
 
 - The app is running (dev: `npm run app:start`; production: use the deployment
