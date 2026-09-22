@@ -21,6 +21,7 @@ const VERIFIED_CLIENT_NAME = 'Claude Code';
 const VERIFIED_CLIENT_VERSION = '2.1.278';
 const TRANSPORT_TYPE = 'http';
 const MCP_CLIENT_ID = 'mcp_client';
+const OAUTH_CALLBACK_PORT = 3334;
 
 const DEV_KEYCLOAK_ORIGIN = 'http://localhost:9080';
 
@@ -52,6 +53,10 @@ export default defineComponent({
           'ombuto-ost': {
             type: TRANSPORT_TYPE,
             url: endpointUrl.value,
+            oauth: {
+              clientId: MCP_CLIENT_ID,
+              callbackPort: OAUTH_CALLBACK_PORT,
+            },
           },
         },
       };

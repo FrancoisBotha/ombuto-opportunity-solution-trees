@@ -61,12 +61,12 @@
         complete the browser step. Direct-access (password) grants are <strong>not required</strong> and are turned off in production.
       </p>
       <p class="mb-0" data-cy="clientIdInstructions">
-        The <code>.mcp.json</code> snippet above carries only the transport type and the server URL — no bearer token, no static
-        <code>Authorization</code> header, no client secret. The MCP client learns everything else (authorization server, scopes, and the
-        pre-registered public client id <code>mcp_client</code>) from the <code>WWW-Authenticate</code> challenge and the protected-resource
-        metadata document; the browser sign-in is opened against a loopback redirect URI Keycloak already accepts for
-        <code>mcp_client</code>. Claude Code stores the resulting tokens and refreshes them automatically, so the connection survives past
-        an access token's lifetime with no manual intervention.
+        The <code>.mcp.json</code> snippet uses Claude Code's documented <code>oauth.clientId</code> and
+        <code>oauth.callbackPort</code> fields to select the pre-registered public client <code>mcp_client</code> and its
+        <code>http://localhost:3334/callback</code> redirect. It contains no bearer token, static <code>Authorization</code> header, or
+        client secret. The challenge and protected-resource metadata supply the authorization server and scopes; they do not supply a client
+        id. Claude Code stores the resulting tokens and refreshes them automatically, so the connection survives past an access token's
+        lifetime with no manual intervention.
       </p>
     </section>
 

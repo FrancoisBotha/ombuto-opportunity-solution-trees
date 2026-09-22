@@ -88,29 +88,28 @@ describe('ConnectAgent Component', () => {
     expect(config.mcpServers['ombuto-ost']).toMatchObject({
       type: 'http',
       url: 'https://ost.example.com/mcp',
+      oauth: {
+        clientId: 'mcp_client',
+        callbackPort: 3334,
+      },
     });
     // The Streamable HTTP transport is expressed via `type: "http"`; the deprecated `type: "sse"`
     // must not creep back in — MCP clients treat it as the HTTP+SSE transport instead.
     expect(config.mcpServers['ombuto-ost'].type).not.toBe('sse');
     expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('transport');
-    // MCPSRV-008: the client discovers OAuth via the WWW-Authenticate challenge; no static
-    // Authorization header, and no undocumented `oauth` key that isn't part of the .mcp.json
-    // schema an MCP client actually reads.
+    // MCPSRV-008: OAuth uses a public client id and PKCE; no static Authorization header is stored.
     expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('headers');
-    expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('oauth');
   });
 
-  it('names the pre-registered public client without inventing .mcp.json OAuth fields', () => {
+  it('uses Claude Codes documented fields for the pre-registered public client', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     expect(wrapper.find('[data-cy="mcpClientId"]').text()).toBe('mcp_client');
     const instr = wrapper.find('[data-cy="clientIdInstructions"]').text();
     expect(instr).toContain('mcp_client');
-    // The .mcp.json schema an MCP client actually reads does not have documented `oauth.*`
-    // pre-configuration fields — do not push readers to add ones the client will ignore.
-    expect(instr).not.toContain('oauth.clientId');
-    expect(instr).not.toContain('oauth.callbackPort');
+    expect(instr).toContain('oauth.clientId');
+    expect(instr).toContain('oauth.callbackPort');
   });
 
   it('registers the icons used by the page and its account-menu entry', () => {

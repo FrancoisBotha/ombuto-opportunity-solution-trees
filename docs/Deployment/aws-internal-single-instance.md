@@ -180,8 +180,11 @@ file does not need to change.
      authorization-code + PKCE in the browser (RFC 9728 / MCP authorization
      specification). Leaving direct-access grants off in production removes a
      password-grant recipe from the deployment surface entirely.
-   - **Login settings → Valid redirect URIs**: `http://127.0.0.1:*`,
-     `http://localhost:*` (and their HTTPS loopback variants). Loopback URIs are
+   - **Login settings → Valid redirect URIs**: at minimum
+     `http://localhost:3334/callback`, which matches the Connect an agent
+     configuration. You may also permit `http://127.0.0.1:3334/callback` and the
+     loopback wildcard forms `http://127.0.0.1:*`, `http://localhost:*` (and
+     their HTTPS variants) when supporting other desktop clients. Loopback URIs are
      what desktop MCP clients (Claude Code, Claude Desktop, and similar) open a
      browser against to complete the authorization step; the server never
      forwards a browser to them itself.
@@ -205,14 +208,12 @@ file does not need to change.
    of it.
 
    **Client identifier for MCP clients**: RFC 9728 protected-resource metadata
-   does not carry a `client_id`, so a desktop MCP client either learns one via
-   Dynamic Client Registration (RFC 7591) or is told one out of band. In this
-   deployment the client id is the static, pre-registered public client
-   `mcp_client`, documented on the in-app Connect an agent page. The
-   `.mcp.json` snippet the page emits carries only the transport type and the
-   server URL — it does not push `oauth.*` fields into `.mcp.json`, because
-   those are not documented fields of the config file an MCP client actually
-   reads. Anonymous Dynamic Client Registration is **not** enabled on the
+   does not carry a `client_id`. The Connect an agent page therefore emits the
+   vendor-supported Claude Code fields `oauth.clientId: "mcp_client"` and
+   `oauth.callbackPort: 3334` in `.mcp.json`. These are the JSON equivalents of
+   `claude mcp add --client-id mcp_client --callback-port 3334`; the client uses
+   `http://localhost:3334/callback`, which must appear in the Keycloak redirect
+   URI list. Anonymous Dynamic Client Registration is **not** enabled on the
    production realm — the realm's `trusted-hosts` anonymous policy denies
    unregistered hosts by default and there is no reason to open it up when
    every MCP caller can reuse the same public client. Access tokens expire on

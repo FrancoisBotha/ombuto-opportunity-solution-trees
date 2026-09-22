@@ -61,7 +61,7 @@ public class McpProtectedResourceMetadataResource {
         body.put("resource", resourceUrl);
         body.put("authorization_servers", List.of(issuerUri));
         body.put("bearer_methods_supported", List.of("header"));
-        body.put("scopes_supported", List.of("openid", "profile", "email", "roles"));
+        body.put("scopes_supported", List.of("openid", "profile", "email", "roles", "offline_access"));
         return body;
     }
 

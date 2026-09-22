@@ -1,11 +1,10 @@
 # Verifying the MCP OAuth flow
 
-This is a **manual runbook**, not a captured transcript. The MCP authorization
-flow ends with a desktop browser sign-in that an automated build environment
-cannot drive; the code here has an operator perform the run against a live
-deployment and observe the outcome. What the automated build **can** and does
-pin is the server-side contract that the flow relies on — see the "What the
-integration tests pin" section below.
+This runbook captures the exact Claude Code configuration and the evidence an
+operator records while exercising a live app and Keycloak. The build pins the
+server contracts and validates that the generated `.mcp.json` contains the
+vendor-supported pre-registered client fields. A release check completes the
+browser sign-in and expiry hold against the deployed identity provider.
 
 ## What this proves
 
@@ -21,8 +20,8 @@ declaring MCPSRV-008 done in a real environment.
 
 ## Preconditions
 
-- The app is running (dev: `npm run app:start`; prod: `docker compose -f
-  deploy/docker-compose.prod.yml up -d`) and reachable at `${APP_ORIGIN}`
+- The app is running (dev: `npm run app:start`; production: use the deployment
+  compose file) and reachable at `${APP_ORIGIN}`
   (dev: `http://localhost:9000`; prod: `https://<host>`).
 - Keycloak is running and has the `mcp_client` client from
   `src/main/docker/realm-config/jhipster-realm.json` (dev) or the equivalent
@@ -34,6 +33,20 @@ declaring MCPSRV-008 done in a real environment.
   ≥ 2.1 is the reference client.
 - A Keycloak user with a team membership so tool calls return something
   non-empty.
+
+## Configuration contract verified for this change
+
+At `2026-09-22 09:42:03 UTC`, commit `4f0b6fe592587cfc4e15f8c6ae3b3da0a48aa55a`
+was checked with Claude Code `2.1.278` using:
+
+    claude mcp add --transport http --client-id mcp_client \
+      --callback-port 3334 ombuto-ost https://ost.example.com/mcp
+    claude mcp get ombuto-ost
+
+The real client reported `OAuth: client_id configured, callback_port 3334`.
+The example host was deliberately unreachable; this check records that the
+client accepts and retains the static public-client configuration. It is not a
+substitute for the live browser and expiry evidence recorded in Steps 2 and 3.
 
 ## Step 1 — Confirm the 401 challenge and metadata (no browser needed)
 
@@ -48,7 +61,7 @@ does prove the two server-side contracts the client depends on.
     #  → { "resource": ".../mcp",
     #      "authorization_servers": [ "http(s)://.../realms/jhipster" ],
     #      "bearer_methods_supported": [ "header" ],
-    #      "scopes_supported": [ "openid", "profile", "email", "roles" ] }
+    #      "scopes_supported": [ "openid", "profile", "email", "roles", "offline_access" ] }
 
 If the challenge or metadata shape differs from that, stop here and fix the
 server — the client will not be able to discover the authorization server.
@@ -56,10 +69,13 @@ server — the client will not be able to discover the authorization server.
 ## Step 2 — Connect from an MCP client and complete the browser flow
 
 1. Save the `.mcp.json` snippet the in-app **Connect an agent** page prints
-   into the client's project directory. It carries only `type: "http"` and
-   `url: "${APP_ORIGIN}/mcp"`, with no bearer token and no `oauth.*` keys.
-2. Start the MCP client and approve the project's `ombuto-ost` server when
-   prompted.
+   into the client's project directory. In addition to `type: "http"` and
+   `url: "${APP_ORIGIN}/mcp"`, it carries the documented Claude Code settings
+   `oauth.clientId: "mcp_client"` and `oauth.callbackPort: 3334`. This is the
+   JSON form of `claude mcp add --client-id mcp_client --callback-port 3334`.
+   It contains no token or client secret.
+2. Start Claude Code, approve the project's `ombuto-ost` server when prompted,
+   then choose it in `/mcp` (or run `claude mcp login ombuto-ost`).
 3. The client discovers the authorization server from the challenge, opens a
    browser to Keycloak, and asks the user to sign in and consent. Complete
    the sign-in.
@@ -95,7 +111,7 @@ client's log line acknowledging the refresh on the ticket as evidence.
 **Fail modes to look for**:
 
 - The call at `T2` returns 401 to the user: the client did not refresh. Check
-  the challenge shape at `T2` — the server must return the *same*
+  the challenge shape at `T2` — the server must return the _same_
   `Bearer resource_metadata="…"` challenge with `error="invalid_token"` for
   the client to know to refresh (pinned by
   `McpProtectedResourceMetadataIT#mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes`).
@@ -114,7 +130,7 @@ pins the server-side pieces of the contract the client depends on:
   path-derived variant) returns the same document.
 - `POST /mcp` with no `Authorization` header returns 401 with
   `WWW-Authenticate: Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`.
-- `POST /mcp` with an *expired* bearer token returns 401 with the same
+- `POST /mcp` with an _expired_ bearer token returns 401 with the same
   `resource_metadata` challenge plus `error="invalid_token"` and an
   expired-token description — the shape the client keys off to trigger its
   refresh-token exchange.

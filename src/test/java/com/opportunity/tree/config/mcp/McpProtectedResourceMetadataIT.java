@@ -76,7 +76,8 @@ class McpProtectedResourceMetadataIT {
             .andExpect(jsonPath("$.resource").value(org.hamcrest.Matchers.endsWith("/mcp")))
             .andExpect(jsonPath("$.authorization_servers[0]").value("http://DO_NOT_CALL:9080/realms/jhipster"))
             .andExpect(jsonPath("$.bearer_methods_supported[0]").value("header"))
-            .andExpect(jsonPath("$.scopes_supported").isArray());
+            .andExpect(jsonPath("$.scopes_supported").isArray())
+            .andExpect(jsonPath("$.scopes_supported").value(org.hamcrest.Matchers.hasItem("offline_access")));
     }
 
     @Test
