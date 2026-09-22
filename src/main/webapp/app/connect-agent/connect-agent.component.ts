@@ -20,6 +20,8 @@ const TOOLS: McpTool[] = [
 const VERIFIED_CLIENT_NAME = 'Claude Code';
 const VERIFIED_CLIENT_VERSION = '2.1.278';
 const TRANSPORT_TYPE = 'http';
+const MCP_CLIENT_ID = 'mcp_client';
+const OAUTH_CALLBACK_PORT = 3334;
 
 const DEV_KEYCLOAK_ORIGIN = 'http://localhost:9080';
 
@@ -40,6 +42,7 @@ export default defineComponent({
   setup() {
     const origin = ref(typeof window !== 'undefined' ? window.location.origin : '');
     const endpointUrl = computed(() => `${origin.value}/mcp`);
+    const metadataUrl = computed(() => `${origin.value}/.well-known/oauth-protected-resource`);
     const keycloakOrigin = computed(() => deriveKeycloakOrigin(origin.value));
     const tokenUrl = computed(() => `${keycloakOrigin.value}/realms/jhipster/protocol/openid-connect/token`);
     const copyState = ref<{ endpoint: boolean; config: boolean }>({ endpoint: false, config: false });
@@ -50,8 +53,9 @@ export default defineComponent({
           'ombuto-ost': {
             type: TRANSPORT_TYPE,
             url: endpointUrl.value,
-            headers: {
-              Authorization: 'Bearer <paste-access-token-here>',
+            oauth: {
+              clientId: MCP_CLIENT_ID,
+              callbackPort: OAUTH_CALLBACK_PORT,
             },
           },
         },
@@ -75,6 +79,7 @@ export default defineComponent({
       tools: TOOLS,
       origin,
       endpointUrl,
+      metadataUrl,
       keycloakOrigin,
       tokenUrl,
       clientConfigSnippet,
@@ -82,6 +87,7 @@ export default defineComponent({
       copy,
       verifiedClientName: VERIFIED_CLIENT_NAME,
       verifiedClientVersion: VERIFIED_CLIENT_VERSION,
+      mcpClientId: MCP_CLIENT_ID,
     };
   },
 });

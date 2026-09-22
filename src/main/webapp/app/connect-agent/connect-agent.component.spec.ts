@@ -79,7 +79,7 @@ describe('ConnectAgent Component', () => {
     expect(wrapper.find('[data-cy="verifiedClient"]').text().length).toBeGreaterThan(0);
   });
 
-  it('shows a valid Claude Code Streamable HTTP configuration', () => {
+  it('shows a valid Claude Code Streamable HTTP configuration with no bearer token to paste', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },
     });
@@ -88,12 +88,28 @@ describe('ConnectAgent Component', () => {
     expect(config.mcpServers['ombuto-ost']).toMatchObject({
       type: 'http',
       url: 'https://ost.example.com/mcp',
-      headers: { Authorization: 'Bearer <paste-access-token-here>' },
+      oauth: {
+        clientId: 'mcp_client',
+        callbackPort: 3334,
+      },
     });
     // The Streamable HTTP transport is expressed via `type: "http"`; the deprecated `type: "sse"`
     // must not creep back in — MCP clients treat it as the HTTP+SSE transport instead.
     expect(config.mcpServers['ombuto-ost'].type).not.toBe('sse');
     expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('transport');
+    // MCPSRV-008: OAuth uses a public client id and PKCE; no static Authorization header is stored.
+    expect(config.mcpServers['ombuto-ost']).not.toHaveProperty('headers');
+  });
+
+  it('uses Claude Codes documented fields for the pre-registered public client', () => {
+    const wrapper = shallowMount(ConnectAgent, {
+      global: { stubs: { 'font-awesome-icon': true } },
+    });
+    expect(wrapper.find('[data-cy="mcpClientId"]').text()).toBe('mcp_client');
+    const instr = wrapper.find('[data-cy="clientIdInstructions"]').text();
+    expect(instr).toContain('mcp_client');
+    expect(instr).toContain('oauth.clientId');
+    expect(instr).toContain('oauth.callbackPort');
   });
 
   it('registers the icons used by the page and its account-menu entry', () => {
@@ -102,11 +118,23 @@ describe('ConnectAgent Component', () => {
     expect(findIconDefinition({ prefix: 'fas', iconName: 'plug' })).toBeDefined();
   });
 
-  it('explains how to obtain a bearer token (Keycloak mcp_client)', () => {
+  it('documents the OAuth authorization-code + PKCE flow discovered from the protected-resource metadata', () => {
+    const wrapper = shallowMount(ConnectAgent, {
+      global: { stubs: { 'font-awesome-icon': true } },
+    });
+    const text = wrapper.find('[data-cy="authFlowInstructions"]').text();
+    expect(text.toLowerCase()).toContain('pkce');
+    expect(text.toLowerCase()).toContain('authorization-code');
+    expect(text).toContain('mcp_client');
+    expect(wrapper.find('[data-cy="metadataUrl"]').text()).toBe('https://ost.example.com/.well-known/oauth-protected-resource');
+  });
+
+  it('marks the direct-access-grant curl as a local-development fallback only', () => {
     const wrapper = shallowMount(ConnectAgent, {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     const text = wrapper.find('[data-cy="tokenInstructions"]').text();
+    expect(text.toLowerCase()).toContain('local development');
     expect(text).toContain('mcp_client');
   });
 

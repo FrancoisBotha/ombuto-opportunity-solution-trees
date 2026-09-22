@@ -825,7 +825,14 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "secret": "mcp_client",
-      "redirectUris": ["http://127.0.0.1:*", "http://localhost:*", "https://127.0.0.1:*", "https://localhost:*"],
+      "redirectUris": [
+        "http://localhost:3334/callback",
+        "http://127.0.0.1:3334/callback",
+        "http://127.0.0.1:*",
+        "http://localhost:*",
+        "https://127.0.0.1:*",
+        "https://localhost:*"
+      ],
       "webOrigins": ["*"],
       "notBefore": 0,
       "bearerOnly": false,

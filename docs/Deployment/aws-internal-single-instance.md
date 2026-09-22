@@ -149,6 +149,7 @@ file does not need to change.
    built most recently, so it cannot answer which build is running, and pulling it
    again can silently change the application. The compose file refuses to start
    without `APP_IMAGE` set for this reason.
+
 2. **Install Docker and the Compose plugin** on the instance, and copy the repo's
    `deploy/` directory to `/opt/ombuto-ost/deploy`.
 3. **Place the TLS certificate** at `deploy/tls/server.crt` and `server.key`.
@@ -171,12 +172,22 @@ file does not need to change.
    `web_app`'s session tokens do not carry it, so they are rejected at `/mcp`. In
    the admin console:
    - **Clients → Create client** → Client type OpenID Connect, Client ID `mcp_client`.
-   - **Capability config**: enable _Direct access grants_ (`password` grant) so the
-     "Connect an agent" page's one-shot `curl` works, disable _Client authentication_
-     (public client), enable _Standard flow_ (Authorization Code + PKCE) for
-     interactive clients.
-   - **Login settings → Valid redirect URIs**: `http://127.0.0.1:*`,
-     `http://localhost:*` (and any HTTPS loopback variants your clients need).
+   - **Capability config**: disable _Client authentication_ (public client),
+     enable _Standard flow_ (Authorization Code + PKCE — this is the documented
+     path for MCP clients), and leave _Direct access grants_ **off**. The
+     password grant is not required — the MCP client discovers the authorization
+     server from the `WWW-Authenticate` challenge on a 401 and runs
+     authorization-code + PKCE in the browser (RFC 9728 / MCP authorization
+     specification). Leaving direct-access grants off in production removes a
+     password-grant recipe from the deployment surface entirely.
+   - **Login settings → Valid redirect URIs**: at minimum
+     `http://localhost:3334/callback`, which matches the Connect an agent
+     configuration. You may also permit `http://127.0.0.1:3334/callback` and the
+     loopback wildcard forms `http://127.0.0.1:*`, `http://localhost:*` (and
+     their HTTPS variants) when supporting other desktop clients. Loopback URIs are
+     what desktop MCP clients (Claude Code, Claude Desktop, and similar) open a
+     browser against to complete the authorization step; the server never
+     forwards a browser to them itself.
    - **Advanced → Proof Key for Code Exchange**: `S256`.
    - **Client scopes → mcp_client-dedicated → Add mapper → By configuration →
      Audience**: name `audience-mcp-server`, leave _Included Client Audience_ empty,
@@ -185,8 +196,38 @@ file does not need to change.
      NOT add the same mapper to `web_app`.
 
    The dev realm export at `src/main/docker/realm-config/jhipster-realm.json`
-   (client `mcp_client`, mapper `audience-mcp-server`) is the reference — replicate
-   its shape, not its secret or redirect URIs.
+   (client `mcp_client`, mapper `audience-mcp-server`) is the reference for the
+   client shape and audience mapper — replicate those, but not its secret,
+   redirect URIs, or the dev-only `directAccessGrantsEnabled: true` flag it
+   carries for the local-development curl fallback.
+
+   The app publishes the OAuth 2.0 protected-resource metadata at
+   `https://<host>/.well-known/oauth-protected-resource`; MCP clients fetch it
+   after a 401 challenge to learn which realm to authenticate against. It is a
+   public JSON document — do not require an authenticated bearer token in front
+   of it.
+
+   **Client identifier for MCP clients**: RFC 9728 protected-resource metadata
+   does not carry a `client_id`. The Connect an agent page therefore emits the
+   vendor-supported Claude Code fields `oauth.clientId: "mcp_client"` and
+   `oauth.callbackPort: 3334` in `.mcp.json`. These are the JSON equivalents of
+   `claude mcp add --client-id mcp_client --callback-port 3334`; the client uses
+   `http://localhost:3334/callback`, which must appear in the Keycloak redirect
+   URI list. Anonymous Dynamic Client Registration is **not** enabled on the
+   production realm — the realm's `trusted-hosts` anonymous policy denies
+   unregistered hosts by default and there is no reason to open it up when
+   every MCP caller can reuse the same public client. Access tokens expire on
+   the realm's configured lifespan; when a token expires the app answers 401
+   with the same `WWW-Authenticate` challenge, which triggers the client's
+   refresh-token exchange with Keycloak, so operators do not need to touch the
+   connection at expiry. The server-side contract that shape depends on is
+   pinned by
+   `McpProtectedResourceMetadataIT#mcpEndpoint_afterAccessTokenExpiry_returns401WithSameResourceMetadataChallenge_soClientRefreshes`.
+   See [Verifying the MCP OAuth flow](../Verification/mcp-oauth-flow.md) for
+   the manual runbook to prove browser sign-in and refresh across expiry
+   against a live deployment (it is a runbook, not a canned transcript — an
+   automated build cannot drive a desktop browser sign-in, so this step is
+   operator-owned).
 
 7. **Start the rest**: `docker compose -f docker-compose.prod.yml up -d`.
 8. **Verify** `https://<host>/management/health` returns `UP`, then sign in.
