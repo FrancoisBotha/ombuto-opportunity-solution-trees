@@ -212,6 +212,83 @@ class TreeToolIT {
         assertThat(response.nodes()).extracting(TreeTool.TreeNode::id).doesNotContain(productA2.getId());
     }
 
+    @Test
+    void getTree_exposesNestedOpportunityPriorityAndAllHighestScoreTies() {
+        Outcome outcome = em
+            .createQuery("select o from Outcome o where o.product.id = :id", Outcome.class)
+            .setParameter("id", productA1.getId())
+            .getSingleResult();
+        Opportunity parent = em
+            .createQuery("select o from Opportunity o where o.outcome.id = :id", Opportunity.class)
+            .setParameter("id", outcome.getId())
+            .getSingleResult();
+        parent.setPriority(80);
+        Opportunity nested = persistOpportunity(outcome, parent, "Nested priority", 1);
+        nested.setPriority(95);
+        Opportunity sibling = persistOpportunity(outcome, null, "Tied priority", 2);
+        sibling.setPriority(95);
+        em.flush();
+        em.clear();
+        authenticate(MEMBER_A_LOGIN);
+
+        TreeTool.TreeResponse response = tool.getTree(teamA.getId(), productA1.getId(), 0);
+        int highest = response
+            .nodes()
+            .stream()
+            .filter(n -> "OPPORTUNITY".equals(n.type()))
+            .mapToInt(TreeTool.TreeNode::priority)
+            .max()
+            .orElseThrow();
+        assertThat(highest).isEqualTo(95);
+        assertThat(
+            response
+                .nodes()
+                .stream()
+                .filter(n -> "OPPORTUNITY".equals(n.type()) && n.priority() == highest)
+                .map(TreeTool.TreeNode::title)
+        ).containsExactlyInAnyOrder("Nested priority", "Tied priority");
+        assertThat(
+            response
+                .nodes()
+                .stream()
+                .filter(n -> n.id().equals(nested.getId()) && "OPPORTUNITY".equals(n.type()))
+                .findFirst()
+                .orElseThrow()
+                .parentId()
+        ).isEqualTo(parent.getId());
+    }
+
+    @Test
+    void getTree_largeProductCanBeReadCompletelyInStablePages() {
+        for (int i = 0; i < 1001; i++) {
+            persistOutcome(productA1, "Bulk outcome " + i, i + 10);
+        }
+        em.flush();
+        em.clear();
+        authenticate(MEMBER_A_LOGIN);
+
+        TreeTool.TreeResponse first = tool.getTree(teamA.getId(), productA1.getId(), 0);
+        TreeTool.TreeResponse second = tool.getTree(teamA.getId(), productA1.getId(), first.nodeCount());
+        assertThat(first.nodeCount()).isEqualTo(1000);
+        assertThat(first.hasMore()).isTrue();
+        assertThat(second.hasMore()).isFalse();
+        assertThat(first.totalNodes()).isEqualTo((long) first.nodeCount() + second.nodeCount());
+        assertThat(
+            first
+                .nodes()
+                .stream()
+                .map(n -> n.type() + ":" + n.id())
+                .toList()
+        ).doesNotContainAnyElementsOf(
+            second
+                .nodes()
+                .stream()
+                .map(n -> n.type() + ":" + n.id())
+                .toList()
+        );
+        assertThat(tool.getTree(teamA.getId(), null).overflow()).isTrue();
+    }
+
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------

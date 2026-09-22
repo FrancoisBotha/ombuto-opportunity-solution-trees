@@ -7,13 +7,25 @@ export interface McpTool {
 
 const TOOLS: McpTool[] = [
   { name: 'list_products', description: 'Lists the products (with team) the caller may read.' },
-  { name: 'get_tree', description: "Returns a team's whole opportunity solution tree, optionally limited to one product." },
+  {
+    name: 'get_tree',
+    description:
+      'Returns tree nodes with descriptions, priority, value rating, confidence, owner and dates. Product branches can be paged with offset; include nested opportunities when ranking priority ties.',
+  },
   {
     name: 'get_node',
     description:
-      'Returns one node by type and id with its details — parent, direct children, links (target, type and title), open questions (text and resolved state, for opportunities), and evidence / comment counts where they apply.',
+      'Returns one node by type and id with decision fields, owner, dates, parent, children, links, open questions and applicable counts.',
   },
-  { name: 'list_interviews', description: 'Returns interviews for a product or team with their linked opportunities.' },
+  {
+    name: 'search_nodes',
+    description:
+      'Finds nodes, readable interview notes, node comments and open questions across the caller’s teams; results identify their parent and are paginated.',
+  },
+  {
+    name: 'list_interviews',
+    description: 'Returns paged interviews for a product, team or opportunity, with linked opportunities and policy-controlled notes.',
+  },
   { name: 'list_node_comments', description: 'Returns the discussion thread on one node — body, author and times, oldest first.' },
 ];
 

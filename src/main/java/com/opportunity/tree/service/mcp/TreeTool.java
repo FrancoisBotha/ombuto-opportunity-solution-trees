@@ -8,6 +8,7 @@ import com.opportunity.tree.service.TreeNodeRef;
 import com.opportunity.tree.service.dto.ProductDTO;
 import com.opportunity.tree.service.dto.tree.TeamTreeDTO;
 import com.opportunity.tree.service.dto.tree.TreeNodeDTO;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -16,7 +17,9 @@ import java.util.Locale;
 import java.util.Set;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Read-only MCP tools that expose the opportunity solution tree to an authenticated agent.
@@ -34,6 +37,7 @@ import org.springframework.stereotype.Service;
  * queries; neither performs any create, update or delete (NFR-019).
  */
 @Service
+@Transactional(readOnly = true)
 public class TreeTool {
 
     /**
@@ -46,10 +50,17 @@ public class TreeTool {
 
     private final ProductService productService;
     private final TeamTreeService teamTreeService;
+    private final McpProductTreeReader productTreeReader;
 
-    public TreeTool(ProductService productService, TeamTreeService teamTreeService) {
+    @Autowired
+    public TreeTool(ProductService productService, TeamTreeService teamTreeService, McpProductTreeReader productTreeReader) {
         this.productService = productService;
         this.teamTreeService = teamTreeService;
+        this.productTreeReader = productTreeReader;
+    }
+
+    public TreeTool(ProductService productService, TeamTreeService teamTreeService) {
+        this(productService, teamTreeService, null);
     }
 
     @Tool(
@@ -79,20 +90,66 @@ public class TreeTool {
         name = "get_tree",
         description = "Return a team's opportunity solution tree — products, outcomes, opportunities, " +
             "solutions, assumptions and evidence — as structured JSON. Each node carries its type, title, " +
-            "status (where applicable), parent id and parent type. Prefer scoping to one product for large " +
-            "trees by passing productId (a large tree without a productId returns an actionable overflow " +
-            "message rather than an unbounded payload). Call list_products first to discover the ids. " +
-            "Read-only; performs no writes."
+            "description, status, parent id/type, priority (opportunity 1-100, higher first), valueRating " +
+            "(opportunity 1-5), confidence (assumption 0-100%, lower is less certain), ownerLogin and dates. " +
+            "Non-applicable fields are null. Rank all opportunities, including nested ones, by descending " +
+            "priority and include every tie. Product pages have up to 1000 nodes in stable type, " +
+            "sortOrder, id order; use offset + nodeCount while hasMore is true. Parent references preserve " +
+            "hierarchy across pages. For large team trees, overflow requires scoping by product. Use " +
+            "search_nodes to find a node when you do not already know its id or team. Call list_products " +
+            "first to discover the ids. Read-only; performs no writes."
     )
     public TreeResponse getTree(
         @ToolParam(description = "The id of the team whose tree to return. The caller must be a member of this team.") Long teamId,
         @ToolParam(
             required = false,
             description = "Optional product id. When set, only that product's branch is returned. Use this to scope large trees."
-        ) Long productId
+        ) Long productId,
+        @ToolParam(
+            required = false,
+            description = "Zero-based offset for product-scoped pages of up to 1000 nodes. Follow hasMore by adding nodeCount to offset."
+        ) Integer offset
     ) {
         if (teamId == null) {
             throw new TeamAccessDeniedException();
+        }
+        int effectiveOffset = offset == null || offset < 0 ? 0 : offset;
+        if (productTreeReader != null) {
+            String teamName = productTreeReader.requireTeamName(teamId);
+            if (productId != null) {
+                productTreeReader.requireProductInTeam(productId, teamId);
+                McpProductTreeReader.ProductPage page = productTreeReader.readProduct(productId, effectiveOffset, NODE_CEILING);
+                return new TreeResponse(
+                    teamId,
+                    teamName,
+                    page.nodes().size(),
+                    NODE_CEILING,
+                    false,
+                    null,
+                    page.nodes(),
+                    page.total(),
+                    effectiveOffset,
+                    (long) effectiveOffset + page.nodes().size() < page.total()
+                );
+            }
+            if (effectiveOffset != 0) {
+                throw new IllegalArgumentException("offset requires productId");
+            }
+            long total = productTreeReader.countTeamNodes(teamId);
+            if (total > NODE_CEILING) {
+                return new TreeResponse(
+                    teamId,
+                    teamName,
+                    0,
+                    NODE_CEILING,
+                    true,
+                    "Team tree exceeds 1000 nodes. Use list_products and page each product with get_tree(productId, offset).",
+                    List.of(),
+                    total,
+                    0,
+                    false
+                );
+            }
         }
         // Enforces membership through TeamAccessService inside getTreeForTeam: throws
         // TeamAccessDeniedException whether the team exists or not.
@@ -128,6 +185,11 @@ public class TreeTool {
             mapped.add(project(n));
         }
         return new TreeResponse(tree.getId(), tree.getName(), mapped.size(), NODE_CEILING, false, null, mapped);
+    }
+
+    /** Compatibility for in-process callers; the MCP schema exposes the offset parameter. */
+    public TreeResponse getTree(Long teamId, Long productId) {
+        return getTree(teamId, productId, null);
     }
 
     /**
@@ -167,7 +229,21 @@ public class TreeTool {
                 }
             }
         }
-        return new TreeNode(n.getId(), n.getType() == null ? null : n.getType().name(), n.getTitle(), n.getStatus(), parentType, parentId);
+        return new TreeNode(
+            n.getId(),
+            n.getType() == null ? null : n.getType().name(),
+            n.getTitle(),
+            n.getNotes(),
+            n.getStatus(),
+            parentType,
+            parentId,
+            n.getPriority(),
+            n.getValueRating(),
+            n.getConfidence(),
+            n.getOwnerLogin(),
+            n.getCreatedDate(),
+            n.getLastModifiedDate()
+        );
     }
 
     // ---------------------------------------------------------------------
@@ -186,8 +262,37 @@ public class TreeTool {
         int nodeCeiling,
         boolean overflow,
         String message,
-        List<TreeNode> nodes
-    ) {}
+        List<TreeNode> nodes,
+        long totalNodes,
+        int offset,
+        boolean hasMore
+    ) {
+        public TreeResponse(
+            Long teamId,
+            String teamName,
+            int nodeCount,
+            int nodeCeiling,
+            boolean overflow,
+            String message,
+            List<TreeNode> nodes
+        ) {
+            this(teamId, teamName, nodeCount, nodeCeiling, overflow, message, nodes, nodeCount, 0, false);
+        }
+    }
 
-    public record TreeNode(Long id, String type, String title, String status, String parentType, Long parentId) {}
+    public record TreeNode(
+        Long id,
+        String type,
+        String title,
+        String description,
+        String status,
+        String parentType,
+        Long parentId,
+        Integer priority,
+        Integer valueRating,
+        Integer confidence,
+        String ownerLogin,
+        Instant createdDate,
+        Instant lastModifiedDate
+    ) {}
 }

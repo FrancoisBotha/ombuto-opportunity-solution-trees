@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.opportunity.tree.IntegrationTest;
 import com.opportunity.tree.domain.Assumption;
+import com.opportunity.tree.domain.Comment;
+import com.opportunity.tree.domain.Evidence;
+import com.opportunity.tree.domain.Interview;
+import com.opportunity.tree.domain.OpenQuestion;
 import com.opportunity.tree.domain.Opportunity;
 import com.opportunity.tree.domain.Outcome;
 import com.opportunity.tree.domain.Product;
@@ -22,6 +26,7 @@ import com.opportunity.tree.service.mcp.dto.SearchHit;
 import com.opportunity.tree.service.mcp.dto.SearchPage;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -30,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -62,6 +68,9 @@ class SearchToolIT {
 
     @Autowired
     private SearchTool tool;
+
+    @MockitoSpyBean
+    private McpInterviewNotesPolicy notesPolicy;
 
     private Team teamA;
     private Team teamB;
@@ -219,6 +228,75 @@ class SearchToolIT {
         assertThat(page.hits())
             .extracting(SearchHit::description)
             .anyMatch(d -> d != null && d.contains("bounce"));
+    }
+
+    @Test
+    void searchNodesFindsNotesCommentsAndQuestionsWithParentContext() {
+        Opportunity op = em
+            .createQuery("select o from Opportunity o where o.title = 'Signup friction'", Opportunity.class)
+            .getSingleResult();
+        User author = userRepository.findOneByLogin(MEMBER_A_LOGIN).orElseThrow();
+        em.persist(new Comment().body("friction comment phrase").author(author).createdDate(Instant.now()).opportunity(op));
+        Evidence evidence = new Evidence().title("Observation").sortOrder(0).createdDate(Instant.now()).opportunity(op);
+        em.persist(evidence);
+        em.persist(new Comment().body("friction evidence comment").author(author).createdDate(Instant.now()).evidence(evidence));
+        em.persist(
+            new OpenQuestion().questionText("friction question phrase?").done(false).sortOrder(0).createdDate(Instant.now()).opportunity(op)
+        );
+        Interview interview = new Interview()
+            .title("Research call")
+            .participant("Participant")
+            .interviewDate(LocalDate.now())
+            .notes("friction interview phrase")
+            .createdDate(Instant.now())
+            .product(op.getOutcome().getProduct());
+        em.persist(interview);
+        em.flush();
+        em.clear();
+        authenticate(MEMBER_A_LOGIN);
+
+        SearchPage page = tool.searchNodes("friction", teamA.getId(), 0, 50);
+        assertThat(page.hits()).extracting(SearchHit::type).contains("INTERVIEW_NOTE", "NODE_COMMENT", "OPEN_QUESTION");
+        assertThat(
+            page
+                .hits()
+                .stream()
+                .filter(h -> h.type().equals("NODE_COMMENT") || h.type().equals("OPEN_QUESTION"))
+        ).anyMatch(h -> h.parentType().equals("OPPORTUNITY") && h.parentId().equals(op.getId()));
+        assertThat(
+            page
+                .hits()
+                .stream()
+                .filter(h -> h.type().equals("NODE_COMMENT"))
+        ).anyMatch(h -> h.parentType().equals("EVIDENCE") && h.parentId().equals(evidence.getId()));
+        assertThat(
+            page
+                .hits()
+                .stream()
+                .filter(h -> h.type().equals("INTERVIEW_NOTE"))
+        ).allMatch(h -> h.parentType().equals("PRODUCT") && h.parentId().equals(op.getOutcome().getProduct().getId()));
+    }
+
+    @Test
+    void searchNodesRestrictedNotesDoNotAffectHitsOrCounts() {
+        Product product = firstProductOfTeam(teamA);
+        em.persist(
+            new Interview()
+                .title("Private call")
+                .participant("P")
+                .interviewDate(LocalDate.now())
+                .notes("uniquesecretnote")
+                .createdDate(Instant.now())
+                .product(product)
+        );
+        em.flush();
+        em.clear();
+        authenticate(MEMBER_A_LOGIN);
+        org.mockito.Mockito.doReturn(false).when(notesPolicy).canReadNotes(teamA.getId());
+
+        SearchPage page = tool.searchNodes("uniquesecretnote", teamA.getId(), 0, 20);
+        assertThat(page.total()).isZero();
+        assertThat(page.hits()).isEmpty();
     }
 
     // ---------------------------------------------------------------

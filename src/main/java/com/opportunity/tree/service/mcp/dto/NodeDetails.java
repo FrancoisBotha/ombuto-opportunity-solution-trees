@@ -1,5 +1,6 @@
 package com.opportunity.tree.service.mcp.dto;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -28,5 +29,11 @@ public record NodeDetails(
     Long linkCount,
     List<OpenQuestionDetails> openQuestions,
     Long evidenceCount,
-    Long commentCount
+    Long commentCount,
+    Integer priority,
+    Integer valueRating,
+    Integer confidence,
+    String ownerLogin,
+    Instant createdDate,
+    Instant lastModifiedDate
 ) {}

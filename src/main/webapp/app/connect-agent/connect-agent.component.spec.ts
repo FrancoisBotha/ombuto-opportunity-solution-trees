@@ -62,9 +62,11 @@ describe('ConnectAgent Component', () => {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     const rows = wrapper.findAll('[data-cy^="mcpTool-"]');
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     const names = rows.map(r => r.find('[data-cy^="mcpToolName-"]').text());
-    expect(names).toEqual(expect.arrayContaining(['list_products', 'get_tree', 'get_node', 'list_interviews', 'list_node_comments']));
+    expect(names).toEqual(
+      expect.arrayContaining(['list_products', 'get_tree', 'get_node', 'search_nodes', 'list_interviews', 'list_node_comments']),
+    );
     for (const row of rows) {
       const desc = row.find('[data-cy^="mcpToolDescription-"]').text();
       expect(desc.length).toBeGreaterThan(0);

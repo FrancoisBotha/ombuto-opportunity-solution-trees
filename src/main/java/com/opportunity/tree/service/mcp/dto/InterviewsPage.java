@@ -16,5 +16,6 @@ public record InterviewsPage(
     int limit,
     long totalMatching,
     boolean notesIncluded,
-    List<InterviewSummary> interviews
+    List<InterviewSummary> interviews,
+    Long opportunityId
 ) {}

@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,8 +57,9 @@ public class ListInterviewsTool {
             "participant / interviewee label, interviewer and the opportunities each is linked " +
             "to (id, title, status). Pass a productId when you know which product you are " +
             "asking about — the result is narrower and easier to reason about; only fall back to " +
-            "teamId when you specifically want every product of the team. Exactly one of " +
-            "productId and teamId must be given. Results are ordered by interview date " +
+            "teamId when you specifically want every product of the team; pass opportunityId for " +
+            "interviews directly linked to that opportunity (including nested opportunities). Exactly " +
+            "one of productId, teamId and opportunityId must be given. Results are ordered by interview date " +
             "descending, then id descending, and returned as a bounded page (default 20, " +
             "capped at " +
             MAX_PAGE_SIZE +
@@ -81,13 +84,15 @@ public class ListInterviewsTool {
         @ToolParam(
             required = false,
             description = "Page size, default " + DEFAULT_PAGE_SIZE + ", capped at " + MAX_PAGE_SIZE + "."
-        ) Integer size
+        ) Integer size,
+        @ToolParam(
+            required = false,
+            description = "Optional opportunity id. When set, return only interviews linked to this opportunity; do not also pass productId or teamId. Nested opportunities are supported."
+        ) Long opportunityId
     ) {
-        if (productId == null && teamId == null) {
-            throw new IllegalArgumentException("Provide either productId or teamId.");
-        }
-        if (productId != null && teamId != null) {
-            throw new IllegalArgumentException("Provide exactly one of productId or teamId, not both.");
+        int scopes = (productId == null ? 0 : 1) + (teamId == null ? 0 : 1) + (opportunityId == null ? 0 : 1);
+        if (scopes != 1) {
+            throw new IllegalArgumentException("Provide exactly one of productId, teamId or opportunityId.");
         }
 
         int effectivePage = page == null || page < 0 ? 0 : page;
@@ -96,25 +101,28 @@ public class ListInterviewsTool {
 
         Long resolvedTeamId;
         Long resolvedProductId;
-        List<Interview> allInterviews;
+        Page<Interview> interviews;
+        PageRequest pageable = PageRequest.of(effectivePage, effectiveSize);
 
-        if (productId != null) {
+        if (opportunityId != null) {
+            resolvedTeamId = teamAccessService.requireReadNode(TreeNodeType.OPPORTUNITY, opportunityId);
+            resolvedProductId = null;
+            interviews = readRepository.findInterviewsByOpportunityId(opportunityId, resolvedTeamId, pageable);
+        } else if (productId != null) {
             resolvedTeamId = teamAccessService.requireReadNode(TreeNodeType.PRODUCT, productId);
             resolvedProductId = productId;
-            allInterviews = readRepository.findInterviewsByProductId(productId);
+            interviews = readRepository.findInterviewsByProductId(productId, pageable);
         } else {
             teamAccessService.requireReadTeam(teamId);
             resolvedTeamId = teamId;
             resolvedProductId = null;
-            allInterviews = readRepository.findInterviewsByTeamId(teamId);
+            interviews = readRepository.findInterviewsByTeamId(teamId, pageable);
         }
 
         boolean notesIncluded = notesPolicy.canReadNotes(resolvedTeamId);
 
-        long total = allInterviews.size();
-        int from = Math.min(effectivePage * effectiveSize, allInterviews.size());
-        int to = Math.min(from + effectiveSize, allInterviews.size());
-        List<Interview> pageContent = allInterviews.subList(from, to);
+        long total = interviews.getTotalElements();
+        List<Interview> pageContent = interviews.getContent();
 
         List<InterviewSummary> summaries = pageContent
             .stream()
@@ -129,8 +137,14 @@ public class ListInterviewsTool {
             MAX_PAGE_SIZE,
             total,
             notesIncluded,
-            summaries
+            summaries,
+            opportunityId
         );
+    }
+
+    /** Java-call compatibility for existing four-argument callers; the MCP schema uses five arguments. */
+    public InterviewsPage listInterviews(Long productId, Long teamId, Integer page, Integer size) {
+        return listInterviews(productId, teamId, page, size, null);
     }
 
     private InterviewSummary toSummary(Interview interview, boolean notesIncluded) {
@@ -140,6 +154,7 @@ public class ListInterviewsTool {
         List<OpportunityRef> opps = interview
             .getOpportunities()
             .stream()
+            .filter(op -> interview.getProduct().getTeam().getId().equals(op.getOutcome().getProduct().getTeam().getId()))
             .map(this::toOpportunityRef)
             .sorted(java.util.Comparator.comparing(OpportunityRef::id))
             .collect(Collectors.toList());
@@ -154,7 +169,9 @@ public class ListInterviewsTool {
             interview.getParticipant(),
             interviewerLabel,
             notes,
-            opps
+            opps,
+            interview.getProduct().getId(),
+            interview.getCreatedDate()
         );
     }
 

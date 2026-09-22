@@ -8,6 +8,7 @@ import com.opportunity.tree.service.mcp.dto.LinkDetails;
 import com.opportunity.tree.service.mcp.dto.NodeDetails;
 import com.opportunity.tree.service.mcp.dto.NodeRef;
 import com.opportunity.tree.service.mcp.dto.OpenQuestionDetails;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -41,7 +42,9 @@ public class GetNodeTool {
         name = "get_node",
         description = "Return one tree node by type and id. Prefer this over get_tree when you " +
             "already know the node — it returns only that node's title, description, status, its " +
-            "parent, a summary of its direct children (type, id, title), its 'links' (each with " +
+            "priority (opportunity 1-100, higher first), valueRating (opportunity 1-5), confidence " +
+            "(assumption 0-100%, lower is less certain), ownerLogin and dates. Non-applicable fields " +
+            "are null. Also returns parent, direct children (type, id, title), and 'links' (each with " +
             "'target' URL, coarse 'type' JIRA/CONFLUENCE/OTHER derived from the URL, and 'title'), " +
             "and — for an OPPORTUNITY — its 'openQuestions' (each with 'text' and a 'resolved' " +
             "flag). 'linkCount' is kept alongside 'links' for backward compatibility and equals " +
@@ -106,6 +109,12 @@ public class GetNodeTool {
         String title = (String) basics[1];
         String description = (String) basics[2];
         String status = (String) basics[3];
+        Integer priority = (Integer) basics[4];
+        Integer valueRating = (Integer) basics[5];
+        Integer confidence = (Integer) basics[6];
+        String ownerLogin = (String) basics[7];
+        Instant createdDate = (Instant) basics[8];
+        Instant lastModifiedDate = (Instant) basics[9];
 
         NodeRef parent = parentFor(nodeType, id);
         List<NodeRef> children = childrenFor(nodeType, id);
@@ -128,7 +137,13 @@ public class GetNodeTool {
             linkCount,
             openQuestions,
             evidenceCount,
-            commentCount
+            commentCount,
+            priority,
+            valueRating,
+            confidence,
+            ownerLogin,
+            createdDate,
+            lastModifiedDate
         );
     }
 

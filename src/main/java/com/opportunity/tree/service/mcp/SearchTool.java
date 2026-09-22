@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,15 +47,26 @@ public class SearchTool {
 
     private final TeamAccessService teamAccessService;
     private final McpNodeReadRepository readRepository;
+    private final McpInterviewNotesPolicy notesPolicy;
 
-    public SearchTool(TeamAccessService teamAccessService, McpNodeReadRepository readRepository) {
+    @Autowired
+    public SearchTool(TeamAccessService teamAccessService, McpNodeReadRepository readRepository, McpInterviewNotesPolicy notesPolicy) {
         this.teamAccessService = teamAccessService;
         this.readRepository = readRepository;
+        this.notesPolicy = notesPolicy;
+    }
+
+    public SearchTool(TeamAccessService teamAccessService, McpNodeReadRepository readRepository) {
+        this(teamAccessService, readRepository, new McpInterviewNotesPolicy(teamAccessService));
     }
 
     @Tool(
         name = "search_nodes",
-        description = "Find tree nodes whose title or description matches a term, without walking the tree. " +
+        description = "Find tree nodes by title/description and readable interview notes, node comments " +
+            "and opportunity open questions by text, without walking the tree. Context hits have type " +
+            "INTERVIEW_NOTE, NODE_COMMENT or OPEN_QUESTION, source id, matched text in description, " +
+            "and parentType/parentId. Interview notes are searched only for teams whose notes policy " +
+            "allows the caller to read them; protected text contributes no hit, count or snippet. " +
             "Case-insensitive substring match. Search is restricted to the caller's readable teams — a hit " +
             "from a team the caller cannot read never appears in the response. Results are paginated " +
             "(default " +
@@ -114,6 +126,16 @@ public class SearchTool {
         merged.addAll(mapRows(readRepository.searchSolutions(scopeTeams, needle)));
         merged.addAll(mapRows(readRepository.searchAssumptions(scopeTeams, needle)));
         merged.addAll(mapRows(readRepository.searchEvidence(scopeTeams, needle)));
+        merged.addAll(mapContextRows(readRepository.searchOutcomeComments(scopeTeams, needle)));
+        merged.addAll(mapContextRows(readRepository.searchOpportunityComments(scopeTeams, needle)));
+        merged.addAll(mapContextRows(readRepository.searchSolutionComments(scopeTeams, needle)));
+        merged.addAll(mapContextRows(readRepository.searchAssumptionComments(scopeTeams, needle)));
+        merged.addAll(mapContextRows(readRepository.searchEvidenceComments(scopeTeams, needle)));
+        merged.addAll(mapContextRows(readRepository.searchOpenQuestions(scopeTeams, needle)));
+        Set<Long> notesTeams = scopeTeams.stream().filter(notesPolicy::canReadNotes).collect(java.util.stream.Collectors.toSet());
+        if (!notesTeams.isEmpty()) {
+            merged.addAll(mapContextRows(readRepository.searchInterviewNotes(notesTeams, needle)));
+        }
 
         // Stable order: title (case-insensitive), then type, then id.
         merged.sort(
@@ -141,6 +163,26 @@ public class SearchTool {
             Long teamId = r[5] == null ? null : ((Number) r[5]).longValue();
             String teamName = (String) r[6];
             out.add(new SearchHit(type, id, title, description, status, teamId, teamName));
+        }
+        return out;
+    }
+
+    private static List<SearchHit> mapContextRows(List<Object[]> rows) {
+        List<SearchHit> out = new ArrayList<>(rows.size());
+        for (Object[] r : rows) {
+            out.add(
+                new SearchHit(
+                    (String) r[0],
+                    ((Number) r[1]).longValue(),
+                    (String) r[2],
+                    (String) r[3],
+                    null,
+                    ((Number) r[5]).longValue(),
+                    (String) r[6],
+                    (String) r[7],
+                    ((Number) r[8]).longValue()
+                )
+            );
         }
         return out;
     }

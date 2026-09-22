@@ -170,13 +170,10 @@ REDACTED (StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION disabled) …]`. Contrary
   `list_products` returns `{total:0}` and every scoped call returns "Access denied", with no
   explanation. Fail-closed and safe, but confusing. Consider surfacing a clear "no Ombuto account
   linked to this identity" message. Access-control call; coordinate with S3.
-- **W3 (minor) — `list_interviews` and `get_tree` bound the _response_ but not the _DB read_
-  (NFR-021).** `findInterviewsByProductId/ByTeamId` fetch **all** matching interviews (eagerly
-  joining product + interviewer) and paginate in memory; `get_tree` assembles the entire team tree
-  before applying `NODE_CEILING`. Output is capped (page ≤50; tree ceiling 1000), so a caller cannot
-  pull the whole DB over the wire, but a large team still materialises everything server-side.
-  Recommend DB-level `LIMIT/OFFSET` (with a separate count) for interviews and a product-scoped tree
-  query. Left as a follow-up ticket to avoid a blind repository refactor.
+- **W3 (resolved) — interview and tree reads are now DB-bounded (NFR-021).** Interview
+  queries page and count in the database. Team-wide `get_tree` counts before assembly;
+  product-scoped `get_tree` pages a product at the database, including products above
+  1,000 nodes. See section 17 for ordering and continuation rules.
 
 ### Discussion visibility policy (MCPSRV-011, 2026-09-21)
 
@@ -247,3 +244,91 @@ Rationale:
 
 Clients that only understood the old HTTP+SSE transport will need to upgrade (Claude Code
 2.1.278, verified against the running app, speaks Streamable HTTP).
+
+## 16. Bulk tree reads and search (MCPSRV-013, 2026-09-21)
+
+`get_tree` originally returned only `(id, type, title, status, parentType, parentId)` per node.
+Descriptions were only available through `get_node`, so an agent that wanted to understand a tree
+rather than list it had to issue one round trip per node. There was also no way to find a topic
+without walking the whole tree.
+
+Two shapes were considered for the "read a branch with descriptions" half of the problem:
+
+- **A. A `detail` parameter on `get_tree`** (e.g. `detail = "summary" | "full"`) that would opt
+  the caller into descriptions. It keeps a single tool, but the response schema now depends on a
+  parameter — a caller cannot cache or reason about `get_tree`'s output without also inspecting
+  the flag they passed, and the JSON shape changes call to call. That works against NFR-021's
+  "clear enough for an agent to choose correctly" bar.
+- **B. Include the description in `get_tree`'s node projection unconditionally, and add a
+  separate `search_nodes` tool for the "find without walking" half of the problem.** The
+  response shape stays predictable — every node in every call carries the same fields — and an
+  agent that needs the descriptions no longer has to make a second decision to get them. Payload
+  size is already bounded by `NODE_CEILING` (1 000 nodes) and by `productId` scoping (unchanged),
+  so adding one string per node does not create a new blow-up vector for tree size; the ceiling
+  still refuses an oversized team with the same "scope by product" message.
+
+**Decision: B.** `get_tree`'s `TreeNode` now always includes `description`, and a new read-only
+`search_nodes` tool answers "where was this topic discussed?" in one call. Trade-offs:
+
+- Payload grows by the sum of node description lengths — for a well-populated 300-node tree that
+  is measurable, but still cheaper than 300 `get_node` round trips. If this ever becomes a
+  problem in practice, a follow-up ticket can add a `detail` parameter for a slim projection
+  (i.e. add option A on top), but the shape stays predictable by default.
+- `search_nodes` uses one JPQL projection per node type filtered by the caller's team ids
+  (`TeamAccessService.getCurrentUserTeamIds()`); merging happens in Java. Substring match is
+  case-insensitive against title/statement and description. Results are paginated (`limit`
+  default 20, capped at 50; `offset` and `hasMore` in the response). A hit from a team the
+  caller cannot read never appears because the `IN :teamIds` clause is applied at the DB layer
+  — the tool returns no hit rather than a redacted one (AC 5). `teamId` may be passed to narrow
+  the search; a cross-team `teamId` is refused with `TeamAccessDeniedException`, the same shape
+  as an unknown id, so ids cannot be probed for existence.
+
+The alternative — a search tool that only returns node ids and defers to `get_tree` /
+`get_node` for the details — was rejected: the search result would still need one round trip
+per hit to be useful, which reintroduces exactly the problem this ticket is closing.
+
+## 17. Discovery decision reads and bounded paging
+
+`get_tree` and `get_node` retain their existing fields and add `priority`, `valueRating`,
+`confidence`, `ownerLogin`, `createdDate`, and `lastModifiedDate`. Fields that do not apply
+to the node type are JSON `null`, never a fabricated zero. Opportunity priority is an
+integer 1–100 (higher means more urgent: the UI labels 85+ *Critical*, 65+ *High*);
+opportunity value rating is 1–5 (higher means more value); assumption confidence is
+0–100 percent (lower means less certain). These ranges are enforced in
+`TreeNodeWriteService`, the JDL and the UI; priority direction is confirmed by
+`ost/domain/rules.ts`. `ownerLogin` applies to outcomes, opportunities, solutions and
+assumptions; `lastModifiedDate` is null for products. Rank **every** opportunity in the
+product, including nested opportunities, by descending numeric `priority`; retain all
+equal-score ties. Do not rank only direct outcome children.
+
+`get_tree` adds optional `offset` and response fields `totalNodes`, `offset`, `hasMore`.
+Product-scoped calls return at most 1,000 nodes. Start at offset 0 and repeat with
+`offset + nodeCount` while `hasMore` is true; a product larger than 1,000 nodes remains
+fully readable. The product page is ordered by node type (product, outcome, opportunity,
+solution, assumption, evidence), then `sortOrder`, then id. This intentionally differs
+from the former depth-first array order for product-scoped calls; `parentType`/`parentId`
+retain the hierarchy across pages. Consumers must follow those references rather than
+assuming a parent immediately precedes a child. Concurrent edits can shift offset pages;
+retry the traversal when `totalNodes` changes. A team-wide call first counts rows in the
+database and returns `overflow` before assembling a tree above 1,000 nodes. Scope by
+product to continue. Product-scoped calls only query that product and page at the DB.
+
+`list_interviews` adds optional `opportunityId`; exactly one of `teamId`, `productId`,
+`opportunityId` is required. Linked interviews are direct links via the existing
+many-to-many relationship, including opportunities nested under another opportunity.
+The response includes `opportunityId`, each interview's `productId` and `createdDate`,
+and the existing date/title/participant/interviewer/linked-opportunity metadata. The
+database applies page/size (zero-based, default 20, cap 50) and counts matches separately;
+ordering is interview date descending, id descending. Notes remain null when
+`McpInterviewNotesPolicy` disallows them. Unknown and cross-team scope ids produce the
+same access-denied error.
+
+`search_nodes` additionally searches node comments, opportunity open questions and
+interview notes. Context hits use `type` values `NODE_COMMENT`, `OPEN_QUESTION`,
+`INTERVIEW_NOTE`; `id` identifies that source record, `description` contains the matched
+text, and `parentType`/`parentId` identify its parent node. Existing node hits remain
+unchanged (the new parent fields are null). The database restricts every context query
+to readable teams; interview notes are queried only for teams allowed by the notes
+policy. Restricted text does not affect hits, `total`, snippets or errors. Search still
+merges matches before applying offset/limit; this is a separate future scaling concern
+for very broad queries.

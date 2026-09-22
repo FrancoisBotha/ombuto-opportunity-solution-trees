@@ -3,38 +3,40 @@
 A collaborative web application for product teams that practise **continuous discovery**. Each team
 keeps one living [Opportunity Solution Tree](https://www.producttalk.org/opportunity-solution-trees/):
 its products at the top, the outcomes each product is chasing, the customer opportunities behind
-those outcomes, the solutions being considered, and the assumptions and experiments that test them.
+those outcomes, the solutions being considered, and the assumptions and evidence used to test them.
 
 It replaces trees drawn in whiteboard tools — which have no structure, go stale within weeks, and
 are invisible outside the team that drew them — with a structured, shared, always-current model that
 links to the tickets and pages where the work actually happens.
 
-> **Status: early development.** Teams and scoped access (Epic 1) are implemented and the tree
-> editor (Epic 2) is in progress. See the [roadmap](#roadmap). Not yet ready for production use.
+> **Status: active development.** The core team tree workflow and read-only MCP access are
+> available. Interviews, leadership reporting and meeting transcripts still have planned work.
+> See the [roadmap](#roadmap). Not yet ready for production use.
 
 ## Who it is for
 
 - **Product trios** — product manager, designer and tech lead — who interview customers most weeks
   and need somewhere to record what they learned, turn it into opportunities, and track which
   solutions and assumptions they are testing.
-- **Heads of product** and similar leaders, who get a read-only overview across every team's tree.
+- **Heads of product** and similar leaders, for whom a cross-team read-only overview is planned.
 
 ## Features
 
-| Capability                                                                                                       | State       |
-| ---------------------------------------------------------------------------------------------------------------- | ----------- |
-| **Teams and products** — many teams, one tree per team, a user can belong to several                             | Implemented |
-| **Team-scoped access** — owner, editor and viewer roles; you only ever see the trees of teams you belong to      | Implemented |
-| **SSO sign-in** — OAuth2 / OpenID Connect through Keycloak, with company identity providers brokered through it  | Implemented |
-| **Tree editor** — build the tree visually from products down to experiments, with a status on every node         | In progress |
-| **Tree rearranging** — drag nodes and subtrees to restructure                                                    | Planned     |
-| **Assumptions and experiments** — record what each solution depends on and how it is being tested                | Planned     |
-| **Real-time collaboration** — several people in the same tree at once, seeing each other's changes as they occur | Planned     |
-| **Threaded comments** on nodes                                                                                   | Planned     |
-| **Interviews as evidence** — log customer interviews and link them to the opportunities they support             | Planned     |
-| **Jira and Confluence links** — paste a URL onto a node and it becomes a named, typed link                       | Planned     |
-| **Leadership overview** — read-only view across all teams                                                        | Planned     |
-| **MCP server** — read-only access for LLM agent tools, limited to what the calling user may see                  | Planned     |
+| Capability                                                                                                                                       | State     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
+| **Teams and products** — create teams, manage members and products, and use owner, editor and viewer roles                                       | Available |
+| **SSO sign-in** — OAuth2 / OpenID Connect through Keycloak, with a guide for brokering company identity providers                                | Available |
+| **Visual tree editor** — build product, outcome, nested opportunity, solution, assumption and evidence branches; edit details and open questions | Available |
+| **Tree rearranging** — move or reorder nodes by dragging or with keyboard controls; collapse branches                                            | Available |
+| **Assumption tracking** — record status, confidence and owner; review assumptions in the experiment tracker                                      | Available |
+| **Live collaboration** — changes to the shared tree and node comments appear in other open sessions                                              | Available |
+| **Node discussion** — add, edit and delete chat-style comments on nodes; replies are not threaded                                                | Available |
+| **Node links** — add named URLs, including Jira and Confluence links, to tree nodes                                                              | Available |
+| **MCP server** — read-only, team-scoped tools for trees, nodes, interviews, search and discussions; connect through OAuth                        | Available |
+| **Admin backup and restore** — export application data and restore a compatible backup                                                           | Available |
+| **Interviews as evidence** — interview records and opportunity links exist, but the planned team-facing workflow is unfinished                   | Partial   |
+| **Leadership overview** — read-only view across all teams                                                                                        | Planned   |
+| **Meeting transcripts** — attach and read transcripts on tree nodes                                                                              | Planned   |
 
 ## Tech stack
 
@@ -127,7 +129,7 @@ ombuto.jdl                  Data model — the single source of truth for entiti
 src/main/java/              Spring Boot application (com.opportunity.tree)
 src/main/webapp/app/        Vue application
   entities/                   generated CRUD screens
-  teams/, tree/               hand-written product features
+  teams/, ost/, connect-agent/  hand-written product features
 src/main/resources/config/  Spring configuration and Liquibase changelogs
 src/main/docker/            Compose files for Keycloak, PostgreSQL, the app, monitoring
 src/test/java/              JUnit, ArchUnit and Cucumber tests
@@ -156,18 +158,20 @@ Two rules matter to anyone contributing, human or agent:
 
 ## Roadmap
 
-| Epic | Scope                                                                          | State       |
-| ---- | ------------------------------------------------------------------------------ | ----------- |
-| 1    | [Teams & Scoped Access](docs/Epics/epic_01_TEAMS_AND_SCOPED_ACCESS.md)         | In review   |
-| 2    | [Tree Editor Core](docs/Epics/epic_02_TREE_EDITOR_CORE.md)                     | In progress |
-| 3    | [Tree Rearranging](docs/Epics/epic_03_TREE_REARRANGING.md)                     | Planned     |
-| 4    | [Assumptions & Experiments](docs/Epics/epic_04_ASSUMPTIONS_AND_EXPERIMENTS.md) | Planned     |
-| 5    | [Real-Time Collaboration](docs/Epics/epic_05_REALTIME_COLLABORATION.md)        | Planned     |
-| 6    | [Threaded Comments](docs/Epics/epic_06_THREADED_COMMENTS.md)                   | Planned     |
-| 7    | [Interviews as Evidence](docs/Epics/epic_07_INTERVIEWS_AS_EVIDENCE.md)         | Planned     |
-| 8    | [Jira & Confluence Links](docs/Epics/epic_08_JIRA_AND_CONFLUENCE_LINKS.md)     | Planned     |
-| 9    | [Leadership Overview](docs/Epics/epic_09_LEADERSHIP_OVERVIEW.md)               | Planned     |
-| 10   | [MCP Server](docs/Epics/epic_10_MCP_SERVER.md)                                 | Planned     |
+| Epic | Scope                                                                          | State                                                |
+| ---- | ------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| 1    | [Teams & Scoped Access](docs/Epics/epic_01_TEAMS_AND_SCOPED_ACCESS.md)         | Available                                            |
+| 2    | [Tree Editor Core](docs/Epics/epic_02_TREE_EDITOR_CORE.md)                     | Available                                            |
+| 3    | [Tree Rearranging](docs/Epics/epic_03_TREE_REARRANGING.md)                     | Available                                            |
+| 4    | [Assumptions & Experiments](docs/Epics/epic_04_ASSUMPTIONS_AND_EXPERIMENTS.md) | Partial; core assumptions shipped through Epic 11    |
+| 5    | [Real-Time Collaboration](docs/Epics/epic_05_REALTIME_COLLABORATION.md)        | Available; a reliability follow-up remains           |
+| 6    | [Node Comments](docs/Epics/epic_06_THREADED_COMMENTS.md)                       | Available as flat chat-style comments                |
+| 7    | [Interviews as Evidence](docs/Epics/epic_07_INTERVIEWS_AS_EVIDENCE.md)         | Partial                                              |
+| 8    | [Jira & Confluence Links](docs/Epics/epic_08_JIRA_AND_CONFLUENCE_LINKS.md)     | Available; provider inference is still being refined |
+| 9    | [Leadership Overview](docs/Epics/epic_09_LEADERSHIP_OVERVIEW.md)               | Planned                                              |
+| 10   | [MCP Server](docs/Epics/epic_10_MCP_SERVER.md)                                 | Available; tool coverage is still expanding          |
+| 11   | [OST Tree Builder](docs/Epics/epic_11_OST_TREE_BUILDER.md)                     | Available                                            |
+| 12   | [Meeting Transcripts](docs/Epics/epic_12_MEETING_TRANSCRIPTS.md)               | Planned                                              |
 
 ## Documentation
 

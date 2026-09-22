@@ -103,7 +103,8 @@ class McpToolsIT {
             .priority(50)
             .sortOrder(0)
             .createdDate(Instant.now())
-            .outcome(outcomeA);
+            .outcome(outcomeA)
+            .owner(alice);
         em.persist(opportunityA);
         solutionA = new Solution()
             .title("Interactive tour")
@@ -120,7 +121,8 @@ class McpToolsIT {
             .confidence(40)
             .sortOrder(0)
             .createdDate(Instant.now())
-            .solution(solutionA);
+            .solution(solutionA)
+            .owner(carol);
         em.persist(assumptionA);
         evidenceA = new Evidence().title("Interview snippet").sortOrder(0).createdDate(Instant.now()).opportunity(opportunityA);
         em.persist(evidenceA);
@@ -162,6 +164,11 @@ class McpToolsIT {
         assertThat(details.title()).isEqualTo("Onboarding is confusing");
         assertThat(details.description()).isEqualTo("odesc");
         assertThat(details.status()).isEqualTo("UNEXPLORED");
+        assertThat(details.priority()).isEqualTo(50);
+        assertThat(details.valueRating()).isEqualTo(4);
+        assertThat(details.confidence()).isNull();
+        assertThat(details.ownerLogin()).isEqualTo(alice.getLogin());
+        assertThat(details.createdDate()).isNotNull();
         assertThat(details.parent()).isNotNull();
         assertThat(details.parent().type()).isEqualTo("OUTCOME");
         assertThat(details.parent().id()).isEqualTo(outcomeA.getId());
@@ -250,6 +257,16 @@ class McpToolsIT {
     }
 
     @Test
+    void getNode_assumptionExposesConfidenceAndOwnerOnlyWhereApplicable() {
+        authenticate(alice);
+        NodeDetails assumption = getNodeTool.getNode("ASSUMPTION", assumptionA.getId());
+        assertThat(assumption.confidence()).isEqualTo(40);
+        assertThat(assumption.ownerLogin()).isEqualTo(carol.getLogin());
+        assertThat(assumption.priority()).isNull();
+        assertThat(assumption.createdDate()).isNotNull();
+    }
+
+    @Test
     void getNode_nonMemberSeesNeitherOpenQuestionsNorLinks() {
         // AC #4 / #6 non-member row: even after we seed both, a caller who is not a member of
         // the owning team is refused at the TeamAccessService layer — the get_node call throws
@@ -276,6 +293,9 @@ class McpToolsIT {
         assertThat(details.type()).isEqualTo("PRODUCT");
         assertThat(details.parent()).isNull();
         assertThat(details.status()).isNull();
+        assertThat(details.priority()).isNull();
+        assertThat(details.valueRating()).isNull();
+        assertThat(details.ownerLogin()).isNull();
         assertThat(details.evidenceCount()).isNull();
         assertThat(details.commentCount()).isNull();
         assertThat(details.openQuestions()).isNull();
@@ -349,6 +369,93 @@ class McpToolsIT {
         InterviewsPage page = listInterviewsTool.listInterviews(null, teamA.getId(), null, null);
         assertThat(page.interviews()).hasSize(2);
         assertThat(page.notesIncluded()).isTrue();
+    }
+
+    @Test
+    void listInterviews_byOpportunityReturnsOnlyDirectLinksAndPagesAtDatabase() {
+        authenticate(alice);
+        InterviewsPage linked = listInterviewsTool.listInterviews(null, null, 0, 1, opportunityA.getId());
+        assertThat(linked.opportunityId()).isEqualTo(opportunityA.getId());
+        assertThat(linked.totalMatching()).isEqualTo(1);
+        assertThat(linked.interviews()).extracting("id").containsExactly(interviewA1.getId());
+        assertThat(linked.interviews().get(0).productId()).isEqualTo(productA.getId());
+        assertThat(linked.interviews().get(0).createdDate()).isNotNull();
+        assertThat(listInterviewsTool.listInterviews(null, null, 1, 1, opportunityA.getId()).interviews()).isEmpty();
+    }
+
+    @Test
+    void listInterviews_crossTeamOpportunityAndUnknownIdHaveSameError() {
+        authenticate(bob);
+        Throwable cross = org.assertj.core.api.Assertions.catchThrowable(() ->
+            listInterviewsTool.listInterviews(null, null, 0, 20, opportunityA.getId())
+        );
+        Throwable unknown = org.assertj.core.api.Assertions.catchThrowable(() ->
+            listInterviewsTool.listInterviews(null, null, 0, 20, 987654321L)
+        );
+        assertThat(cross).isInstanceOf(TeamAccessDeniedException.class);
+        assertThat(unknown).isInstanceOf(TeamAccessDeniedException.class);
+        assertThat(cross.getMessage()).isEqualTo(unknown.getMessage());
+    }
+
+    @Test
+    void listInterviews_nestedOpportunityUsesItsOwnDirectLinks() {
+        Opportunity parent = em.find(Opportunity.class, opportunityA.getId());
+        Opportunity child = new Opportunity()
+            .title("Nested need")
+            .status(OpportunityStatus.UNEXPLORED)
+            .valuerating(3)
+            .priority(70)
+            .sortOrder(1)
+            .createdDate(Instant.now())
+            .outcome(parent.getOutcome())
+            .parent(parent);
+        em.persist(child);
+        Interview nestedInterview = persistInterview(
+            productA,
+            "Nested interview",
+            "Pat",
+            LocalDate.of(2026, 3, 1),
+            "nested notes",
+            alice,
+            Set.of(child)
+        );
+        em.flush();
+        em.clear();
+        authenticate(alice);
+
+        InterviewsPage page = listInterviewsTool.listInterviews(null, null, 0, 20, child.getId());
+        assertThat(page.interviews()).extracting("id").containsExactly(nestedInterview.getId());
+        assertThat(page.interviews().get(0).opportunities()).extracting("id").contains(child.getId());
+    }
+
+    @Test
+    void listInterviews_inconsistentCrossTeamLinkDoesNotExposeInterviewOrOpportunity() {
+        Outcome otherOutcome = new Outcome().title("Private outcome").sortOrder(0).createdDate(Instant.now()).product(productB);
+        em.persist(otherOutcome);
+        Opportunity other = new Opportunity()
+            .title("Private opportunity")
+            .status(OpportunityStatus.UNEXPLORED)
+            .valuerating(3)
+            .priority(50)
+            .sortOrder(0)
+            .createdDate(Instant.now())
+            .outcome(otherOutcome);
+        em.persist(other);
+        other.addInterview(em.find(Interview.class, interviewA1.getId()));
+        em.flush();
+        em.clear();
+
+        authenticate(bob);
+        assertThat(listInterviewsTool.listInterviews(null, null, 0, 20, other.getId()).interviews()).isEmpty();
+        authenticate(alice);
+        InterviewsPage own = listInterviewsTool.listInterviews(productA.getId(), null, 0, 20);
+        assertThat(
+            own
+                .interviews()
+                .stream()
+                .flatMap(i -> i.opportunities().stream())
+                .map(o -> o.title())
+        ).doesNotContain("Private opportunity");
     }
 
     @Test

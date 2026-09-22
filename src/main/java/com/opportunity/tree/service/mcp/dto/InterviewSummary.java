@@ -1,5 +1,6 @@
 package com.opportunity.tree.service.mcp.dto;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -15,5 +16,7 @@ public record InterviewSummary(
     String participant,
     String interviewer,
     String notes,
-    List<OpportunityRef> opportunities
+    List<OpportunityRef> opportunities,
+    Long productId,
+    Instant createdDate
 ) {}
