@@ -6,7 +6,9 @@
  * - ALLOWED: Evidence only under Opportunity | Assumption (the server enforces the same matrix):
  *   solution: ['assumption'] (was ['assumption', 'evidence']), assumption: ['evidence'] (was []).
  * - PALETTE_HINT added: the evidence palette hint explains where evidence may be attached.
- * - defaultLinks takes { id: <node key>, type } — the key is what the links embed.
+ * - defaultLinks (LINK-001): returns slot NAMES only, no URLs. The panel renders each slot as an
+ *   add-button that opens the add-link form prefilled with the slot's name. Nothing is persisted
+ *   at node creation; a NodeLink row means a human attached it.
  * - Formatting follows the repo's Prettier config.
  */
 import type { NodeType, OstNode } from './types';
@@ -54,26 +56,23 @@ export const STATUS: Record<NodeType, string[]> = {
 export const GOOD_STATUS = ['validated', 'supported', 'shipped'];
 export const BAD_STATUS = ['refuted', 'dropped', 'parked'];
 
-/** Default links seeded per type (restorable in the Links tab). */
-export function defaultLinks(node: Pick<OstNode, 'id' | 'type'>): { name: string; url: string }[] {
-  const base = 'https://ombuto.atlassian.net';
-  switch (node.type) {
+/**
+ * Default link slots per node type — the panel renders each as an add-button that opens the
+ * add-link form prefilled with the slot's name (LINK-001). No URLs: the previous placeholder
+ * URLs (with a hardcoded Atlassian tenant) were never real links, and the server no longer
+ * persists them. A NodeLink row now means a human attached it.
+ */
+export function defaultLinks(type: NodeType): { name: string }[] {
+  switch (type) {
     case 'product':
-      return [{ name: 'Product space', url: `${base}/wiki/spaces/${node.id}` }];
+      return [{ name: 'Product space' }];
     case 'outcome':
     case 'assumption':
-      return [{ name: 'Confluence', url: `${base}/wiki/discovery/${node.id}` }];
+      return [{ name: 'Confluence' }];
     case 'evidence':
-      return [
-        { name: 'Confluence', url: `${base}/wiki/discovery/${node.id}` },
-        { name: 'Jira Ticket', url: `${base}/browse/DISC-000` },
-      ];
+      return [{ name: 'Confluence' }, { name: 'Jira Ticket' }];
     default:
-      return [
-        { name: 'Confluence', url: `${base}/wiki/discovery/${node.id}` },
-        { name: 'Jira Initiative', url: `${base}/browse/INIT-000` },
-        { name: 'Jira Epic', url: `${base}/browse/DISC-000` },
-      ];
+      return [{ name: 'Confluence' }, { name: 'Jira Initiative' }, { name: 'Jira Epic' }];
   }
 }
 

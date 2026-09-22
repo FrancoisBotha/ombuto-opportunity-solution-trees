@@ -50,5 +50,6 @@
     <!-- jhipster-needle-liquibase-add-constraints-changelog - JHipster will add liquibase constraints changelogs here -->
     <include file="config/liquibase/changelog/20260918110000_add_unique_constraint_team_member.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260919120000_add_index_node_history_node.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260921120000_link_001_delete_placeholder_node_links.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-incremental-changelog - JHipster will add incremental liquibase changelogs here -->
 </databaseChangeLog>

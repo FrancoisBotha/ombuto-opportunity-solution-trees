@@ -33,15 +33,18 @@ export const isWikiLink = (url: string) => /confluence|wiki/i.test(url);
 
 export interface RestoreOption {
   name: string;
-  url: string;
   label: string;
   present: boolean;
 }
 
-/** The node type's default links, each flagged when a link of that name (any case) is present. */
-export function restoreOptions(node: Pick<OstNode, 'id' | 'type'> & { links: LinkRef[] }): RestoreOption[] {
+/**
+ * The node type's default link slots, each flagged when a link of that name (any case) is
+ * already present. LINK-001: slots are add-buttons only — no URL is attached; clicking one
+ * opens the add-link form prefilled with the slot's name for the user to paste a URL into.
+ */
+export function restoreOptions(node: Pick<OstNode, 'type'> & { links: LinkRef[] }): RestoreOption[] {
   const have = new Set(node.links.map(l => l.name.trim().toLowerCase()));
-  return defaultLinks(node).map(l => ({ ...l, label: restoreLabel(l.name), present: have.has(l.name.toLowerCase()) }));
+  return defaultLinks(node.type).map(l => ({ name: l.name, label: restoreLabel(l.name), present: have.has(l.name.toLowerCase()) }));
 }
 
 /** "No assumption tests …" / "3 assumption tests · 1 supported · 1 refuted. …" */

@@ -62,14 +62,21 @@ describe('LinksTab', () => {
       expect(restoreButtons(wrapper)).toEqual(expected);
     });
 
-    it('re-adds a missing default and then disables its button', async () => {
+    it('opens the add-link form prefilled with the slot name, then adds and disables the button', async () => {
+      // LINK-001: default slots are add-buttons — clicking one does not persist a placeholder,
+      // it opens the form prefilled with the slot's name for the user to paste a URL into.
       const { wrapper, service, tree } = await mountTab('opportunity-1');
-      service.addLink.resolves({ id: 13, name: 'Jira Initiative', url: 'https://ombuto.atlassian.net/browse/INIT-000' });
+      service.addLink.resolves({ id: 13, name: 'Jira Initiative', url: 'https://example.com/init' });
       await wrapper.get('[data-cy="ost-link-restore-jira-initiative"]').trigger('click');
       await flushPromises();
-      expect(
-        service.addLink.calledOnceWith('opportunity', 1, { name: 'Jira Initiative', url: 'https://ombuto.atlassian.net/browse/INIT-000' }),
-      ).toBe(true);
+      expect(service.addLink.called).toBe(false);
+      expect(wrapper.find('[data-cy="ost-link-form"]').exists()).toBe(true);
+      const nameField = wrapper.get('[data-cy="ost-link-new-name"]').element as HTMLInputElement;
+      expect(nameField.value).toBe('Jira Initiative');
+      await wrapper.get('[data-cy="ost-link-new-url"]').setValue('https://example.com/init');
+      await wrapper.get('[data-cy="ost-link-form"]').trigger('submit');
+      await flushPromises();
+      expect(service.addLink.calledOnceWith('opportunity', 1, { name: 'Jira Initiative', url: 'https://example.com/init' })).toBe(true);
       expect(tree.byId('opportunity-1')?.links.map(l => l.id)).toEqual([11, 12, 13]);
       expect(wrapper.get('[data-cy="ost-link-restore-jira-initiative"]').attributes('disabled')).toBeDefined();
     });
@@ -166,12 +173,17 @@ describe('LinksTab', () => {
   });
 
   it('surfaces a server error inline in the panel', async () => {
+    // LINK-001: the slot button opens the prefilled form; submitting is what talks to the server,
+    // and a server rejection surfaces in the panel error strip.
     const ctx = await setupStores();
     ctx.ui.select('outcome-1');
     ctx.ui.setPanelTab('links');
     ctx.service.addLink.rejects(apiError(400, 'error.linkurlinvalid'));
     const wrapper = await mountWith(DetailPanel, ctx.pinia);
     await wrapper.get('[data-cy="ost-link-restore-confluence"]').trigger('click');
+    await flushPromises();
+    await wrapper.get('[data-cy="ost-link-new-url"]').setValue('https://example.com/x');
+    await wrapper.get('[data-cy="ost-link-form"]').trigger('submit');
     await flushPromises();
     expect(wrapper.get('[data-cy="ost-panel-error"]').text()).toBe('Links must start with http:// or https://.');
     expect(ctx.tree.error).toBeNull();

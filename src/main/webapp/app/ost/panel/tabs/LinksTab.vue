@@ -11,7 +11,7 @@
     <p v-if="!node.links.length" class="ost-links__empty" data-cy="ost-links-empty">No links yet.</p>
 
     <div v-if="!readonly && restore.length" class="ost-links__restore">
-      <span class="ost-links__restore-label">Restore a default link</span>
+      <span class="ost-links__restore-label">Add a default link</span>
       <button
         v-for="option in restore"
         :key="option.name"
@@ -20,7 +20,7 @@
         :disabled="option.present || busy"
         :title="option.present ? `${option.name} already linked` : `Add a ${option.name} link`"
         :data-cy="`ost-link-restore-${slug(option.name)}`"
-        @click="restoreOne(option)"
+        @click="startFromSlot(option)"
       >
         <component :is="restoreIcon(option.name)" :size="14" aria-hidden="true" />
         <span>{{ option.label }}</span>
@@ -39,6 +39,7 @@
         @keydown.esc.prevent="closeForm"
       />
       <input
+        ref="urlInput"
         v-model="draft.url"
         class="ost-input ost-links__input"
         aria-label="New link URL"
@@ -53,7 +54,7 @@
         <button type="submit" class="ost-btn ost-btn--primary ost-links__small" :disabled="busy" data-cy="ost-link-new-save">Add</button>
       </div>
     </form>
-    <button v-else-if="!readonly" ref="addButton" type="button" class="ost-btn ost-links__add" data-cy="ost-link-add" @click="openForm">
+    <button v-else-if="!readonly" ref="addButton" type="button" class="ost-btn ost-links__add" data-cy="ost-link-add" @click="openForm()">
       + Add link
     </button>
   </div>
@@ -86,6 +87,7 @@ const busy = ref(false);
 const draft = reactive({ name: '', url: 'https://' });
 const formError = ref<string | null>(null);
 const nameInput = ref<HTMLInputElement | null>(null);
+const urlInput = ref<HTMLInputElement | null>(null);
 const addButton = ref<HTMLButtonElement | null>(null);
 
 function restoreIcon(name: string) {
@@ -105,23 +107,24 @@ function remove(linkId: number | undefined) {
   void run(() => tree.removeLink(props.nodeKey, linkId));
 }
 
-async function restoreOne(option: RestoreOption) {
+/**
+ * LINK-001: default-link slots are add-buttons, not persistence. Clicking one opens the
+ * add-link form with the slot's name prefilled — the user pastes the URL themselves. Nothing
+ * writes a NodeLink row until they submit.
+ */
+async function startFromSlot(option: RestoreOption) {
   if (readonly.value || option.present || busy.value) return;
-  busy.value = true;
-  try {
-    await run(() => tree.addLink(props.nodeKey, { name: option.name, url: option.url }));
-  } finally {
-    busy.value = false;
-  }
+  await openForm(option.name);
 }
 
-async function openForm() {
-  draft.name = '';
+async function openForm(prefillName = '') {
+  draft.name = prefillName;
   draft.url = 'https://';
   formError.value = null;
   adding.value = true;
   await nextTick();
-  nameInput.value?.focus();
+  // Focus the URL when a slot is chosen (name is already filled), otherwise the name field.
+  (prefillName ? urlInput.value : nameInput.value)?.focus();
 }
 
 /** Closing the form (Cancel, Escape, or after adding) hands focus back to "+ Add link". */

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        LINK-001 — one-off cleanup of the placeholder NodeLink rows the old DefaultNodeLinks used
+        to write on every node create (Jira DISC-000 / INIT-000 keys, /wiki/discovery/<key>,
+        /wiki/spaces/<key>). These were indistinguishable from links a human had attached, so
+        linkCount and the MCP link list included them; an agent that followed the key traced to
+        nothing (or worse, some unrelated ticket if the placeholder key ever existed).
+
+        This changelog deletes only the rows that match both the placeholder NAME and the
+        placeholder URL PATTERN — deliberately conservative so a human-attached row with a
+        matching name but a different URL (or vice-versa) survives. The URL patterns embed the
+        node-type key convention (`opportunity-42`) that a human would not type by hand.
+
+        The Atlassian base URL below is the historical hardcoded tenant; new installations
+        can now override it via `application.default-links.base-url`.
+    -->
+    <changeSet id="20260921120000-1" author="link-001">
+        <delete tableName="node_link">
+            <where>
+                (name = 'Jira Epic'      AND url = 'https://ombuto.atlassian.net/browse/DISC-000') OR
+                (name = 'Jira Ticket'    AND url = 'https://ombuto.atlassian.net/browse/DISC-000') OR
+                (name = 'Jira Initiative' AND url = 'https://ombuto.atlassian.net/browse/INIT-000') OR
+                (name = 'Confluence'     AND url LIKE 'https://ombuto.atlassian.net/wiki/discovery/outcome-%') OR
+                (name = 'Confluence'     AND url LIKE 'https://ombuto.atlassian.net/wiki/discovery/opportunity-%') OR
+                (name = 'Confluence'     AND url LIKE 'https://ombuto.atlassian.net/wiki/discovery/solution-%') OR
+                (name = 'Confluence'     AND url LIKE 'https://ombuto.atlassian.net/wiki/discovery/assumption-%') OR
+                (name = 'Confluence'     AND url LIKE 'https://ombuto.atlassian.net/wiki/discovery/evidence-%') OR
+                (name = 'Product space'  AND url LIKE 'https://ombuto.atlassian.net/wiki/spaces/product-%')
+            </where>
+        </delete>
+    </changeSet>
+</databaseChangeLog>

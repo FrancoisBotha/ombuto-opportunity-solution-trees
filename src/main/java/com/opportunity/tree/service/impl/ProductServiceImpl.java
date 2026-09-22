@@ -4,7 +4,6 @@ import com.opportunity.tree.domain.Product;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.repository.ProductRepository;
 import com.opportunity.tree.repository.TeamRepository;
-import com.opportunity.tree.service.DefaultNodeLinks;
 import com.opportunity.tree.service.NodeWriteRuleException;
 import com.opportunity.tree.service.ProductService;
 import com.opportunity.tree.service.TeamAccessDeniedException;
@@ -62,8 +61,6 @@ public class ProductServiceImpl implements ProductService {
 
     private final TeamAccessService teamAccessService;
 
-    private final DefaultNodeLinks defaultNodeLinks;
-
     private final TreeNodeCascadeService treeNodeCascadeService;
 
     private final TreeStructureLock structureLock;
@@ -78,7 +75,6 @@ public class ProductServiceImpl implements ProductService {
         ProductRepository productRepository,
         ProductMapper productMapper,
         TeamAccessService teamAccessService,
-        DefaultNodeLinks defaultNodeLinks,
         TreeNodeCascadeService treeNodeCascadeService,
         TreeStructureLock structureLock,
         TeamRepository teamRepository,
@@ -88,7 +84,6 @@ public class ProductServiceImpl implements ProductService {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.teamAccessService = teamAccessService;
-        this.defaultNodeLinks = defaultNodeLinks;
         this.treeNodeCascadeService = treeNodeCascadeService;
         this.structureLock = structureLock;
         this.teamRepository = teamRepository;
@@ -131,8 +126,8 @@ public class ProductServiceImpl implements ProductService {
         structureLock.lockTeam(targetTeamId);
         product.setSortOrder(productRepository.findMaxSortOrderByTeamId(targetTeamId) + 1);
         product = productRepository.save(product);
-        // OST: every new product gets its default "Product space" link.
-        defaultNodeLinks.addDefaults(product);
+        // LINK-001: no placeholder "Product space" link is persisted. The panel offers the slot
+        // as an add-button; the user attaches a real URL themselves.
         publishProduct(TreeChangeType.NODE_CREATED, targetTeamId, product.getId());
         return productMapper.toDto(product);
     }

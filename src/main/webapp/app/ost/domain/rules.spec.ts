@@ -52,17 +52,16 @@ describe('OST rules', () => {
     expect(BAD_STATUS.every(s => all.includes(s))).toBe(true);
   });
 
-  it('builds default links per type from the node key', () => {
-    expect(defaultLinks({ id: 'product-3', type: 'product' })).toEqual([
-      { name: 'Product space', url: 'https://ombuto.atlassian.net/wiki/spaces/product-3' },
-    ]);
-    expect(defaultLinks({ id: 'opportunity-4', type: 'opportunity' }).map(l => l.name)).toEqual([
-      'Confluence',
-      'Jira Initiative',
-      'Jira Epic',
-    ]);
-    expect(defaultLinks({ id: 'evidence-5', type: 'evidence' }).map(l => l.name)).toEqual(['Confluence', 'Jira Ticket']);
-    expect(defaultLinks({ id: 'assumption-6', type: 'assumption' })[0].url).toContain('assumption-6');
+  it('lists the default link slot names per type — UI affordance only, no URLs baked in', () => {
+    // LINK-001: defaults are add-buttons in the panel, never persisted. defaultLinks
+    // returns only names — the Atlassian base URL used to build placeholder URLs is gone.
+    expect(defaultLinks('product').map(l => l.name)).toEqual(['Product space']);
+    expect(defaultLinks('opportunity').map(l => l.name)).toEqual(['Confluence', 'Jira Initiative', 'Jira Epic']);
+    expect(defaultLinks('solution').map(l => l.name)).toEqual(['Confluence', 'Jira Initiative', 'Jira Epic']);
+    expect(defaultLinks('outcome').map(l => l.name)).toEqual(['Confluence']);
+    expect(defaultLinks('assumption').map(l => l.name)).toEqual(['Confluence']);
+    expect(defaultLinks('evidence').map(l => l.name)).toEqual(['Confluence', 'Jira Ticket']);
+    expect(defaultLinks('opportunity')[0]).not.toHaveProperty('url');
   });
 
   it('derives evidence strength: supported 100, refuted 0, otherwise confidence, averaged', () => {
