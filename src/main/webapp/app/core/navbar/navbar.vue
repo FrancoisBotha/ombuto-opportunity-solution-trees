@@ -10,6 +10,7 @@
     <ribbon></ribbon>
 
     <div class="navbar-actions">
+      <help-panel v-if="authenticated"></help-panel>
       <theme-toggle></theme-toggle>
       <span class="navbar-user" v-if="authenticated && username" data-cy="navbarUser">
         <font-awesome-icon icon="user" />
