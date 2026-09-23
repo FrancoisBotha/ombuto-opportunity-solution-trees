@@ -64,6 +64,13 @@ could not go there.
   (409 `error.duplicate`), lock and concurrency failures (409 `error.concurrencyFailure`), and
   generic details with no SQL or Java `toString`. Also its tests `ExceptionTranslatorIT` and
   `ExceptionTranslatorTestController`.
+- **`MeetingTranscript`** and **`MeetingTranscriptDTO`**: `toString()` reports `bodyBytes=<length>`
+  rather than `body='<contents>'` — transcript bodies must never appear in application logs
+  (NFR-022 / MTRANS-002). Every field except body is otherwise kept as generated.
+- **`MeetingTranscriptRepository`**: hand-written team- and node-scoped list queries
+  (`findAllByTeamId`, `findAllByProductId`, `findAllByOutcomeId`, `findAllByOpportunityId`,
+  `findAllBySolutionId`, `findAllByAssumptionId`, `findAllByEvidenceId`) used by the team-scoped
+  `TreeMeetingTranscriptService`. Keep them if the generator rewrites the file.
 - **`TeamMemberRepository`** and **`UserRepository`**: added queries.
 - **`config/ApplicationProperties.java`**: the `seed` property. **`config/application-dev.yml`**:
   `application.seed.enabled: true`, and the Liquibase `contexts: dev` (without `faker`).

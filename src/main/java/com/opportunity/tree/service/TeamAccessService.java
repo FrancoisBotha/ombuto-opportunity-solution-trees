@@ -226,6 +226,32 @@ public class TeamAccessService {
         return requireEditOn(nodeOfComment(commentId));
     }
 
+    /** The node a {@code MeetingTranscript} hangs off; empty when the transcript does not exist. */
+    public Optional<TreeNodeRef> nodeOfTranscript(Long transcriptId) {
+        if (transcriptId == null) {
+            return Optional.empty();
+        }
+        return firstNonNull(
+            treeAccessLookupRepository.findNodeIdsOfTranscript(transcriptId),
+            TreeNodeType.PRODUCT,
+            TreeNodeType.OUTCOME,
+            TreeNodeType.OPPORTUNITY,
+            TreeNodeType.SOLUTION,
+            TreeNodeType.ASSUMPTION,
+            TreeNodeType.EVIDENCE
+        );
+    }
+
+    /** Requires read access (any member) to the transcript's node; returns that node. */
+    public TreeNodeRef requireReadTranscript(Long transcriptId) {
+        return requireReadOn(nodeOfTranscript(transcriptId));
+    }
+
+    /** Requires edit access (OWNER or EDITOR) to the transcript's node; returns that node. */
+    public TreeNodeRef requireEditTranscript(Long transcriptId) {
+        return requireEditOn(nodeOfTranscript(transcriptId));
+    }
+
     private TreeNodeRef requireReadOn(Optional<TreeNodeRef> node) {
         TreeNodeRef ref = node.orElseThrow(TeamAccessDeniedException::new);
         requireReadNode(ref.type(), ref.id());

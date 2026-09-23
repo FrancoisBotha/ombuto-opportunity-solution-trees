@@ -70,4 +70,13 @@ public interface TreeAccessLookupRepository extends org.springframework.data.rep
             " where c.id = :id"
     )
     List<Object[]> findNodeIdsOfComment(@Param("id") Long id);
+
+    /** One row: [productId, outcomeId, opportunityId, solutionId, assumptionId, evidenceId] — exactly one non-null. */
+    @Query(
+        "select p.id, o.id, op.id, s.id, a.id, e.id from MeetingTranscript t" +
+            " left join t.product p left join t.outcome o left join t.opportunity op" +
+            " left join t.solution s left join t.assumption a left join t.evidence e" +
+            " where t.id = :id"
+    )
+    List<Object[]> findNodeIdsOfTranscript(@Param("id") Long id);
 }

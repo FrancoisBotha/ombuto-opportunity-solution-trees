@@ -309,7 +309,7 @@ public class MeetingTranscript implements Serializable {
             ", title='" + getTitle() + "'" +
             ", meetingDate='" + getMeetingDate() + "'" +
             ", attendees='" + getAttendees() + "'" +
-            ", body='" + getBody() + "'" +
+            ", bodyBytes=" + (getBody() == null ? 0 : getBody().length()) +
             ", source='" + getSource() + "'" +
             ", createdDate='" + getCreatedDate() + "'" +
             ", editedDate='" + getEditedDate() + "'" +
