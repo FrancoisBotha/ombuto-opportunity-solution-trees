@@ -6,6 +6,7 @@ import AssumptionService from './assumption/assumption.service';
 import CommentService from './comment/comment.service';
 import EvidenceService from './evidence/evidence.service';
 import InterviewService from './interview/interview.service';
+import MeetingTranscriptService from './meeting-transcript/meeting-transcript.service';
 import NodeHistoryService from './node-history/node-history.service';
 import NodeLinkService from './node-link/node-link.service';
 import OpenQuestionService from './open-question/open-question.service';
@@ -36,6 +37,7 @@ export default defineComponent({
     provide('nodeLinkService', () => new NodeLinkService());
     provide('openQuestionService', () => new OpenQuestionService());
     provide('nodeHistoryService', () => new NodeHistoryService());
+    provide('meetingTranscriptService', () => new MeetingTranscriptService());
     // jhipster-needle-add-entity-service-to-entities-component - JHipster will import entities services here
   },
 });

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        Added the constraints for entity MeetingTranscript.
+    -->
+    <changeSet id="20260923100251-2" author="jhipster">
+
+        <addForeignKeyConstraint baseColumnNames="author_id"
+                                 baseTableName="meeting_transcript"
+                                 constraintName="fk_meeting_transcript__author_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="jhi_user"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="product_id"
+                                 baseTableName="meeting_transcript"
+                                 constraintName="fk_meeting_transcript__product_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="product"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="outcome_id"
+                                 baseTableName="meeting_transcript"
+                                 constraintName="fk_meeting_transcript__outcome_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="outcome"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="opportunity_id"
+                                 baseTableName="meeting_transcript"
+                                 constraintName="fk_meeting_transcript__opportunity_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="opportunity"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="solution_id"
+                                 baseTableName="meeting_transcript"
+                                 constraintName="fk_meeting_transcript__solution_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="solution"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="assumption_id"
+                                 baseTableName="meeting_transcript"
+                                 constraintName="fk_meeting_transcript__assumption_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="assumption"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="evidence_id"
+                                 baseTableName="meeting_transcript"
+                                 constraintName="fk_meeting_transcript__evidence_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="evidence"
+                                 />
+    </changeSet>
+</databaseChangeLog>

@@ -48,6 +48,7 @@ export const staticDataGroup: SidebarGroup = {
     { path: '/open-question', label: 'Open Questions', icon: 'tasks', prefix: true },
     { path: '/node-history', label: 'History', icon: 'list', prefix: true },
     { path: '/tag', label: 'Tags', icon: 'tag', prefix: true },
+    { path: '/meeting-transcript', label: 'Meeting Transcripts', icon: 'file-lines', prefix: true },
     // jhipster-needle-add-entity-to-menu - JHipster will add entities to the menu here
   ],
 };

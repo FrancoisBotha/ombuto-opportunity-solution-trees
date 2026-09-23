@@ -57,6 +57,10 @@ const NodeHistory = () => import('@/entities/node-history/node-history.vue');
 const NodeHistoryUpdate = () => import('@/entities/node-history/node-history-update.vue');
 const NodeHistoryDetails = () => import('@/entities/node-history/node-history-details.vue');
 
+const MeetingTranscript = () => import('@/entities/meeting-transcript/meeting-transcript.vue');
+const MeetingTranscriptUpdate = () => import('@/entities/meeting-transcript/meeting-transcript-update.vue');
+const MeetingTranscriptDetails = () => import('@/entities/meeting-transcript/meeting-transcript-details.vue');
+
 // jhipster-needle-add-entity-to-router-import - JHipster will import entities to the router here
 
 export default {
@@ -397,6 +401,30 @@ export default {
       path: 'node-history/:nodeHistoryId/view',
       name: 'NodeHistoryView',
       component: NodeHistoryDetails,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'meeting-transcript',
+      name: 'MeetingTranscript',
+      component: MeetingTranscript,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'meeting-transcript/new',
+      name: 'MeetingTranscriptCreate',
+      component: MeetingTranscriptUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'meeting-transcript/:meetingTranscriptId/edit',
+      name: 'MeetingTranscriptEdit',
+      component: MeetingTranscriptUpdate,
+      meta: { authorities: [Authority.ADMIN] },
+    },
+    {
+      path: 'meeting-transcript/:meetingTranscriptId/view',
+      name: 'MeetingTranscriptView',
+      component: MeetingTranscriptDetails,
       meta: { authorities: [Authority.ADMIN] },
     },
     // jhipster-needle-add-entity-to-router - JHipster will add entities to the router here

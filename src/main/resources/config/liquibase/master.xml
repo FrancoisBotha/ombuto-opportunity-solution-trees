@@ -33,6 +33,7 @@
     <include file="config/liquibase/changelog/20260919105651_added_entity_NodeLink.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260919105652_added_entity_OpenQuestion.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260919105653_added_entity_NodeHistory.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260923100251_added_entity_MeetingTranscript.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-changelog - JHipster will add liquibase changelogs here -->
     <include file="config/liquibase/changelog/20260918101619_added_entity_constraints_TeamMember.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260918101719_added_entity_constraints_Product.xml" relativeToChangelogFile="false"/>
@@ -47,9 +48,11 @@
     <include file="config/liquibase/changelog/20260919105651_added_entity_constraints_NodeLink.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260919105652_added_entity_constraints_OpenQuestion.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260919105653_added_entity_constraints_NodeHistory.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260923100251_added_entity_constraints_MeetingTranscript.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-constraints-changelog - JHipster will add liquibase constraints changelogs here -->
     <include file="config/liquibase/changelog/20260918110000_add_unique_constraint_team_member.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260919120000_add_index_node_history_node.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260921120000_link_001_delete_placeholder_node_links.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260923120000_add_index_meeting_transcript_node.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-incremental-changelog - JHipster will add incremental liquibase changelogs here -->
 </databaseChangeLog>

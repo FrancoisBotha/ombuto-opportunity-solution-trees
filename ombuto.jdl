@@ -59,7 +59,12 @@ enum TreeNodeType {
 
 enum HistoryEventType {
   CREATED, STATUS_CHANGED, CONFIDENCE_CHANGED, PRIORITY_CHANGED, VALUE_CHANGED,
-  MOVED, COMMENT_ADDED, COMMENT_DELETED, LINK_ADDED, LINK_REMOVED, QUESTION_ADDED
+  MOVED, COMMENT_ADDED, COMMENT_DELETED, LINK_ADDED, LINK_REMOVED, QUESTION_ADDED,
+  TRANSCRIPT_ADDED, TRANSCRIPT_DELETED
+}
+
+enum MeetingTranscriptSource {
+  PASTED, UPLOADED
 }
 
 /* ------------------------------------------------------------------ */
@@ -197,6 +202,17 @@ entity Tag {
   colour String maxlength(7) pattern(/^#[0-9A-Fa-f]{6}$/)
 }
 
+/** Transcript of a meeting attached to exactly one tree node (Epic 12). */
+entity MeetingTranscript {
+  title String required minlength(2) maxlength(200)
+  meetingDate LocalDate required
+  attendees String maxlength(500)
+  body TextBlob required
+  source MeetingTranscriptSource required
+  createdDate Instant required
+  editedDate Instant
+}
+
 /* ------------------------------------------------------------------ */
 /* Relationships                                                       */
 /* ------------------------------------------------------------------ */
@@ -240,6 +256,14 @@ relationship ManyToOne {
   NodeLink{assumption(statement)} to Assumption
   NodeLink{evidence(title)} to Evidence
 
+  MeetingTranscript{author(login)} to User with builtInEntity
+  MeetingTranscript{product(name)} to Product
+  MeetingTranscript{outcome(title)} to Outcome
+  MeetingTranscript{opportunity(title)} to Opportunity
+  MeetingTranscript{solution(title)} to Solution
+  MeetingTranscript{assumption(statement)} to Assumption
+  MeetingTranscript{evidence(title)} to Evidence
+
   OpenQuestion{opportunity(title) required} to Opportunity
 
   NodeHistory{author(login)} to User with builtInEntity
@@ -259,5 +283,5 @@ relationship ManyToMany {
 
 dto * with mapstruct
 service * with serviceImpl
-paginate Opportunity, Solution, Interview, Comment, NodeHistory with pagination
-filter Opportunity, Solution, Outcome, Interview
+paginate Opportunity, Solution, Interview, Comment, NodeHistory, MeetingTranscript with pagination
+filter Opportunity, Solution, Outcome, Interview, MeetingTranscript

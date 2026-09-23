@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        MTRANS-001 — Every MeetingTranscript hangs off exactly one of the six node foreign keys, and
+        the canvas badge (FR-065) counts a node's transcripts on every tree render. Each FK column
+        gets its own index so the count query hits an index scan instead of a table scan. Kept out
+        of the generated MeetingTranscript changelog so regeneration cannot drop it.
+    -->
+    <changeSet id="20260923120000-1" author="mtrans-001">
+        <createIndex tableName="meeting_transcript" indexName="ix_meeting_transcript__product_id">
+            <column name="product_id"/>
+        </createIndex>
+        <createIndex tableName="meeting_transcript" indexName="ix_meeting_transcript__outcome_id">
+            <column name="outcome_id"/>
+        </createIndex>
+        <createIndex tableName="meeting_transcript" indexName="ix_meeting_transcript__opportunity_id">
+            <column name="opportunity_id"/>
+        </createIndex>
+        <createIndex tableName="meeting_transcript" indexName="ix_meeting_transcript__solution_id">
+            <column name="solution_id"/>
+        </createIndex>
+        <createIndex tableName="meeting_transcript" indexName="ix_meeting_transcript__assumption_id">
+            <column name="assumption_id"/>
+        </createIndex>
+        <createIndex tableName="meeting_transcript" indexName="ix_meeting_transcript__evidence_id">
+            <column name="evidence_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

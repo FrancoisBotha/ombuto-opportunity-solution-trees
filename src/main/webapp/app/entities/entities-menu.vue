@@ -56,6 +56,10 @@
       <font-awesome-icon icon="asterisk" />
       <span>Node History</span>
     </b-dropdown-item>
+    <b-dropdown-item to="/meeting-transcript">
+      <font-awesome-icon icon="asterisk" />
+      <span>Meeting Transcript</span>
+    </b-dropdown-item>
     <!-- jhipster-needle-add-entity-to-menu - JHipster will add entities to the menu here -->
   </div>
 </template>

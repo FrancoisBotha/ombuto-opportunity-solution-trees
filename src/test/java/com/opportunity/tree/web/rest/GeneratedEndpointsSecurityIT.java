@@ -13,6 +13,7 @@ import com.opportunity.tree.domain.Team;
 import com.opportunity.tree.domain.TeamMember;
 import com.opportunity.tree.domain.enumeration.AssumptionStatus;
 import com.opportunity.tree.domain.enumeration.HistoryEventType;
+import com.opportunity.tree.domain.enumeration.MeetingTranscriptSource;
 import com.opportunity.tree.domain.enumeration.OpportunityStatus;
 import com.opportunity.tree.domain.enumeration.SolutionStatus;
 import com.opportunity.tree.domain.enumeration.TeamRole;
@@ -24,6 +25,7 @@ import com.opportunity.tree.service.dto.AssumptionDTO;
 import com.opportunity.tree.service.dto.CommentDTO;
 import com.opportunity.tree.service.dto.EvidenceDTO;
 import com.opportunity.tree.service.dto.InterviewDTO;
+import com.opportunity.tree.service.dto.MeetingTranscriptDTO;
 import com.opportunity.tree.service.dto.NodeHistoryDTO;
 import com.opportunity.tree.service.dto.NodeLinkDTO;
 import com.opportunity.tree.service.dto.OpenQuestionDTO;
@@ -395,6 +397,24 @@ class GeneratedEndpointsSecurityIT {
 
     @Test
     @Transactional
+    void meetingTranscriptEndpointsDenyNonAdminOnEveryVerb() throws Exception {
+        UserDTO authorRef = new UserDTO();
+        authorRef.setId("some-user");
+        authorRef.setLogin("some-user");
+        MeetingTranscriptDTO body = new MeetingTranscriptDTO();
+        body.setId(1L);
+        body.setTitle("Kickoff meeting");
+        body.setMeetingDate(LocalDate.of(2026, 1, 15));
+        body.setAttendees("Ada, Bob");
+        body.setBody("Body text");
+        body.setSource(MeetingTranscriptSource.PASTED);
+        body.setCreatedDate(Instant.now());
+        body.setAuthor(authorRef);
+        assertAdminOnlyOnEveryVerb("/api/meeting-transcripts", body);
+    }
+
+    @Test
+    @Transactional
     void commentEndpointsDenyNonAdminOnEveryVerb() throws Exception {
         UserDTO authorRef = new UserDTO();
         authorRef.setId("some-user");
@@ -459,6 +479,7 @@ class GeneratedEndpointsSecurityIT {
             "/api/node-links",
             "/api/open-questions",
             "/api/node-histories",
+            "/api/meeting-transcripts",
             "/api/comments",
             "/api/interviews",
             "/api/tags",
@@ -555,6 +576,7 @@ class GeneratedEndpointsSecurityIT {
         Map.entry("NodeLinkResource", Protection.ADMIN_ONLY),
         Map.entry("OpenQuestionResource", Protection.ADMIN_ONLY),
         Map.entry("NodeHistoryResource", Protection.ADMIN_ONLY),
+        Map.entry("MeetingTranscriptResource", Protection.ADMIN_ONLY),
         Map.entry("CommentResource", Protection.ADMIN_ONLY),
         Map.entry("InterviewResource", Protection.ADMIN_ONLY),
         Map.entry("TagResource", Protection.ADMIN_ONLY),

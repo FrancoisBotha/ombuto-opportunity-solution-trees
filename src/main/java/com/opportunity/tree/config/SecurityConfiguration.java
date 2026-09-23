@@ -75,6 +75,7 @@ public class SecurityConfiguration {
         "/api/node-links/**",
         "/api/open-questions/**",
         "/api/node-histories/**",
+        "/api/meeting-transcripts/**",
         "/api/comments/**",
         "/api/interviews/**",
         "/api/tags/**",

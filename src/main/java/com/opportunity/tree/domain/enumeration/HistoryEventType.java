@@ -15,4 +15,6 @@ public enum HistoryEventType {
     LINK_ADDED,
     LINK_REMOVED,
     QUESTION_ADDED,
+    TRANSCRIPT_ADDED,
+    TRANSCRIPT_DELETED,
 }
