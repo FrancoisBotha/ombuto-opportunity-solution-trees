@@ -1,0 +1,134 @@
+assumptions:AssumptionRow
+  confidence:java.lang.Integer
+  createdDate:java.time.Instant
+  description:java.lang.String
+  id:java.lang.Long
+  lastModifiedDate:java.time.Instant
+  ownerId:java.lang.String
+  solutionId:java.lang.Long
+  sortOrder:java.lang.Integer
+  statement:java.lang.String
+  status:com.opportunity.tree.domain.enumeration.AssumptionStatus
+comments:CommentRow
+  assumptionId:java.lang.Long
+  authorId:java.lang.String
+  body:java.lang.String
+  createdDate:java.time.Instant
+  editedDate:java.time.Instant
+  evidenceId:java.lang.Long
+  id:java.lang.Long
+  opportunityId:java.lang.Long
+  outcomeId:java.lang.Long
+  solutionId:java.lang.Long
+evidences:EvidenceRow
+  assumptionId:java.lang.Long
+  createdDate:java.time.Instant
+  description:java.lang.String
+  id:java.lang.Long
+  lastModifiedDate:java.time.Instant
+  opportunityId:java.lang.Long
+  sortOrder:java.lang.Integer
+  title:java.lang.String
+interviews:InterviewRow
+  createdDate:java.time.Instant
+  id:java.lang.Long
+  interviewDate:java.time.LocalDate
+  interviewerId:java.lang.String
+  notes:java.lang.String
+  participant:java.lang.String
+  productId:java.lang.Long
+  recordingUrl:java.lang.String
+  title:java.lang.String
+nodeHistories:NodeHistoryRow
+  authorId:java.lang.String
+  createdDate:java.time.Instant
+  eventType:com.opportunity.tree.domain.enumeration.HistoryEventType
+  id:java.lang.Long
+  nodeId:java.lang.Long
+  nodeType:com.opportunity.tree.domain.enumeration.TreeNodeType
+  summary:java.lang.String
+nodeLinks:NodeLinkRow
+  assumptionId:java.lang.Long
+  createdDate:java.time.Instant
+  evidenceId:java.lang.Long
+  id:java.lang.Long
+  name:java.lang.String
+  opportunityId:java.lang.Long
+  outcomeId:java.lang.Long
+  productId:java.lang.Long
+  solutionId:java.lang.Long
+  sortOrder:java.lang.Integer
+  url:java.lang.String
+openQuestions:OpenQuestionRow
+  createdDate:java.time.Instant
+  done:java.lang.Boolean
+  id:java.lang.Long
+  opportunityId:java.lang.Long
+  questionText:java.lang.String
+  sortOrder:java.lang.Integer
+opportunities:OpportunityRow
+  createdDate:java.time.Instant
+  description:java.lang.String
+  id:java.lang.Long
+  lastModifiedDate:java.time.Instant
+  outcomeId:java.lang.Long
+  ownerId:java.lang.String
+  parentId:java.lang.Long
+  priority:java.lang.Integer
+  sortOrder:java.lang.Integer
+  status:com.opportunity.tree.domain.enumeration.OpportunityStatus
+  title:java.lang.String
+  valuerating:java.lang.Integer
+opportunityInterviews:JoinRow
+  leftId:java.lang.Long
+  rightId:java.lang.Long
+opportunityTags:JoinRow
+  leftId:java.lang.Long
+  rightId:java.lang.Long
+outcomes:OutcomeRow
+  createdDate:java.time.Instant
+  description:java.lang.String
+  id:java.lang.Long
+  lastModifiedDate:java.time.Instant
+  ownerId:java.lang.String
+  productId:java.lang.Long
+  sortOrder:java.lang.Integer
+  title:java.lang.String
+products:ProductRow
+  archived:java.lang.Boolean
+  createdDate:java.time.Instant
+  description:java.lang.String
+  id:java.lang.Long
+  name:java.lang.String
+  sortOrder:java.lang.Integer
+  teamId:java.lang.Long
+  vision:java.lang.String
+solutionTags:JoinRow
+  leftId:java.lang.Long
+  rightId:java.lang.Long
+solutions:SolutionRow
+  createdDate:java.time.Instant
+  description:java.lang.String
+  id:java.lang.Long
+  lastModifiedDate:java.time.Instant
+  opportunityId:java.lang.Long
+  ownerId:java.lang.String
+  sortOrder:java.lang.Integer
+  status:com.opportunity.tree.domain.enumeration.SolutionStatus
+  title:java.lang.String
+tags:TagRow
+  colour:java.lang.String
+  id:java.lang.Long
+  name:java.lang.String
+  teamId:java.lang.Long
+teamMembers:TeamMemberRow
+  id:java.lang.Long
+  joinedDate:java.time.Instant
+  role:com.opportunity.tree.domain.enumeration.TeamRole
+  teamId:java.lang.Long
+  userId:java.lang.String
+teams:TeamRow
+  createdDate:java.time.Instant
+  description:java.lang.String
+  id:java.lang.Long
+  name:java.lang.String
