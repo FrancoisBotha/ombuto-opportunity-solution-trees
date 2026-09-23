@@ -101,6 +101,16 @@
       >
         <PhChat :size="11" aria-hidden="true" />{{ node.commentCount }}
       </button>
+      <span
+        v-if="node.transcriptCount > 0"
+        class="ost-node__transcripts"
+        :title="`${node.transcriptCount} transcript${node.transcriptCount === 1 ? '' : 's'}`"
+        :aria-label="`${node.transcriptCount} transcript${node.transcriptCount === 1 ? '' : 's'}`"
+        :data-cy="`ost-node-transcripts-${node.id}`"
+        :data-count="node.transcriptCount"
+      >
+        <PhFileText :size="11" aria-hidden="true" />{{ node.transcriptCount }}
+      </span>
     </div>
 
     <div
@@ -148,7 +158,7 @@
  * pointer also `is-drop`). The node itself is focusable: Enter/Space activates (select, or attach
  * the armed palette type), F2 renames, Delete asks to delete — the canvas decides what is allowed.
  */
-import { PhChat } from '@phosphor-icons/vue';
+import { PhChat, PhFileText } from '@phosphor-icons/vue';
 import { computed, ref } from 'vue';
 
 import { Handle, Position } from '@vue-flow/core';
@@ -550,6 +560,17 @@ const priorityDots = computed(() =>
 }
 .ost-node__chat:hover {
   border-color: var(--color-accent-600);
+}
+
+.ost-node__transcripts {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-neutral-700);
+  color: var(--color-accent-300);
 }
 
 .ost-node__priority {

@@ -48,6 +48,8 @@ export interface TreeNodeDTO {
   createdDate: string | null;
   lastModifiedDate: string | null;
   commentCount: number | null;
+  /** MTRANS-004/005: number of transcripts on this node; body is never included in the tree payload. */
+  transcriptCount: number | null;
   links: NodeLinkDTO[] | null;
   questions: OpenQuestionDTO[] | null;
   /** LABEL-001: empty (never null) for non-taggable types. */
@@ -123,6 +125,31 @@ export interface CommentDTO {
   authorName: string | null;
   createdDate: string;
   editedDate: string | null;
+}
+
+/**
+ * MTRANS-005: metadata view of a meeting transcript. The list endpoint returns this — never the
+ * body — so a scrollable list can load without pulling every transcript's text (NFR-024).
+ */
+export interface TranscriptMetaDTO {
+  id: number;
+  title: string;
+  meetingDate: string;
+  attendees: string | null;
+  source: 'PASTED' | 'UPLOADED';
+  nodeType: string;
+  nodeId: number;
+  nodeKey: string;
+  authorLogin: string | null;
+  authorInitials: string | null;
+  authorName: string | null;
+  createdDate: string;
+  editedDate: string | null;
+}
+
+/** MTRANS-005: a transcript with its body. Only returned by the single-transcript read endpoint. */
+export interface TranscriptDTO extends TranscriptMetaDTO {
+  body: string;
 }
 
 export interface HistoryEntryDTO {

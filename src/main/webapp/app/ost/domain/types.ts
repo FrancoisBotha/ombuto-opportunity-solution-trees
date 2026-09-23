@@ -63,6 +63,8 @@ export interface OstNode {
   createdDate: string | null;
   lastModifiedDate: string | null;
   commentCount: number;
+  /** MTRANS-005: number of meeting transcripts on this node (metadata only; never carries the body). */
+  transcriptCount: number;
   links: LinkRef[];
   questions: Question[];
   /** LABEL-001: labels attached to opportunities and solutions; empty for other types. */

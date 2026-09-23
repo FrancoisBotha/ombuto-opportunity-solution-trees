@@ -11,6 +11,8 @@ import type {
   OpenQuestionDTO,
   PatchNodeRequest,
   TeamTreeDTO,
+  TranscriptDTO,
+  TranscriptMetaDTO,
   TreeNodeDTO,
   TreeNodeTagDTO,
 } from './ost.model';
@@ -111,6 +113,16 @@ export default class OstService {
 
   listHistory(type: string, id: number): Promise<HistoryEntryDTO[]> {
     return axios.get<HistoryEntryDTO[]>(`${treeApi}/nodes/${seg(type)}/${id}/history`).then(res => res.data);
+  }
+
+  // ---- MTRANS-005: transcripts (metadata list + lazy body fetch) -----------------------------
+
+  listTranscriptsByNode(type: string, id: number): Promise<TranscriptMetaDTO[]> {
+    return axios.get<TranscriptMetaDTO[]>(`${treeApi}/nodes/${seg(type)}/${id}/transcripts`).then(res => res.data);
+  }
+
+  getTranscript(id: number): Promise<TranscriptDTO> {
+    return axios.get<TranscriptDTO>(`${treeApi}/transcripts/${id}`).then(res => res.data);
   }
 
   // ---- LABEL-001: team-scoped labels --------------------------------------------------------

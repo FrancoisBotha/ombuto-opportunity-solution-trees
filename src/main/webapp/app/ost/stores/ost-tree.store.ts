@@ -26,6 +26,8 @@ import type {
   OpenQuestionDTO,
   TeamMemberDTO,
   TeamTreeDTO,
+  TranscriptDTO,
+  TranscriptMetaDTO,
   TreeNodeDTO,
 } from '../ost.model';
 import OstService from '../ost.service';
@@ -266,6 +268,13 @@ export const useOstTreeStore = defineStore('ostTree', () => {
   const comments = ref<Record<string, CommentDTO[]>>({});
   /** History by node key, newest first (loaded on demand, invalidated by writes). */
   const history = ref<Record<string, HistoryEntryDTO[]>>({});
+  /**
+   * MTRANS-005: transcript metadata by node key, newest first. Bodies are NEVER stored here —
+   * the list carries title/date/attendees only and the viewer fetches the body on open.
+   */
+  const transcripts = ref<Record<string, TranscriptMetaDTO[]>>({});
+  /** MTRANS-005: transcript bodies by transcript id, loaded lazily when the viewer opens. */
+  const transcriptBodies = ref<Record<number, TranscriptDTO>>({});
   /** Guards against an older tree response overwriting a newer team switch. */
   const loadSeq = shallowRef(0);
   /** Orders optimistic writes (patches and moves) so late responses never undo newer edits. */
@@ -549,6 +558,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     removedFromCurrentTeam.value = false;
     comments.value = {};
     history.value = {};
+    transcripts.value = {};
+    transcriptBodies.value = {};
     patchTracks.clear();
     moveSeqs.clear();
     historyGen.clear();
@@ -1118,6 +1129,46 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     }
   }
 
+  // ---- actions: transcripts (MTRANS-005) ------------------------------------------------------
+
+  /**
+   * Loads the transcript metadata list for a node, newest first. Bodies are never fetched here
+   * (NFR-024). Refreshes {@link OstNode.transcriptCount} from the returned list so the canvas
+   * badge follows a remote change on next open.
+   */
+  async function loadTranscripts(key: string): Promise<TranscriptMetaDTO[]> {
+    const parsed = parseKey(key);
+    if (!parsed) return [];
+    try {
+      const list = await api().listTranscriptsByNode(parsed.type, parsed.id);
+      const sorted = [...list].sort((a, b) => Date.parse(b.createdDate) - Date.parse(a.createdDate));
+      transcripts.value = { ...transcripts.value, [key]: sorted };
+      const node = byId(key);
+      if (node) node.transcriptCount = sorted.length;
+      return sorted;
+    } catch (err) {
+      fail(err, 'The transcripts could not be loaded.');
+      return transcripts.value[key] ?? [];
+    }
+  }
+
+  /**
+   * Fetches a single transcript's full body on demand (viewer open). Cached by id so re-opening
+   * the same transcript does not re-fetch. The body never lands in the tree payload or the list.
+   */
+  async function loadTranscript(id: number): Promise<TranscriptDTO | null> {
+    const cached = transcriptBodies.value[id];
+    if (cached) return cached;
+    try {
+      const dto = await api().getTranscript(id);
+      transcriptBodies.value = { ...transcriptBodies.value, [id]: dto };
+      return dto;
+    } catch (err) {
+      fail(err, 'The transcript could not be loaded.');
+      return null;
+    }
+  }
+
   // ---- actions: realtime -------------------------------------------------------------------
 
   /**
@@ -1365,6 +1416,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     removedFromCurrentTeam,
     comments,
     history,
+    transcripts,
+    transcriptBodies,
     loadSeq,
     droppedRemote,
     pulses,
@@ -1406,6 +1459,8 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     editComment,
     deleteComment,
     loadHistory,
+    loadTranscripts,
+    loadTranscript,
     applyEvents,
     endPulse,
     clearPulses,
