@@ -93,6 +93,28 @@ public interface TeamTreeRepository extends org.springframework.data.repository.
     List<OpenQuestion> findQuestions(@Param("opportunityIds") Collection<Long> opportunityIds);
 
     /**
+     * Rows: [productId, outcomeId, opportunityId, solutionId, assumptionId, evidenceId, count] —
+     * exactly one non-null id per row. Bodies are never selected, so this query is safe for the
+     * tree read (NFR-024). Never pass an empty collection — the caller substitutes a sentinel.
+     */
+    @Query(
+        "select p.id, o.id, op.id, s.id, a.id, e.id, count(t) from MeetingTranscript t" +
+            " left join t.product p left join t.outcome o left join t.opportunity op" +
+            " left join t.solution s left join t.assumption a left join t.evidence e" +
+            " where p.id in :productIds or o.id in :outcomeIds or op.id in :opportunityIds" +
+            " or s.id in :solutionIds or a.id in :assumptionIds or e.id in :evidenceIds" +
+            " group by p.id, o.id, op.id, s.id, a.id, e.id"
+    )
+    List<Object[]> countTranscripts(
+        @Param("productIds") Collection<Long> productIds,
+        @Param("outcomeIds") Collection<Long> outcomeIds,
+        @Param("opportunityIds") Collection<Long> opportunityIds,
+        @Param("solutionIds") Collection<Long> solutionIds,
+        @Param("assumptionIds") Collection<Long> assumptionIds,
+        @Param("evidenceIds") Collection<Long> evidenceIds
+    );
+
+    /**
      * The newest history row of every given node. Rows: [nodeType, nodeId,
      * createdDate, authorLogin]. Ties on createdDate may yield more than one row
      * per node.

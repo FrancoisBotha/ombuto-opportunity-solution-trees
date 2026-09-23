@@ -201,6 +201,7 @@ public class TeamTreeService {
 
         if (!byKey.isEmpty()) {
             attachCommentCounts(byKey, idsByType);
+            attachTranscriptCounts(byKey, idsByType);
             attachLinks(byKey, idsByType);
             attachQuestions(byKey, idsByType);
         }
@@ -312,6 +313,37 @@ public class TeamTreeService {
                     TreeNodeDTO n = byKey.get(key(columns[i], id.longValue()));
                     if (n != null) {
                         n.setCommentCount(n.getCommentCount() + count);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    private void attachTranscriptCounts(Map<String, TreeNodeDTO> byKey, Map<TreeNodeType, Set<Long>> idsByType) {
+        TreeNodeType[] columns = {
+            TreeNodeType.PRODUCT,
+            TreeNodeType.OUTCOME,
+            TreeNodeType.OPPORTUNITY,
+            TreeNodeType.SOLUTION,
+            TreeNodeType.ASSUMPTION,
+            TreeNodeType.EVIDENCE,
+        };
+        List<Object[]> rows = teamTreeRepository.countTranscripts(
+            ids(idsByType, TreeNodeType.PRODUCT),
+            ids(idsByType, TreeNodeType.OUTCOME),
+            ids(idsByType, TreeNodeType.OPPORTUNITY),
+            ids(idsByType, TreeNodeType.SOLUTION),
+            ids(idsByType, TreeNodeType.ASSUMPTION),
+            ids(idsByType, TreeNodeType.EVIDENCE)
+        );
+        for (Object[] row : rows) {
+            long count = ((Number) row[columns.length]).longValue();
+            for (int i = 0; i < columns.length; i++) {
+                if (row[i] instanceof Number id) {
+                    TreeNodeDTO n = byKey.get(key(columns[i], id.longValue()));
+                    if (n != null) {
+                        n.setTranscriptCount(n.getTranscriptCount() + count);
                     }
                     break;
                 }

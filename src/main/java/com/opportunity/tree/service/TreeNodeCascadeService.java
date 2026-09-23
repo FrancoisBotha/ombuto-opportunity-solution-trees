@@ -72,6 +72,7 @@ public class TreeNodeCascadeService {
             .executeUpdate();
         em.createQuery("delete from Interview i where i.product.id = :pid").setParameter("pid", productId).executeUpdate();
         em.createQuery("delete from NodeLink l where l.product.id = :pid").setParameter("pid", productId).executeUpdate();
+        em.createQuery("delete from MeetingTranscript t where t.product.id = :pid").setParameter("pid", productId).executeUpdate();
         deleteHistoryFor(TreeNodeType.PRODUCT, List.of(productId));
         em.createQuery("delete from Product p where p.id = :id").setParameter("id", productId).executeUpdate();
         em.flush();
@@ -220,6 +221,7 @@ public class TreeNodeCascadeService {
         deleteCommentsFor("outcome", outcomeIds);
         deleteHistoryFor(TreeNodeType.OUTCOME, outcomeIds);
         em.createQuery("delete from NodeLink l where l.outcome.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
+        em.createQuery("delete from MeetingTranscript t where t.outcome.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
         em.createQuery("delete from Outcome o where o.id in :ids").setParameter("ids", outcomeIds).executeUpdate();
     }
 
@@ -263,6 +265,7 @@ public class TreeNodeCascadeService {
             .executeUpdate();
         em.createNativeQuery("delete from rel_opportunity__tag where opportunity_id in (:ids)").setParameter("ids", all).executeUpdate();
         em.createQuery("delete from NodeLink l where l.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
+        em.createQuery("delete from MeetingTranscript t where t.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
         em.createQuery("delete from OpenQuestion q where q.opportunity.id in :ids").setParameter("ids", all).executeUpdate();
         deleteCommentsFor("opportunity", all);
         deleteHistoryFor(TreeNodeType.OPPORTUNITY, all);
@@ -279,6 +282,7 @@ public class TreeNodeCascadeService {
         }
         em.createNativeQuery("delete from rel_solution__tag where solution_id in (:ids)").setParameter("ids", solutionIds).executeUpdate();
         em.createQuery("delete from NodeLink l where l.solution.id in :ids").setParameter("ids", solutionIds).executeUpdate();
+        em.createQuery("delete from MeetingTranscript t where t.solution.id in :ids").setParameter("ids", solutionIds).executeUpdate();
         List<Long> assumptionIds = em
             .createQuery("select a.id from Assumption a where a.solution.id in :ids", Long.class)
             .setParameter("ids", solutionIds)
@@ -299,6 +303,7 @@ public class TreeNodeCascadeService {
             .getResultList();
         deleteEvidenceInternal(evidenceIds);
         em.createQuery("delete from NodeLink l where l.assumption.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
+        em.createQuery("delete from MeetingTranscript t where t.assumption.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
         deleteCommentsFor("assumption", assumptionIds);
         deleteHistoryFor(TreeNodeType.ASSUMPTION, assumptionIds);
         em.createQuery("delete from Assumption a where a.id in :ids").setParameter("ids", assumptionIds).executeUpdate();
@@ -309,6 +314,7 @@ public class TreeNodeCascadeService {
             return;
         }
         em.createQuery("delete from NodeLink l where l.evidence.id in :ids").setParameter("ids", evidenceIds).executeUpdate();
+        em.createQuery("delete from MeetingTranscript t where t.evidence.id in :ids").setParameter("ids", evidenceIds).executeUpdate();
         deleteCommentsFor("evidence", evidenceIds);
         deleteHistoryFor(TreeNodeType.EVIDENCE, evidenceIds);
         em.createQuery("delete from Evidence e where e.id in :ids").setParameter("ids", evidenceIds).executeUpdate();

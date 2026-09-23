@@ -37,6 +37,7 @@ public class TreeNodeDTO implements Serializable {
     private Instant createdDate;
     private Instant lastModifiedDate;
     private long commentCount;
+    private long transcriptCount;
     private List<TreeNodeLinkDTO> links = new ArrayList<>();
     private List<TreeOpenQuestionDTO> questions = new ArrayList<>();
     /** LABEL-001: only populated for OPPORTUNITY and SOLUTION; empty (never null) for other types. */
@@ -169,6 +170,14 @@ public class TreeNodeDTO implements Serializable {
 
     public void setCommentCount(long commentCount) {
         this.commentCount = commentCount;
+    }
+
+    public long getTranscriptCount() {
+        return transcriptCount;
+    }
+
+    public void setTranscriptCount(long transcriptCount) {
+        this.transcriptCount = transcriptCount;
     }
 
     public List<TreeNodeLinkDTO> getLinks() {

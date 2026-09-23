@@ -129,6 +129,13 @@ public class TreeNodeDtoAssembler {
                 n.getTags().add(new TreeNodeTagDTO(((Number) row[0]).longValue(), (String) row[1]));
             }
         }
+        if (type != TreeNodeType.PRODUCT) {
+            Long transcriptCount = em
+                .createQuery("select count(t) from MeetingTranscript t where t." + fk + ".id = :id", Long.class)
+                .setParameter("id", id)
+                .getSingleResult();
+            n.setTranscriptCount(transcriptCount == null ? 0 : transcriptCount);
+        }
         return n;
     }
 
