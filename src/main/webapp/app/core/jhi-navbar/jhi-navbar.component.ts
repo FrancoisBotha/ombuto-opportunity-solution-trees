@@ -21,7 +21,7 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
 
-    const version = `v${APP_VERSION}`;
+    const version = `v${APP_VERSION}${import.meta.env.DEV ? '-dev' : ''}`;
     const hasAnyAuthorityValues: Ref<any> = ref({});
 
     const openAPIEnabled = computed(() => store.activeProfiles.includes('api-docs'));

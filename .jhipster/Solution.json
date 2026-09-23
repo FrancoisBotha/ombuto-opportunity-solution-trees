@@ -20,7 +20,7 @@
       "fieldName": "status",
       "fieldType": "SolutionStatus",
       "fieldValidateRules": ["required"],
-      "fieldValues": "CANDIDATE,BUILDING,SHIPPED,DROPPED"
+      "fieldValues": "CANDIDATE,EXPLORING,DEVREADY,BUILDING,SHIPPED,DROPPED"
     },
     {
       "fieldName": "sortOrder",

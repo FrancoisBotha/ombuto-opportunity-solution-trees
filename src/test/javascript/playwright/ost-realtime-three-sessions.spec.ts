@@ -269,7 +269,8 @@ test.describe('OST realtime collaboration — three sessions', () => {
     const commentsLoaded = other.page.waitForResponse(
       r => r.url().includes(`/api/tree/nodes/opportunity/${target.id}/comments`) && r.request().method() === 'GET',
     );
-    await other.page.getByTestId('ost-tab-chat').click();
+    await other.page.getByTestId('ost-tab-detail').click();
+    await other.page.getByTestId('ost-detail-chat').click();
     expect((await commentsLoaded).status()).toBe(200);
     const cRes = await owner.api('post', `/api/tree/nodes/opportunity/${target.id}/comments`, { body: 'Trio message' });
     expect(cRes.status()).toBe(201);
@@ -282,7 +283,7 @@ test.describe('OST realtime collaboration — three sessions', () => {
 
     expect((await owner.api('delete', `/api/tree/comments/${commentId}`)).status()).toBe(204);
     await expect(message).toHaveCount(0);
-    await expect(other.page.getByTestId('ost-tab-badge-chat')).toHaveCount(0);
+    await expect(other.page.getByTestId('ost-detail-chat-count')).toHaveCount(0);
 
     expect((await owner.api('delete', `/api/tree/nodes/opportunity/${target.id}`)).status()).toBe(204);
     for (const page of [owner.page, other.page]) expect(takeErrors(page), 'page / console errors').toEqual([]);

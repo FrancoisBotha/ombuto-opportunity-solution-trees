@@ -160,6 +160,15 @@ export const useOstUiStore = defineStore('ostUi', {
       this.collapsed = { ...this.collapsed, [key]: collapsed };
       this.persistCollapsed();
     },
+    setCollapsedMany(keys: string[], collapsed: boolean) {
+      const next = { ...this.collapsed };
+      for (const key of keys) {
+        if (collapsed) next[key] = true;
+        else delete next[key];
+      }
+      this.collapsed = next;
+      this.persistCollapsed();
+    },
     toggleCollapse(key: string) {
       this.setCollapsed(key, !this.collapsed[key]);
     },

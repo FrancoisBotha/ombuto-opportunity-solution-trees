@@ -31,7 +31,7 @@ describe('DetailTab', () => {
   describe('status chips', () => {
     it.each([
       ['opportunity-1', ['unexplored', 'exploring', 'validated', 'parked']],
-      ['solution-1', ['candidate', 'building', 'shipped', 'dropped']],
+      ['solution-1', ['candidate', 'exploring', 'devready', 'building', 'shipped', 'dropped']],
       ['assumption-1', ['untested', 'testing', 'supported', 'refuted']],
       ['outcome-1', []],
       ['product-1', []],

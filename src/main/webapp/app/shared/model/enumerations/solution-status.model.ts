@@ -1,6 +1,10 @@
 export enum SolutionStatus {
   CANDIDATE = 'CANDIDATE',
 
+  EXPLORING = 'EXPLORING',
+
+  DEVREADY = 'DEVREADY',
+
   BUILDING = 'BUILDING',
 
   SHIPPED = 'SHIPPED',

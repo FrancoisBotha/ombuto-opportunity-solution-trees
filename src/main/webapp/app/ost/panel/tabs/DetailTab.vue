@@ -2,6 +2,20 @@
   <div v-if="node" class="ost-tab ost-detail" data-cy="ostTab-detail">
     <NodeFields :node-key="node.id" :readonly="readonly" />
 
+    <button
+      v-if="node.type !== 'product'"
+      type="button"
+      class="ost-btn ost-btn--quick"
+      data-cy="ost-detail-chat"
+      aria-haspopup="dialog"
+      @click="ui.openChat(node.id)"
+    >
+      Chat<span v-if="node.commentCount">
+        (<span data-cy="ost-detail-chat-count">{{ node.commentCount }}</span
+        >)</span
+      >
+    </button>
+
     <NotesField
       :value="node.note"
       :readonly="readonly"
@@ -121,8 +135,9 @@ async function add(type: NodeType) {
 }
 
 .ost-children__item {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 10px;
   align-items: baseline;
   text-align: left;
   font: inherit;
@@ -146,11 +161,12 @@ async function add(type: NodeType) {
   letter-spacing: 0.07em;
   text-transform: uppercase;
   opacity: 0.6;
-  flex: none;
-  width: 44px;
+  white-space: nowrap;
 }
 
 .ost-children__title {
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-wrap: pretty;
 }
 

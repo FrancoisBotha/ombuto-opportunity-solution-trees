@@ -23,21 +23,23 @@ describe('DetailPanel', () => {
   describe('tab set per type', () => {
     it.each([
       ['product-1', ['detail', 'links']],
-      ['outcome-1', ['detail', 'links', 'chat', 'history']],
-      ['opportunity-1', ['detail', 'links', 'chat', 'questions', 'history']],
-      ['solution-1', ['detail', 'links', 'chat', 'history']],
-      ['assumption-1', ['detail', 'links', 'chat', 'history']],
-      ['evidence-1', ['detail', 'links', 'chat', 'history']],
+      ['outcome-1', ['detail', 'links', 'transcripts', 'history']],
+      ['opportunity-1', ['detail', 'links', 'transcripts', 'questions', 'history']],
+      ['solution-1', ['detail', 'links', 'transcripts', 'history']],
+      ['assumption-1', ['detail', 'links', 'transcripts', 'history']],
+      ['evidence-1', ['detail', 'links', 'transcripts', 'history']],
     ])('%s → %j', async (key, tabs) => {
       const { wrapper } = await mountPanel(key);
       expect(tabIds(wrapper)).toEqual(tabs);
     });
 
-    it('labels the tabs and badges links, chat and open questions (not history)', async () => {
-      const { wrapper } = await mountPanel('opportunity-1');
+    it('labels the tabs and badges links, transcripts and open questions (not history)', async () => {
+      const { wrapper, tree } = await mountPanel('opportunity-1');
+      tree.byId('opportunity-1')!.transcriptCount = 2;
+      await flushPromises();
       expect(wrapper.get('[data-cy="ost-tab-questions"]').text()).toContain('Open Qs');
       expect(wrapper.get('[data-cy="ost-tab-badge-links"]').text()).toBe('2');
-      expect(wrapper.get('[data-cy="ost-tab-badge-chat"]').text()).toBe('2');
+      expect(wrapper.get('[data-cy="ost-tab-badge-transcripts"]').text()).toBe('2');
       expect(wrapper.get('[data-cy="ost-tab-badge-questions"]').text()).toBe('2');
       expect(wrapper.find('[data-cy="ost-tab-badge-history"]').exists()).toBe(false);
     });
@@ -45,7 +47,7 @@ describe('DetailPanel', () => {
     it('hides zero badges', async () => {
       const { wrapper } = await mountPanel('solution-1');
       expect(wrapper.find('[data-cy="ost-tab-badge-links"]').exists()).toBe(false);
-      expect(wrapper.find('[data-cy="ost-tab-badge-chat"]').exists()).toBe(false);
+      expect(wrapper.find('[data-cy="ost-tab-badge-transcripts"]').exists()).toBe(false);
     });
 
     it('switches tabs and falls back to Detail when the type has no such tab', async () => {

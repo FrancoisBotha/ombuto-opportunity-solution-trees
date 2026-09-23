@@ -10,7 +10,8 @@ are invisible outside the team that drew them — with a structured, shared, alw
 links to the tickets and pages where the work actually happens.
 
 > **Status: active development.** The core team tree workflow and read-only MCP access are
-> available. Interviews, leadership reporting and meeting transcripts still have planned work.
+> available, including meeting transcript capture and reading. Interviews and leadership reporting
+> still have planned work. Transcript backup coverage and epic closeout remain outstanding.
 > See the [roadmap](#roadmap). Not yet ready for production use.
 
 ## Who it is for
@@ -27,16 +28,66 @@ links to the tickets and pages where the work actually happens.
 | **Teams and products** — create teams, manage members and products, and use owner, editor and viewer roles                                       | Available |
 | **SSO sign-in** — OAuth2 / OpenID Connect through Keycloak, with a guide for brokering company identity providers                                | Available |
 | **Visual tree editor** — build product, outcome, nested opportunity, solution, assumption and evidence branches; edit details and open questions | Available |
-| **Tree rearranging** — move or reorder nodes by dragging or with keyboard controls; collapse branches                                            | Available |
+| **Tree rearranging** — move or reorder nodes by dragging or with keyboard controls; collapse branches individually or all at once                | Available |
 | **Assumption tracking** — record status, confidence and owner; review assumptions in the experiment tracker                                      | Available |
 | **Live collaboration** — changes to the shared tree and node comments appear in other open sessions                                              | Available |
-| **Node discussion** — add, edit and delete chat-style comments on nodes; replies are not threaded                                                | Available |
+| **Node discussion** — open chat from Detail or a canvas chip; replies are not threaded                                                           | Available |
 | **Node links** — add named URLs, including Jira and Confluence links, to tree nodes                                                              | Available |
-| **MCP server** — read-only, team-scoped tools for trees, nodes, interviews, search and discussions; connect through OAuth                        | Available |
-| **Admin backup and restore** — export application data and restore a compatible backup                                                           | Available |
+| **MCP server** — read-only, team-scoped tools for trees, nodes, labels, interviews, search, discussions and transcripts; connect through OAuth   | Available |
+| **Admin backup and restore** — export supported data; meeting transcripts are not yet covered                                                    | Available |
 | **Interviews as evidence** — interview records and opportunity links exist, but the planned team-facing workflow is unfinished                   | Partial   |
 | **Leadership overview** — read-only view across all teams                                                                                        | Planned   |
-| **Meeting transcripts** — attach and read transcripts on tree nodes                                                                              | Planned   |
+| **Meeting transcripts** — paste/upload, read, edit and delete from a dedicated tab                                                               | Available |
+
+## Using the tree
+
+- **Canvas:** the active node has a bright outline and tinted background. Collapse all / Expand
+  all beside Search nodes applies to the current product view and fits the result to the canvas.
+  Collapse preferences are saved locally per user and team.
+- **Detail:** edit fields, notes and labels, navigate children, or open the Chat dialog with its
+  message-count button. The full-page node detail view also has a discussion section.
+- **Transcripts:** select a non-product node and open its Transcripts tab. Paste text or upload
+  a `.txt`, `.vtt` or `.srt` file, review the parsed text, then save. Editors can edit/delete;
+  viewers can read. Counts appear on nodes and tabs. Audio/video transcription is not included.
+- **Solution statuses:** CANDIDATE, EXPLORING, DEVREADY, BUILDING, SHIPPED and DROPPED.
+- **Help:** use Help in the navbar for searchable guidance without leaving the current page.
+
+## Connecting an agent
+
+Open **Connect an agent** below Teams in the sidebar, or visit `/connect-agent`. The page has
+copyable endpoint and client configuration blocks that follow the current color theme, plus
+OAuth sign-in instructions. MCP is read-only and enforces team membership. Node and tree reads
+include labels and the current status, including EXPLORING and DEVREADY. `list_transcripts`
+returns metadata; `get_transcript` returns a transcript's body. UI layout and collapse preferences
+do not change the MCP data contract.
+
+## Backup scope and current limitation
+
+The admin backup includes the existing tree entities, statuses, labels and their node links,
+comments, interviews, history and team membership references. **Meeting transcripts are currently
+missing from the archive and restore implementation. Do not rely on this export as a complete
+backup for transcript-bearing trees.** Existing transcript foreign keys may also prevent restore
+from clearing node data. Transcript coverage needs to be added and verified before that workflow
+can be considered complete.
+
+Browser preferences (including collapse state) and Keycloak accounts/configuration are outside
+the application archive and need separate handling. Restore expects referenced user identities
+to exist. New solution status values require an application version that recognizes them.
+
+## Application version
+
+The navbar displays the version from `package.json`, for example `v0.1.0`.
+The Vite development server adds `-dev` (`v0.1.0-dev`); production builds omit it.
+An explicit `APP_VERSION` environment variable overrides the package version at build time.
+Maven builds already supply their project version from `pom.xml` through this override,
+including `-SNAPSHOT` for unreleased backend builds.
+
+Use semantic versions: patch for fixes, minor for features, major for breaking changes.
+To prepare a release, run `npm version patch --no-git-tag-version` (or `minor` / `major`)
+to update `package.json` and `package-lock.json`, and set the top-level project version in
+`pom.xml` to the same release version. Commit those files together. For subsequent backend
+development, use the next version with `-SNAPSHOT`. Restart the Vite dev server after changing
+the package version; deployed assets need a rebuild to pick up a new version.
 
 ## Tech stack
 
@@ -87,6 +138,10 @@ a company identity provider, see
 > creates their record in the application.
 
 ### Troubleshooting
+
+- **New controls return 404 despite appearing in the UI** — rebuild/restart the backend after
+  pulling changes. The Vite frontend updates independently; an older Java process can be missing
+  the new endpoints.
 
 - **`Bind for 127.0.0.1:9080 failed: port is already allocated`** — another Keycloak container is
   holding the port. `docker ps -a --filter name=keycloak`, then remove any that is not
@@ -171,7 +226,7 @@ Two rules matter to anyone contributing, human or agent:
 | 9    | [Leadership Overview](docs/Epics/epic_09_LEADERSHIP_OVERVIEW.md)               | Planned                                              |
 | 10   | [MCP Server](docs/Epics/epic_10_MCP_SERVER.md)                                 | Available; tool coverage is still expanding          |
 | 11   | [OST Tree Builder](docs/Epics/epic_11_OST_TREE_BUILDER.md)                     | Available                                            |
-| 12   | [Meeting Transcripts](docs/Epics/epic_12_MEETING_TRANSCRIPTS.md)               | Planned                                              |
+| 12   | [Meeting Transcripts](docs/Epics/epic_12_MEETING_TRANSCRIPTS.md)               | Core available; backup coverage and closeout pending |
 
 ## Documentation
 

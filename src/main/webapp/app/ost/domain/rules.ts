@@ -48,7 +48,7 @@ export const STATUS: Record<NodeType, string[]> = {
   product: [],
   outcome: [],
   opportunity: ['unexplored', 'exploring', 'validated', 'parked'],
-  solution: ['candidate', 'building', 'shipped', 'dropped'],
+  solution: ['candidate', 'exploring', 'devready', 'building', 'shipped', 'dropped'],
   assumption: ['untested', 'testing', 'supported', 'refuted'],
   evidence: [],
 };

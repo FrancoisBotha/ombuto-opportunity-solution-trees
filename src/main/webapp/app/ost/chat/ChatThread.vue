@@ -132,7 +132,7 @@
 
 <script setup lang="ts">
 /**
- * A node's chat thread — shared by the panel's Chat tab, the chat modal (node chip) and the
+ * A node's chat thread — shared by the chat modal (Detail button or node chip) and the
  * full-page node detail. Bubbles are grouped into runs (chat-format.ts): own messages right in
  * accent, others left in neutral, a date-time stamp above a run and the author's initials on its
  * first bubble. Own messages can be edited (in the composer: Enter saves, Escape cancels, marked

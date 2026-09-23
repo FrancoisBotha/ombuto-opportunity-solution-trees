@@ -4,7 +4,7 @@ import { registerTeamForCleanup } from './support/cleanup';
 import { ADMIN_PASSWORD, ADMIN_USERNAME, type Session, USER_PASSWORD, USER_USERNAME, openSession } from './support/session';
 
 /**
- * OST step 11: the Chat, Open Qs and History tabs and the chat modal, driven by two people at once.
+ * OST step 11: the chat dialog, Open Qs and History tabs and the chat modal, driven by two people at once.
  * `user` owns a throwaway team and `admin` joins it as an EDITOR (later demoted to VIEWER): both
  * post, own bubbles sit on the right, only own messages can be edited / deleted, edits are marked,
  * the node chip and the tab badge follow the count, the modal opens from the chip; open questions
@@ -100,13 +100,14 @@ test.describe('OST collaboration tabs', () => {
     await expect(node(page, key)).toHaveClass(/\bis-selected\b/);
     if (tab) {
       if (tab === 'chat') {
+        await page.getByTestId('ost-tab-detail').click();
         await api(page, 'GET', `/nodes/${key.split('-')[0]}/${key.split('-')[1]}/comments`, 200, () =>
-          page.getByTestId(`ost-tab-${tab}`).click(),
+          page.getByTestId('ost-detail-chat').click(),
         );
       } else {
         await page.getByTestId(`ost-tab-${tab}`).click();
       }
-      await expect(page.getByTestId(`ostTab-${tab}`)).toBeVisible();
+      await expect(page.getByTestId(tab === 'chat' ? 'ost-chat-modal' : `ostTab-${tab}`)).toBeVisible();
     }
   }
 
@@ -180,12 +181,12 @@ test.describe('OST collaboration tabs', () => {
 
     await open(u, k.op1, 'chat');
     await expect(u.getByTestId('ost-chat-empty')).toBeVisible();
-    await expect(u.getByTestId('ost-tab-badge-chat')).toHaveCount(0);
+    await expect(u.getByTestId('ost-detail-chat-count')).toHaveCount(0);
     const first = await send(u, u, 'Heard this in 7 of 9 interviews.');
     ids.userFirst = first.id;
     await expect(u.getByTestId(`ost-chat-msg-${first.id}`)).toHaveAttribute('data-mine', 'true');
     expect(await side(u, first.id)).toBe('right');
-    await expect(u.getByTestId('ost-tab-badge-chat')).toHaveText('1');
+    await expect(u.getByTestId('ost-detail-chat-count')).toHaveText('1');
     await expect(chip(u, k.op1)).toHaveText('1');
 
     // Shift+Enter is a new line, not a send
@@ -205,7 +206,7 @@ test.describe('OST collaboration tabs', () => {
     const reply = await send(a, a, 'Same in enterprise, but procurement.');
     ids.adminReply = reply.id;
     expect(await side(a, reply.id)).toBe('right');
-    await expect(a.getByTestId('ost-tab-badge-chat')).toHaveText('2');
+    await expect(a.getByTestId('ost-detail-chat-count')).toHaveText('2');
     await expect(chip(a, k.op1)).toHaveText('2');
 
     // admin edits their own message: Escape cancels, Enter saves, then it is marked edited
@@ -233,11 +234,11 @@ test.describe('OST collaboration tabs', () => {
     await expect(u.getByTestId(`ost-chat-edit-${reply.id}`)).toHaveCount(0);
     await expect(u.getByTestId(`ost-chat-delete-${reply.id}`)).toHaveCount(0);
     const oops = await send(u, u, 'Oops, wrong node.');
-    await expect(u.getByTestId('ost-tab-badge-chat')).toHaveText('3');
+    await expect(u.getByTestId('ost-detail-chat-count')).toHaveText('3');
     await expect(chip(u, k.op1)).toHaveText('3');
     await api(u, 'DELETE', `/api/tree/comments/${oops.id}`, 204, () => u.getByTestId(`ost-chat-delete-${oops.id}`).click());
     await expect(u.getByTestId(`ost-chat-msg-${oops.id}`)).toHaveCount(0);
-    await expect(u.getByTestId('ost-tab-badge-chat')).toHaveText('2');
+    await expect(u.getByTestId('ost-detail-chat-count')).toHaveText('2');
     await expect(chip(u, k.op1)).toHaveText('2');
     const stamps = await u.getByTestId('ost-chat-stamp').allTextContents();
     expect(stamps.length).toBeGreaterThan(0);
@@ -278,10 +279,10 @@ test.describe('OST collaboration tabs', () => {
     await u.mouse.click(320, 700); // the backdrop, beside the dialog
     await expect(modal).toHaveCount(0);
 
-    // the same thread in the panel's Chat tab
+    // the same thread from the Detail button
     await open(u, k.s1, 'chat');
     await expect(u.getByTestId(`ost-chat-msg-${msg.id}`)).toBeVisible();
-    await expect(u.getByTestId('ost-tab-badge-chat')).toHaveText('1');
+    await expect(u.getByTestId('ost-detail-chat-count')).toHaveText('1');
   });
 
   test('open questions: add, tick, remove, summary and badge', async () => {
@@ -358,7 +359,10 @@ test.describe('OST collaboration tabs', () => {
     await u.getByTestId('ost-question-add').fill('Which segment feels it most?');
     await api(u, 'POST', `/opportunities/${opp.id}/questions`, 201, () => u.getByTestId('ost-question-add').press('Enter'));
 
-    await api(u, 'GET', `/nodes/opportunity/${opp.id}/comments`, 200, () => u.getByTestId('ost-tab-chat').click());
+    await api(u, 'GET', `/nodes/opportunity/${opp.id}/comments`, 200, async () => {
+      await u.getByTestId('ost-tab-detail').click();
+      await u.getByTestId('ost-detail-chat').click();
+    });
     await send(u, u, 'Logged in the history too.');
 
     // re-parent under the other opportunity (through the API; drag is covered by the canvas spec)
@@ -404,6 +408,7 @@ test.describe('OST collaboration tabs', () => {
     expect((await admin.api('delete', `/api/tree/comments/${ids.adminReply}`)).status()).toBe(403);
 
     // open questions and the modal are read-only too
+    await a.getByTestId('ost-chat-modal-close').click();
     await a.getByTestId('ost-tab-questions').click();
     await expect(a.getByTestId('ost-question-add')).toHaveCount(0);
     await expect(a.locator('[data-cy^="ost-question-remove-"]')).toHaveCount(0);
@@ -426,7 +431,7 @@ test.describe('OST collaboration tabs', () => {
     }
     const u = user.page;
     await open(u, k.long, 'chat');
-    await expect(u.getByTestId('ost-tab-badge-chat')).toHaveText('30');
+    await expect(u.getByTestId('ost-detail-chat-count')).toHaveText('30');
     const scroller = u.getByTestId('ost-chat-scroll');
     await expect(u.getByTestId(`ost-chat-msg-${last}`)).toBeInViewport();
     await expect(u.getByTestId('ost-chat-jump')).toHaveCount(0);

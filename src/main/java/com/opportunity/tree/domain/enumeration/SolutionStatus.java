@@ -5,6 +5,8 @@ package com.opportunity.tree.domain.enumeration;
  */
 public enum SolutionStatus {
     CANDIDATE,
+    EXPLORING,
+    DEVREADY,
     BUILDING,
     SHIPPED,
     DROPPED,

@@ -35,6 +35,14 @@
         <span class="menu-tooltip">Teams</span>
       </li>
 
+      <li v-if="authenticated" :class="{ active: currentPath === '/connect-agent' }" data-cy="connectAgentMenu">
+        <router-link to="/connect-agent" class="menu-item">
+          <font-awesome-icon class="va-icon" icon="plug" />
+          <span class="nav-item">Connect an agent</span>
+        </router-link>
+        <span class="menu-tooltip">Connect an agent</span>
+      </li>
+
       <!-- Entity groups -->
       <template v-for="group in groups" :key="group.key">
         <template v-if="!group.authority || hasAnyAuthority(group.authority)">

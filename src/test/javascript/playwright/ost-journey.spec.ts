@@ -448,7 +448,10 @@ test.describe('OST journey (editor, then viewer)', () => {
     });
 
     await test.step('chat: post, edit, delete', async () => {
-      await api(page, 'GET', /\/comments$/, 200, () => page.getByTestId('ost-tab-chat').click());
+      await api(page, 'GET', /\/comments$/, 200, async () => {
+        await page.getByTestId('ost-tab-detail').click();
+        await page.getByTestId('ost-detail-chat').click();
+      });
       const input = page.getByTestId('ost-chat-input');
       const posted: number[] = [];
       for (const text of ['Seven of nine interviews mention this.', 'Oops, wrong node.']) {
@@ -468,6 +471,7 @@ test.describe('OST journey (editor, then viewer)', () => {
     });
 
     await test.step('history lists what happened, newest first, and nothing for title / notes edits', async () => {
+      await page.getByTestId('ost-chat-modal-close').click();
       await page.getByTestId('ost-tab-history').click();
       await expect(page.getByTestId('ost-history-what')).toHaveText([
         'Comment deleted',
@@ -661,9 +665,13 @@ test.describe('OST journey (editor, then viewer)', () => {
         expect(Math.round(b.width), 'width').toBeGreaterThanOrEqual(44);
         expect(Math.round(b.height), 'height').toBeGreaterThanOrEqual(44);
       };
-      await api(page, 'GET', /\/comments$/, 200, () => page.getByTestId('ost-tab-chat').click());
+      await api(page, 'GET', /\/comments$/, 200, async () => {
+        await page.getByTestId('ost-tab-detail').click();
+        await page.getByTestId('ost-detail-chat').click();
+      });
       await atLeast44(page.getByTestId(`ost-chat-edit-${k.keptComment}`));
       await atLeast44(page.getByTestId(`ost-chat-delete-${k.keptComment}`));
+      await page.getByTestId('ost-chat-modal-close').click();
       await page.getByTestId('ost-tab-questions').click();
       for (const q of (await serverNode(k.op1))!.questions) {
         await atLeast44(page.getByTestId(`ost-question-toggle-${q.id}`));
@@ -748,7 +756,10 @@ test.describe('OST journey (editor, then viewer)', () => {
       expect((await box(page.getByTestId(`ost-node-add-${k.op1}`))).width, 'node + look unchanged').toBeLessThan(44);
       await hitArea44(page.getByTestId(`ost-collapse-${k.op1}`), 'collapse chip');
       await hitArea44(page.getByTestId(`ost-node-chat-${k.op1}`), 'chat chip');
-      await api(page, 'GET', /\/comments$/, 200, () => page.getByTestId('ost-tab-chat').click());
+      await api(page, 'GET', /\/comments$/, 200, async () => {
+        await page.getByTestId('ost-tab-detail').click();
+        await page.getByTestId('ost-detail-chat').click();
+      });
       await hitArea44(page.getByTestId('ost-chat-send'), 'chat send');
 
       // Full-page detail: breadcrumb links, status chips and $ steps.
@@ -847,7 +858,10 @@ test.describe('OST journey (editor, then viewer)', () => {
         await expect(page.getByTestId('ost-question-add')).toHaveCount(0);
         await expect(page.locator('[data-cy^="ost-question-remove-"]')).toHaveCount(0);
         await expect(page.locator('[data-cy^="ost-question-toggle-"]').first()).toBeDisabled();
-        await api(page, 'GET', /\/comments$/, 200, () => page.getByTestId('ost-tab-chat').click());
+        await api(page, 'GET', /\/comments$/, 200, async () => {
+          await page.getByTestId('ost-tab-detail').click();
+          await page.getByTestId('ost-detail-chat').click();
+        });
         await expect(page.getByTestId(`ost-chat-msg-${k.keptComment}`)).toHaveAttribute('data-mine', 'true');
         await expect(page.getByTestId('ost-chat-input')).toBeDisabled();
         await expect(page.getByTestId('ost-chat-readonly')).toBeVisible();

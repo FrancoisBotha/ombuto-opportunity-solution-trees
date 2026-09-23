@@ -8,7 +8,7 @@ import type { NodeType, OstNode } from './types';
 /** Sibling group order used by the server's tree read (and so by the tidy layout). */
 export const CHILD_TYPE_ORDER: NodeType[] = ['outcome', 'opportunity', 'solution', 'assumption', 'evidence'];
 
-export type PanelTab = 'detail' | 'links' | 'chat' | 'questions' | 'history';
+export type PanelTab = 'detail' | 'links' | 'transcripts' | 'questions' | 'history';
 
 export type StatusTone = 'good' | 'flight' | 'bad';
 
@@ -110,8 +110,8 @@ export function orderTree(nodes: OstNode[]): OstNode[] {
 /** Which detail-panel tabs a node type gets (Product: Detail + Links; Open Qs: opportunities only). */
 export function panelTabsFor(type: NodeType): PanelTab[] {
   if (type === 'product') return ['detail', 'links'];
-  if (type === 'opportunity') return ['detail', 'links', 'chat', 'questions', 'history'];
-  return ['detail', 'links', 'chat', 'history'];
+  if (type === 'opportunity') return ['detail', 'links', 'transcripts', 'questions', 'history'];
+  return ['detail', 'links', 'transcripts', 'history'];
 }
 
 /** Start of the current calendar month in UTC — the boundary the server's TeamTreeService uses. */

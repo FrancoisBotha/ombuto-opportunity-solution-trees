@@ -16,7 +16,7 @@
         whether you are running on localhost, a preview environment or production.
       </p>
       <div class="d-flex align-items-center gap-2">
-        <code class="p-2 bg-light border rounded flex-grow-1" data-cy="mcpEndpointUrl">{{ endpointUrl }}</code>
+        <code class="p-2 connect-agent__snippet border rounded flex-grow-1" data-cy="mcpEndpointUrl">{{ endpointUrl }}</code>
         <button class="btn btn-outline-secondary" type="button" data-cy="copyEndpointButton" @click="copy('endpoint', endpointUrl)">
           <font-awesome-icon icon="copy"></font-awesome-icon>
           <span> {{ copyState.endpoint ? 'Copied' : 'Copy' }}</span>
@@ -33,7 +33,9 @@
         bearer token to paste and no expiry to manage.
       </p>
       <div class="d-flex align-items-start gap-2">
-        <pre class="p-2 bg-light border rounded flex-grow-1 mb-0" data-cy="clientConfigSnippet">{{ clientConfigSnippet }}</pre>
+        <pre class="p-2 connect-agent__snippet border rounded flex-grow-1 mb-0" data-cy="clientConfigSnippet">{{
+          clientConfigSnippet
+        }}</pre>
         <button class="btn btn-outline-secondary" type="button" data-cy="copyConfigButton" @click="copy('config', clientConfigSnippet)">
           <font-awesome-icon icon="copy"></font-awesome-icon>
           <span> {{ copyState.config ? 'Copied' : 'Copy' }}</span>
@@ -82,7 +84,7 @@
         <code data-cy="keycloakOrigin">{{ keycloakOrigin }}</code
         >). Run the one-shot direct-access-grant curl against the realm's token endpoint:
       </p>
-      <pre class="p-2 bg-light border rounded" data-cy="tokenCurl">
+      <pre class="p-2 connect-agent__snippet border rounded" data-cy="tokenCurl">
 curl -s -X POST \
   '{{ tokenUrl }}' \
   -d 'client_id=mcp_client' \
@@ -116,6 +118,12 @@ curl -s -X POST \
 <script lang="ts" src="./connect-agent.component.ts"></script>
 
 <style scoped>
+.connect-agent .connect-agent__snippet {
+  background-color: var(--ost-bg);
+  color: var(--ost-text);
+  min-width: 0;
+}
+
 .connect-agent pre {
   white-space: pre-wrap;
   word-break: break-word;

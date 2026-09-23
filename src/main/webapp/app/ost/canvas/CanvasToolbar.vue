@@ -22,6 +22,29 @@
     <span :id="jumpHintId" class="ost-sr-only">Enter selects the next match on the canvas, Shift+Enter the previous one.</span>
     <span class="ost-sr-only" role="status" data-cy="ost-search-status">{{ jumpStatus }}</span>
 
+    <div class="ost-toolbar__branches" role="group" aria-label="Expand or collapse branches">
+      <button
+        type="button"
+        class="ost-btn ost-toolbar__branch-btn"
+        data-cy="ost-collapse-all"
+        title="Collapse all branches in the current product view"
+        :disabled="!branchKeys.some(key => !ui.collapsed[key])"
+        @click="setAllCollapsed(true)"
+      >
+        Collapse all
+      </button>
+      <button
+        type="button"
+        class="ost-btn ost-toolbar__branch-btn"
+        data-cy="ost-expand-all"
+        title="Expand all branches in the current product view"
+        :disabled="!branchKeys.some(key => ui.collapsed[key])"
+        @click="setAllCollapsed(false)"
+      >
+        Expand all
+      </button>
+    </div>
+
     <div class="ost-toolbar__chips" role="group" aria-label="Show node types">
       <button
         v-for="chip in chips"
@@ -77,7 +100,7 @@
  * page selects and centres it. A status line announces "Match 2 of 5: <title>".
  */
 import { PhMagnifyingGlass } from '@phosphor-icons/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import { countByType } from '../domain/derive';
 import { TYPE_BOX } from '../domain/rules';
@@ -98,6 +121,19 @@ const ui = useOstUiStore();
 const CHIP_TYPES: NodeType[] = ['outcome', 'opportunity', 'solution', 'assumption', 'evidence'];
 
 const productCounts = computed(() => Object.fromEntries(tree.products.map(p => [p.id, tree.descendantCount(p.id)])));
+
+/** Include hidden descendants, but leave products outside the current scope untouched. */
+const branchKeys = computed(() => {
+  const roots = new Set(tree.roots.map(root => root.id));
+  const parents = new Set(tree.nodes.map(node => node.parent).filter(Boolean));
+  return tree.nodes.filter(node => parents.has(node.id) && roots.has(tree.ancestors(node.id)[0]?.id ?? node.id)).map(node => node.id);
+});
+
+async function setAllCollapsed(collapsed: boolean) {
+  ui.setCollapsedMany(branchKeys.value, collapsed);
+  await nextTick();
+  emit('fit');
+}
 
 // ---- keyboard jump to a match -------------------------------------------------------------------
 const jumpHintId = `ost-search-hint-${Math.random().toString(36).slice(2, 9)}`;
@@ -182,6 +218,18 @@ const chips = computed(() => {
   padding: 4px 10px 4px 28px;
   font-size: 13px;
   background: transparent;
+}
+
+.ost-toolbar__branches {
+  display: flex;
+  gap: 4px;
+}
+
+.ost-root .ost-toolbar__branch-btn {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .ost-toolbar__chips {

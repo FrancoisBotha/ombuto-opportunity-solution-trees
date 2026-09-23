@@ -24,7 +24,7 @@
 <script setup lang="ts">
 /**
  * Detail-panel tab bar. The set adapts to the node type (Product: Detail + Links; Open Qs on
- * opportunities only); badges are derived: link count, message count, open-question count.
+ * opportunities only); badges are derived: link count, transcript count, open-question count.
  * WAI-ARIA tabs: roving tabindex, Left/Right (wrapping), Home/End move focus and select;
  * the active tab controls the panel's tabpanel (DetailPanel).
  */
@@ -38,7 +38,13 @@ import { tabDomId, tabPanelDomId } from './panel-format';
 const props = defineProps<{ node: OstNode; active: PanelTab }>();
 const emit = defineEmits<{ select: [tab: PanelTab] }>();
 
-const LABELS: Record<PanelTab, string> = { detail: 'Detail', links: 'Links', chat: 'Chat', questions: 'Open Qs', history: 'History' };
+const LABELS: Record<PanelTab, string> = {
+  detail: 'Detail',
+  links: 'Links',
+  transcripts: 'Transcripts',
+  questions: 'Open Qs',
+  history: 'History',
+};
 
 const tabs = computed(() =>
   panelTabsFor(props.node.type).map(id => ({
@@ -47,8 +53,8 @@ const tabs = computed(() =>
     badge:
       id === 'links'
         ? props.node.links.length
-        : id === 'chat'
-          ? props.node.commentCount
+        : id === 'transcripts'
+          ? props.node.transcriptCount
           : id === 'questions'
             ? props.node.questions.filter(q => !q.done).length
             : 0,

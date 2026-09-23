@@ -116,13 +116,19 @@ import { useOstUiStore } from '../stores/ost-ui.store';
 import PanelTabs from './PanelTabs.vue';
 import { providePanelErrors, usePanelAction } from './panel-action';
 import { tabDomId, tabPanelDomId } from './panel-format';
-import ChatTab from './tabs/ChatTab.vue';
 import DetailTab from './tabs/DetailTab.vue';
 import HistoryTab from './tabs/HistoryTab.vue';
 import LinksTab from './tabs/LinksTab.vue';
 import OpenQuestionsTab from './tabs/OpenQuestionsTab.vue';
+import TranscriptsTab from './tabs/TranscriptsTab.vue';
 
-const TAB_COMPONENTS = { detail: DetailTab, links: LinksTab, chat: ChatTab, questions: OpenQuestionsTab, history: HistoryTab };
+const TAB_COMPONENTS = {
+  detail: DetailTab,
+  links: LinksTab,
+  transcripts: TranscriptsTab,
+  questions: OpenQuestionsTab,
+  history: HistoryTab,
+};
 
 const tree = useOstTreeStore();
 const ui = useOstUiStore();

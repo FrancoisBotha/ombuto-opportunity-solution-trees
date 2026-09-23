@@ -357,8 +357,13 @@ const priorityDots = computed(() =>
   cursor: copy;
 }
 .ost-node.is-selected {
-  outline: 2px solid var(--color-accent);
+  border-color: var(--color-accent-300);
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-surface));
+  outline: 3px solid var(--color-accent-300);
   outline-offset: 2px;
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--color-accent) 22%, transparent),
+    0 0 22px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 /* The legal target under the pointer (prototype: dropId). */
 .ost-node.is-drop {
@@ -368,7 +373,7 @@ const priorityDots = computed(() =>
 }
 /*
  * Keyboard focus: a ring on its own layer (::after), 7–9px outside the border — beyond every state
- * outline (selected 2–4px, target 3–4px, drop 4–6px) and the match halo (0–3px), so it never hides
+ * outline (selected 2–5px, target 3–4px, drop 4–6px) and the match halo (0–3px), so it never hides
  * or replaces them. The pseudo-element is positioned from the padding box (1px border).
  */
 .ost-node:focus-visible::after {

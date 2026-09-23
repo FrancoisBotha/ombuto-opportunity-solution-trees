@@ -147,7 +147,7 @@ test.describe('OST detail panel', () => {
     await expect(page.getByTestId('ost-panel-kicker')).toHaveText('Assumption');
     await expect(page.getByTestId('ost-panel-title')).toHaveValue('Panel assumption one');
     for (const key of [k.product, k.o1, k.op1, k.s1]) await expect(page.getByTestId(`ost-breadcrumb-${key}`)).toBeVisible();
-    await expect(panel(page).locator('[role="tab"]')).toHaveText([/^Detail\s*$/, /^Links\s*1\s*$/, /^Chat\s*$/, /^History\s*$/]);
+    await expect(panel(page).locator('[role="tab"]')).toHaveText([/^Detail\s*$/, /^Links\s*1\s*$/, /^Transcripts\s*$/, /^History\s*$/]);
 
     await page.getByTestId(`ost-breadcrumb-${k.op1}`).click();
     await expect(page).toHaveURL(new RegExp(`node=${k.op1}`));

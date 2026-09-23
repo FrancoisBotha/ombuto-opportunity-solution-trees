@@ -232,8 +232,11 @@ test.describe('OST full-page node detail', () => {
     await page.getByTestId('ost-node-detail-open-canvas').click();
     await expect(panel(page)).toBeVisible();
     await expect(page.getByTestId(`ost-node-chat-${n.s1.key}`)).toHaveText('1');
-    await api(page, 'GET', `/nodes/solution/${n.s1.id}/comments`, 200, () => page.getByTestId('ost-tab-chat').click());
-    await expect(panel(page).getByTestId(`ost-chat-msg-${posted.id}`)).toContainText('Posted from the detail page');
+    await api(page, 'GET', `/nodes/solution/${n.s1.id}/comments`, 200, async () => {
+      await page.getByTestId('ost-tab-detail').click();
+      await page.getByTestId('ost-detail-chat').click();
+    });
+    await expect(page.getByTestId('ost-chat-modal').getByTestId(`ost-chat-msg-${posted.id}`)).toContainText('Posted from the detail page');
   });
 
   test('quick-add opens the new child’s page in rename mode', async () => {

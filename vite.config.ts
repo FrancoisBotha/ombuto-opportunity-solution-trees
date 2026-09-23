@@ -1,4 +1,5 @@
 import { URL, fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 import vue from '@vitejs/plugin-vue';
 import { defineConfig, normalizePath } from 'vite';
@@ -6,6 +7,8 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 const { getAbsoluteFSPath } = await import('swagger-ui-dist');
 const swaggerUiPath = getAbsoluteFSPath();
+const packageVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version as string;
+const appVersion = process.env.APP_VERSION?.trim() || packageVersion;
 
 // eslint-disable-next-line prefer-const
 let config = defineConfig({
@@ -54,7 +57,7 @@ let config = defineConfig({
   define: {
     I18N_HASH: '"generated_hash"',
     SERVER_API_URL: '"/"',
-    APP_VERSION: `"${process.env.APP_VERSION ? process.env.APP_VERSION : 'DEV'}"`,
+    APP_VERSION: JSON.stringify(appVersion),
   },
   server: {
     host: true,

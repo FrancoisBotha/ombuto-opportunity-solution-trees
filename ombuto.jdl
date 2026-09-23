@@ -46,7 +46,7 @@ enum OpportunityStatus {
 }
 
 enum SolutionStatus {
-  CANDIDATE, BUILDING, SHIPPED, DROPPED
+  CANDIDATE, EXPLORING, DEVREADY, BUILDING, SHIPPED, DROPPED
 }
 
 enum AssumptionStatus {
