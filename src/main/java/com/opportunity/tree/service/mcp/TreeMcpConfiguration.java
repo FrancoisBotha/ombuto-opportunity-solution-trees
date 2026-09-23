@@ -23,4 +23,14 @@ public class TreeMcpConfiguration {
     public ToolCallbackProvider searchToolCallbackProvider(SearchTool searchTool) {
         return MethodToolCallbackProvider.builder().toolObjects(searchTool).build();
     }
+
+    @Bean
+    public ToolCallbackProvider listTranscriptsToolCallbackProvider(ListTranscriptsTool listTranscriptsTool) {
+        return MethodToolCallbackProvider.builder().toolObjects(listTranscriptsTool).build();
+    }
+
+    @Bean
+    public ToolCallbackProvider getTranscriptToolCallbackProvider(GetTranscriptTool getTranscriptTool) {
+        return MethodToolCallbackProvider.builder().toolObjects(getTranscriptTool).build();
+    }
 }

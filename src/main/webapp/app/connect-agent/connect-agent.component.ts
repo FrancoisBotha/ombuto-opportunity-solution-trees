@@ -27,6 +27,16 @@ const TOOLS: McpTool[] = [
     description: 'Returns paged interviews for a product, team or opportunity, with linked opportunities and policy-controlled notes.',
   },
   { name: 'list_node_comments', description: 'Returns the discussion thread on one node — body, author and times, oldest first.' },
+  {
+    name: 'list_transcripts',
+    description:
+      'Lists meeting transcript metadata for a team, or for a single node — title, meeting date, attendees, source, author and timestamps. Body is never included; call get_transcript to read one.',
+  },
+  {
+    name: 'get_transcript',
+    description:
+      'Returns one meeting transcript by id with its full body (plain text, line breaks preserved). Refused for transcripts on teams the caller does not belong to.',
+  },
 ];
 
 const VERIFIED_CLIENT_NAME = 'Claude Code';

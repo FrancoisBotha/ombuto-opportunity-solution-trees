@@ -62,15 +62,39 @@ describe('ConnectAgent Component', () => {
       global: { stubs: { 'font-awesome-icon': true } },
     });
     const rows = wrapper.findAll('[data-cy^="mcpTool-"]');
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(8);
     const names = rows.map(r => r.find('[data-cy^="mcpToolName-"]').text());
     expect(names).toEqual(
-      expect.arrayContaining(['list_products', 'get_tree', 'get_node', 'search_nodes', 'list_interviews', 'list_node_comments']),
+      expect.arrayContaining([
+        'list_products',
+        'get_tree',
+        'get_node',
+        'search_nodes',
+        'list_interviews',
+        'list_node_comments',
+        'list_transcripts',
+        'get_transcript',
+      ]),
     );
     for (const row of rows) {
       const desc = row.find('[data-cy^="mcpToolDescription-"]').text();
       expect(desc.length).toBeGreaterThan(0);
     }
+  });
+
+  it('documents list_transcripts as metadata-only and get_transcript as the body reader', () => {
+    const wrapper = shallowMount(ConnectAgent, {
+      global: { stubs: { 'font-awesome-icon': true } },
+    });
+    const list = wrapper.find('[data-cy="mcpToolDescription-list_transcripts"]').text().toLowerCase();
+    expect(list).toContain('metadata');
+    expect(list).not.toMatch(/body[^:]*(said|customer|"[^"]*")/);
+    expect(list).toContain('get_transcript');
+    const get = wrapper.find('[data-cy="mcpToolDescription-get_transcript"]').text().toLowerCase();
+    expect(get).toContain('body');
+    // No verbatim transcript excerpt in the description — descriptions carry no real data.
+    expect(get).not.toContain('customer');
+    expect(get).not.toMatch(/"[^"]{20,}"/);
   });
 
   it('names the verified MCP client and version', () => {
