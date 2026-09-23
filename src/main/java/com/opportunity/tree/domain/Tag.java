@@ -38,6 +38,21 @@ public class Tag implements Serializable {
     @Column(name = "colour", length = 7)
     private String colour;
 
+    /**
+     * LABEL-001: the trimmed, lower-cased form of {@link #name}, kept by the application so the
+     * database can enforce (team_id, normalized_name) uniqueness across case and whitespace.
+     */
+    @Column(name = "normalized_name", length = 50, nullable = false)
+    private String normalizedName;
+
+    /** LABEL-001: canonical form for uniqueness comparisons — trim + lower-case (Locale.ROOT). */
+    public static String normalize(String name) {
+        if (name == null) {
+            return "";
+        }
+        return name.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
     @ManyToOne(optional = false)
     @NotNull
     private Team team;
@@ -78,6 +93,15 @@ public class Tag implements Serializable {
 
     public void setName(String name) {
         this.name = name;
+        this.normalizedName = normalize(name);
+    }
+
+    public String getNormalizedName() {
+        return this.normalizedName;
+    }
+
+    public void setNormalizedName(String normalizedName) {
+        this.normalizedName = normalizedName;
     }
 
     public String getColour() {

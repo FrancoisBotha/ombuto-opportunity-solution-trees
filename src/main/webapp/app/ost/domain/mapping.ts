@@ -48,6 +48,7 @@ export function fromDto(dto: TreeNodeDTO): OstNode {
     commentCount: dto.commentCount ?? 0,
     links: (dto.links ?? []).map(l => ({ id: l.id, name: l.name, url: l.url })),
     questions: (dto.questions ?? []).map(q => ({ id: q.id, text: q.text, done: !!q.done })),
+    tags: (dto.tags ?? []).map(t => ({ id: t.id, name: t.name })),
     lastActivity: dto.lastActivity ? { at: dto.lastActivity.at, byLogin: dto.lastActivity.byLogin ?? null } : null,
   };
 }

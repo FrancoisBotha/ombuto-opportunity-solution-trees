@@ -39,6 +39,8 @@ public class TreeNodeDTO implements Serializable {
     private long commentCount;
     private List<TreeNodeLinkDTO> links = new ArrayList<>();
     private List<TreeOpenQuestionDTO> questions = new ArrayList<>();
+    /** LABEL-001: only populated for OPPORTUNITY and SOLUTION; empty (never null) for other types. */
+    private List<TreeNodeTagDTO> tags = new ArrayList<>();
     private TreeActivityDTO lastActivity;
 
     public String getKey() {
@@ -183,6 +185,14 @@ public class TreeNodeDTO implements Serializable {
 
     public void setQuestions(List<TreeOpenQuestionDTO> questions) {
         this.questions = questions;
+    }
+
+    public List<TreeNodeTagDTO> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<TreeNodeTagDTO> tags) {
+        this.tags = tags == null ? new ArrayList<>() : tags;
     }
 
     public TreeActivityDTO getLastActivity() {

@@ -25,6 +25,12 @@ export interface OpenQuestionDTO {
   sortOrder?: number;
 }
 
+/** LABEL-001: a tag attached to an opportunity or a solution. */
+export interface TreeNodeTagDTO {
+  id: number;
+  name: string;
+}
+
 export interface TreeNodeDTO {
   key: string;
   type: ApiNodeType;
@@ -44,6 +50,8 @@ export interface TreeNodeDTO {
   commentCount: number | null;
   links: NodeLinkDTO[] | null;
   questions: OpenQuestionDTO[] | null;
+  /** LABEL-001: empty (never null) for non-taggable types. */
+  tags: TreeNodeTagDTO[] | null;
   lastActivity: { at: string; byLogin: string | null } | null;
 }
 

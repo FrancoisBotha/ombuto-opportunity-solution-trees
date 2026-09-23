@@ -119,10 +119,27 @@ public class McpProductTreeReader {
                 .setMaxResults(remaining)
                 .getResultList();
             for (Object[] row : rows) {
+                TreeNodeType t = TreeNodeType.values()[i];
+                Long nodeId = ((Number) row[0]).longValue();
+                List<String> labels = null;
+                if (t == TreeNodeType.OPPORTUNITY) {
+                    labels = entityManager
+                        .createQuery(
+                            "select tag.name from Opportunity op join op.tags tag where op.id = :id order by tag.name asc",
+                            String.class
+                        )
+                        .setParameter("id", nodeId)
+                        .getResultList();
+                } else if (t == TreeNodeType.SOLUTION) {
+                    labels = entityManager
+                        .createQuery("select tag.name from Solution s join s.tags tag where s.id = :id order by tag.name asc", String.class)
+                        .setParameter("id", nodeId)
+                        .getResultList();
+                }
                 nodes.add(
                     new TreeTool.TreeNode(
-                        ((Number) row[0]).longValue(),
-                        TreeNodeType.values()[i].name(),
+                        nodeId,
+                        t.name(),
                         (String) row[1],
                         (String) row[2],
                         (String) row[3],
@@ -133,7 +150,8 @@ public class McpProductTreeReader {
                         (Integer) row[6],
                         (String) row[7],
                         (Instant) row[8],
-                        (Instant) row[9]
+                        (Instant) row[9],
+                        labels
                     )
                 );
             }

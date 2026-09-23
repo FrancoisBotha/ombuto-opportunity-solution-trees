@@ -229,6 +229,20 @@ public class TreeTool {
                 }
             }
         }
+        List<String> labels = null;
+        if (
+            n.getType() == com.opportunity.tree.domain.enumeration.TreeNodeType.OPPORTUNITY ||
+            n.getType() == com.opportunity.tree.domain.enumeration.TreeNodeType.SOLUTION
+        ) {
+            labels =
+                n.getTags() == null
+                    ? List.of()
+                    : n
+                          .getTags()
+                          .stream()
+                          .map(t -> t.name())
+                          .toList();
+        }
         return new TreeNode(
             n.getId(),
             n.getType() == null ? null : n.getType().name(),
@@ -242,7 +256,8 @@ public class TreeTool {
             n.getConfidence(),
             n.getOwnerLogin(),
             n.getCreatedDate(),
-            n.getLastModifiedDate()
+            n.getLastModifiedDate(),
+            labels
         );
     }
 
@@ -293,6 +308,41 @@ public class TreeTool {
         Integer confidence,
         String ownerLogin,
         Instant createdDate,
-        Instant lastModifiedDate
-    ) {}
+        Instant lastModifiedDate,
+        /** LABEL-001: tag names for OPPORTUNITY / SOLUTION; null for other node types. */
+        List<String> labels
+    ) {
+        public TreeNode(
+            Long id,
+            String type,
+            String title,
+            String description,
+            String status,
+            String parentType,
+            Long parentId,
+            Integer priority,
+            Integer valueRating,
+            Integer confidence,
+            String ownerLogin,
+            Instant createdDate,
+            Instant lastModifiedDate
+        ) {
+            this(
+                id,
+                type,
+                title,
+                description,
+                status,
+                parentType,
+                parentId,
+                priority,
+                valueRating,
+                confidence,
+                ownerLogin,
+                createdDate,
+                lastModifiedDate,
+                null
+            );
+        }
+    }
 }

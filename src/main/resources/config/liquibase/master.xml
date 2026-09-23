@@ -54,5 +54,6 @@
     <include file="config/liquibase/changelog/20260919120000_add_index_node_history_node.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260921120000_link_001_delete_placeholder_node_links.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20260923120000_add_index_meeting_transcript_node.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20260923120000_label_001_tag_normalized_name.xml" relativeToChangelogFile="false"/>
     <!-- jhipster-needle-liquibase-add-incremental-changelog - JHipster will add incremental liquibase changelogs here -->
 </databaseChangeLog>

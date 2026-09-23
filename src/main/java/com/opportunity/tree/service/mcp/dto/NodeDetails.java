@@ -35,5 +35,7 @@ public record NodeDetails(
     Integer confidence,
     String ownerLogin,
     Instant createdDate,
-    Instant lastModifiedDate
+    Instant lastModifiedDate,
+    /** LABEL-001: only populated for OPPORTUNITY and SOLUTION; null for other node types. */
+    List<String> labels
 ) {}

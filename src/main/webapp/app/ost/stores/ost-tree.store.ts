@@ -6,7 +6,7 @@ import { breadcrumb, descendantIds, evidenceThisMonth as countEvidenceThisMonth,
 import { layoutTree } from '../domain/layout';
 import { type NodePatch, fromDto, parseKey, toApiType, toPatchBody } from '../domain/mapping';
 import { ALLOWED, canReparent } from '../domain/rules';
-import type { NodeType, OstNode } from '../domain/types';
+import type { NodeType, OstNode, TagRef } from '../domain/types';
 import {
   DELETED_ELSEWHERE,
   DEMOTED_TO_VIEWER,
@@ -619,6 +619,59 @@ export const useOstTreeStore = defineStore('ostTree', () => {
    * no newer response for it has been applied; a failed patch rolls back to the newest value still
    * pending, else to the last server-confirmed value.
    */
+  /** LABEL-001: fetch label suggestions for the given team (current team first, then the caller's others). */
+  async function listLabelSuggestions(teamIdArg: number): Promise<TagRef[]> {
+    try {
+      return await api().listLabelSuggestions(teamIdArg);
+    } catch {
+      return [];
+    }
+  }
+
+  /** LABEL-001: inline create (server dedupes on normalized name). Returns the tag. */
+  async function createLabel(teamIdArg: number, name: string): Promise<TagRef | null> {
+    try {
+      return await api().createLabel(teamIdArg, name);
+    } catch (err) {
+      await failOnNodes(err, [], undefined, undefined);
+      return null;
+    }
+  }
+
+  /**
+   * LABEL-001: replace the tag set on an OPPORTUNITY or SOLUTION. Optimistically writes the
+   * requested tag ids into the local node so the panel reflects the change immediately, then
+   * merges the server's DTO on success. Failures leave the previous tags via a rollback.
+   */
+  async function applyLabels(key: string, tags: TagRef[]): Promise<boolean> {
+    const node = byId(key);
+    const parsed = parseKey(key);
+    if (!node || !parsed) return false;
+    if (parsed.type !== 'opportunity' && parsed.type !== 'solution') return false;
+    const previous = node.tags;
+    node.tags = tags;
+    const requestId = generateRequestId();
+    rememberRequestId(requestId);
+    try {
+      const dto = await api().applyLabels(
+        parsed.type,
+        parsed.id,
+        tags.map(t => t.id),
+        requestId,
+      );
+      const fresh = fromDto(dto);
+      const current = byId(key);
+      if (current) current.tags = fresh.tags;
+      recordWrite(key, dto.lastModifiedDate);
+      return true;
+    } catch (err) {
+      const current = byId(key);
+      if (current) current.tags = previous;
+      await failOnNodes(err, [key], undefined, node.type);
+      return false;
+    }
+  }
+
   async function patchNode(key: string, patch: NodePatch): Promise<boolean> {
     const node = byId(key);
     const parsed = parseKey(key);
@@ -1197,6 +1250,7 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     current.commentCount = fresh.commentCount;
     current.links = fresh.links;
     current.questions = fresh.questions;
+    current.tags = fresh.tags;
     current.lastModifiedDate = fresh.lastModifiedDate;
     if (fresh.lastActivity) current.lastActivity = fresh.lastActivity;
     if (fresh.createdDate && !current.createdDate) current.createdDate = fresh.createdDate;
@@ -1335,6 +1389,9 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     loadTeams,
     loadTree,
     patchNode,
+    applyLabels,
+    listLabelSuggestions,
+    createLabel,
     createNode,
     moveNode,
     deleteNode,

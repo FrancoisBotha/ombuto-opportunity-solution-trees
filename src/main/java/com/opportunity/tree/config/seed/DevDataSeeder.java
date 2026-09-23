@@ -684,6 +684,74 @@ public class DevDataSeeder implements ApplicationRunner {
                 }
             }
         }
+        seedTags(team, entities);
+    }
+
+    /**
+     * LABEL-001: give the demo tree a small, realistic label set (persona / segment / theme) so
+     * the feature is visible on first launch without hand-setup. Tags are attached to the first
+     * opportunity and the first solution in the seeded tree; identical text within a team collapses
+     * (uniqueness constraint), so re-runs are safe.
+     */
+    private void seedTags(Team team, Map<String, Object> entities) {
+        String[] tagNames = { "Mobile Value Stream", "Onboarding", "Enterprise", "Retention" };
+        Long teamId = team.getId();
+        java.util.Map<String, Long> tagIdByName = new java.util.LinkedHashMap<>();
+        for (String name : tagNames) {
+            String normalized = com.opportunity.tree.domain.Tag.normalize(name);
+            Long existing = null;
+            try {
+                existing = jdbcTemplate.queryForObject(
+                    "select id from tag where team_id = ? and normalized_name = ?",
+                    Long.class,
+                    teamId,
+                    normalized
+                );
+            } catch (org.springframework.dao.EmptyResultDataAccessException ignore) {
+                // no existing tag
+            }
+            if (existing != null) {
+                tagIdByName.put(name, existing);
+                continue;
+            }
+            Long tagId = jdbcTemplate.queryForObject("select nextval('sequence_generator')", Long.class);
+            jdbcTemplate.update(
+                "insert into tag(id, name, colour, normalized_name, team_id) values (?, ?, null, ?, ?)",
+                tagId,
+                name,
+                normalized,
+                teamId
+            );
+            tagIdByName.put(name, tagId);
+        }
+        Opportunity firstOpp = null;
+        Solution firstSol = null;
+        for (Object entity : entities.values()) {
+            if (firstOpp == null && entity instanceof Opportunity o) {
+                firstOpp = o;
+            }
+            if (firstSol == null && entity instanceof Solution s) {
+                firstSol = s;
+            }
+        }
+        if (firstOpp != null) {
+            for (String name : new String[] { "Mobile Value Stream", "Onboarding" }) {
+                Long tagId = tagIdByName.get(name);
+                try {
+                    jdbcTemplate.update("insert into rel_opportunity__tag(opportunity_id, tag_id) values (?, ?)", firstOpp.getId(), tagId);
+                } catch (org.springframework.dao.DataIntegrityViolationException ignored) {
+                    // Idempotent seeding — the join row already exists on a re-run.
+                }
+            }
+        }
+        if (firstSol != null) {
+            Long tagId = tagIdByName.get("Mobile Value Stream");
+            try {
+                jdbcTemplate.update("insert into rel_solution__tag(solution_id, tag_id) values (?, ?)", firstSol.getId(), tagId);
+            } catch (org.springframework.dao.DataIntegrityViolationException ignored) {
+                // idempotent
+            }
+        }
     }
 
     private void seedLinks(Node node, int index, Object entity, Instant created) {

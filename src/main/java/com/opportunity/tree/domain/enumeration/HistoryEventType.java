@@ -17,4 +17,6 @@ public enum HistoryEventType {
     QUESTION_ADDED,
     TRANSCRIPT_ADDED,
     TRANSCRIPT_DELETED,
+    /** LABEL-001: a tag was applied to or removed from a node. */
+    TAGS_CHANGED,
 }

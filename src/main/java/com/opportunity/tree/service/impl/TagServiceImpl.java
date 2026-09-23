@@ -38,6 +38,8 @@ public class TagServiceImpl implements TagService {
     public TagDTO save(TagDTO tagDTO) {
         LOG.debug("Request to save Tag : {}", tagDTO);
         Tag tag = tagMapper.toEntity(tagDTO);
+        // LABEL-001: keep normalized_name in sync with name so the DB uniqueness constraint holds.
+        tag.setNormalizedName(Tag.normalize(tag.getName()));
         tag = tagRepository.save(tag);
         return tagMapper.toDto(tag);
     }
@@ -46,6 +48,7 @@ public class TagServiceImpl implements TagService {
     public TagDTO update(TagDTO tagDTO) {
         LOG.debug("Request to update Tag : {}", tagDTO);
         Tag tag = tagMapper.toEntity(tagDTO);
+        tag.setNormalizedName(Tag.normalize(tag.getName()));
         tag = tagRepository.save(tag);
         return tagMapper.toDto(tag);
     }
@@ -86,6 +89,20 @@ public class TagServiceImpl implements TagService {
     @Override
     public void delete(Long id) {
         LOG.debug("Request to delete Tag : {}", id);
-        tagRepository.deleteById(id);
+        // LABEL-001: clear the join-table entries on both node sides before delete so the FK
+        // constraint does not block the removal. The tag owns the inverse side of the M2M.
+        tagRepository
+            .findOneWithEagerRelationships(id)
+            .ifPresent(tag -> {
+                for (com.opportunity.tree.domain.Opportunity o : new java.util.ArrayList<>(tag.getOpportunities())) {
+                    o.getTags().remove(tag);
+                }
+                for (com.opportunity.tree.domain.Solution s : new java.util.ArrayList<>(tag.getSolutions())) {
+                    s.getTags().remove(tag);
+                }
+                tag.getOpportunities().clear();
+                tag.getSolutions().clear();
+                tagRepository.delete(tag);
+            });
     }
 }

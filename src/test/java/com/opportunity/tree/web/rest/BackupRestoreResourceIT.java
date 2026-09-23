@@ -395,6 +395,60 @@ class BackupRestoreResourceIT {
         assertThat(rowCount("team")).isEqualTo(teamsInDatabase);
     }
 
+    /**
+     * LABEL-001 criterion 15: labels and both node associations survive export and restore. The
+     * seeded tree gets a tag attached to the opportunity and (a second one) attached to the
+     * solution; the archive is exported, the tables are mutated (adding a stray tag + clearing the
+     * associations), and the restore is verified to bring back exactly the exported state.
+     */
+    @Test
+    void restoreRoundTripPreservesTagsAndBothNodeAssociations() throws Exception {
+        com.opportunity.tree.domain.Tag first = new com.opportunity.tree.domain.Tag();
+        first.setTeam(seededTeam);
+        first.setName("Mobile Value Stream");
+        em.persist(first);
+        com.opportunity.tree.domain.Tag second = new com.opportunity.tree.domain.Tag();
+        second.setTeam(seededTeam);
+        second.setName("Onboarding");
+        em.persist(second);
+        em.flush();
+        seededOpportunity.getTags().add(first);
+        seededOpportunity.getTags().add(second);
+        seededSolution.getTags().add(first);
+        em.flush();
+
+        long opportunityJoinsBefore = rowCount("rel_opportunity__tag");
+        long solutionJoinsBefore = rowCount("rel_solution__tag");
+        long tagsBefore = rowCount("tag");
+        assertThat(opportunityJoinsBefore).isEqualTo(2L);
+        assertThat(solutionJoinsBefore).isEqualTo(1L);
+
+        byte[] archive = exportArchive();
+
+        // Mutate the tables so a "no-op restore" would not pass the assertions.
+        seededOpportunity.getTags().clear();
+        seededSolution.getTags().clear();
+        com.opportunity.tree.domain.Tag stray = new com.opportunity.tree.domain.Tag();
+        stray.setTeam(seededTeam);
+        stray.setName("Stray Tag Not In Archive");
+        em.persist(stray);
+        em.flush();
+
+        mockMvc.perform(adminRestore(archive)).andExpect(status().isOk());
+
+        em.clear();
+        assertThat(rowCount("tag")).isEqualTo(tagsBefore);
+        assertThat(rowCount("rel_opportunity__tag")).isEqualTo(opportunityJoinsBefore);
+        assertThat(rowCount("rel_solution__tag")).isEqualTo(solutionJoinsBefore);
+
+        Opportunity restoredOpp = em.find(Opportunity.class, seededOpportunity.getId());
+        assertThat(restoredOpp.getTags())
+            .extracting(com.opportunity.tree.domain.Tag::getName)
+            .containsExactlyInAnyOrder("Mobile Value Stream", "Onboarding");
+        Solution restoredSol = em.find(Solution.class, seededSolution.getId());
+        assertThat(restoredSol.getTags()).extracting(com.opportunity.tree.domain.Tag::getName).containsExactly("Mobile Value Stream");
+    }
+
     /** Summary key to the table whose rows it claims to count. */
     private static final java.util.Map<String, String> COUNT_KEY_TABLES = java.util.Map.ofEntries(
         java.util.Map.entry("teams", "team"),
@@ -420,12 +474,7 @@ class BackupRestoreResourceIT {
     private Team persistSmallTree(String label) {
         Team team = new Team().name(label).description(label).createdDate(Instant.now());
         em.persist(team);
-        Product product = new Product()
-            .name(label + " product")
-            .archived(Boolean.FALSE)
-            .sortOrder(0)
-            .createdDate(Instant.now())
-            .team(team);
+        Product product = new Product().name(label + " product").archived(Boolean.FALSE).sortOrder(0).createdDate(Instant.now()).team(team);
         em.persist(product);
         Outcome outcome = new Outcome().title(label + " outcome").sortOrder(0).createdDate(Instant.now()).product(product);
         em.persist(outcome);

@@ -12,6 +12,7 @@ import com.opportunity.tree.domain.User;
 import com.opportunity.tree.domain.enumeration.TreeNodeType;
 import com.opportunity.tree.service.dto.tree.TreeNodeDTO;
 import com.opportunity.tree.service.dto.tree.TreeNodeLinkDTO;
+import com.opportunity.tree.service.dto.tree.TreeNodeTagDTO;
 import com.opportunity.tree.service.dto.tree.TreeOpenQuestionDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -118,6 +119,15 @@ public class TreeNodeDtoAssembler {
                 .setParameter("id", id)
                 .getSingleResult();
             n.setCommentCount(count == null ? 0 : count);
+        }
+        if (type == TreeNodeType.OPPORTUNITY || type == TreeNodeType.SOLUTION) {
+            String jpql =
+                type == TreeNodeType.OPPORTUNITY
+                    ? "select t.id, t.name from Opportunity x join x.tags t where x.id = :id order by t.name asc"
+                    : "select t.id, t.name from Solution x join x.tags t where x.id = :id order by t.name asc";
+            for (Object[] row : em.createQuery(jpql, Object[].class).setParameter("id", id).getResultList()) {
+                n.getTags().add(new TreeNodeTagDTO(((Number) row[0]).longValue(), (String) row[1]));
+            }
         }
         return n;
     }

@@ -124,6 +124,7 @@ public class GetNodeTool {
         List<OpenQuestionDetails> openQuestions = openQuestionsFor(nodeType, id);
         Long evidenceCount = evidenceCountFor(nodeType, id);
         Long commentCount = commentCountFor(nodeType, id);
+        List<String> labels = labelsFor(nodeType, id);
 
         return new NodeDetails(
             nodeType.name(),
@@ -143,8 +144,17 @@ public class GetNodeTool {
             confidence,
             ownerLogin,
             createdDate,
-            lastModifiedDate
+            lastModifiedDate,
+            labels
         );
+    }
+
+    private List<String> labelsFor(TreeNodeType type, Long id) {
+        return switch (type) {
+            case OPPORTUNITY -> readRepository.findTagsForOpportunity(id);
+            case SOLUTION -> readRepository.findTagsForSolution(id);
+            default -> null;
+        };
     }
 
     private java.util.Optional<TreeNodeType> actualTypeIfInCallersTeams(Long id) {

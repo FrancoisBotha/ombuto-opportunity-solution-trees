@@ -141,6 +141,13 @@ public interface McpNodeReadRepository extends org.springframework.data.reposito
     @Query("select l.name, l.url from NodeLink l where l.evidence.id = :id order by l.sortOrder asc, l.id asc")
     List<Object[]> findLinksForEvidence(@Param("id") Long id);
 
+    // LABEL-001: tag names for a node, ordered alphabetically.
+    @Query("select t.name from Opportunity o join o.tags t where o.id = :id order by t.name asc")
+    List<String> findTagsForOpportunity(@Param("id") Long id);
+
+    @Query("select t.name from Solution s join s.tags t where s.id = :id order by t.name asc")
+    List<String> findTagsForSolution(@Param("id") Long id);
+
     // Open questions on an opportunity: [id, questionText, done], ordered by sort_order.
     @Query("select q.id, q.questionText, q.done from OpenQuestion q where q.opportunity.id = :id order by q.sortOrder asc, q.id asc")
     List<Object[]> findOpenQuestionsForOpportunity(@Param("id") Long id);

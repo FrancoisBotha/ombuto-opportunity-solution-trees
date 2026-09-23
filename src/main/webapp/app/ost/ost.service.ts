@@ -12,6 +12,7 @@ import type {
   PatchNodeRequest,
   TeamTreeDTO,
   TreeNodeDTO,
+  TreeNodeTagDTO,
 } from './ost.model';
 
 const treeApi = 'api/tree';
@@ -110,5 +111,19 @@ export default class OstService {
 
   listHistory(type: string, id: number): Promise<HistoryEntryDTO[]> {
     return axios.get<HistoryEntryDTO[]>(`${treeApi}/nodes/${seg(type)}/${id}/history`).then(res => res.data);
+  }
+
+  // ---- LABEL-001: team-scoped labels --------------------------------------------------------
+
+  listLabelSuggestions(teamId: number): Promise<TreeNodeTagDTO[]> {
+    return axios.get<TreeNodeTagDTO[]>(`${treeApi}/labels/suggestions/${teamId}`).then(res => res.data);
+  }
+
+  createLabel(teamId: number, name: string): Promise<TreeNodeTagDTO> {
+    return axios.post<TreeNodeTagDTO>(`${treeApi}/labels/team/${teamId}`, { name }).then(res => res.data);
+  }
+
+  applyLabels(type: string, id: number, tagIds: number[], requestId?: string): Promise<TreeNodeDTO> {
+    return axios.put<TreeNodeDTO>(`${treeApi}/labels/node/${seg(type)}/${id}`, { tagIds }, withRequestId(requestId)).then(res => res.data);
   }
 }

@@ -13,6 +13,14 @@
       <ValueScale :value="node.value" :readonly="readonly" @change="save({ value: $event })" />
       <PrioritySlider :value="node.priority" :readonly="readonly" @change="save({ priority: $event })" />
     </template>
+
+    <LabelChips
+      v-if="node.type === 'opportunity' || node.type === 'solution'"
+      :node-key="node.id"
+      :tags="node.tags"
+      :readonly="readonly"
+      :team-id="teamId"
+    />
   </div>
 </template>
 
@@ -35,6 +43,7 @@ import { usePanelAction } from '../panel-action';
 
 import ConfidenceField from './ConfidenceField.vue';
 import EvidenceStrengthBar from './EvidenceStrengthBar.vue';
+import LabelChips from './LabelChips.vue';
 import OwnerSelect from './OwnerSelect.vue';
 import PrioritySlider from './PrioritySlider.vue';
 import StatusChips from './StatusChips.vue';
@@ -48,6 +57,7 @@ const { run } = usePanelAction();
 const node = computed(() => tree.byId(props.nodeKey));
 const statuses = computed(() => (node.value ? STATUS[node.value.type] : []));
 const hasFields = computed(() => !!node.value && ['opportunity', 'solution', 'assumption'].includes(node.value.type));
+const teamId = computed<number | null>(() => tree.team?.id ?? null);
 
 function save(patch: NodePatch) {
   if (props.readonly || !node.value) return;

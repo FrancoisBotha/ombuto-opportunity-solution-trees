@@ -32,6 +32,12 @@ export interface LastActivity {
   byLogin: string | null;
 }
 
+/** LABEL-001: a tag attached to an opportunity or a solution. */
+export interface TagRef {
+  id: number;
+  name: string;
+}
+
 export interface OstNode {
   /** Server node key, e.g. "opportunity-12". Used as the Vue Flow node id. */
   id: string;
@@ -59,6 +65,8 @@ export interface OstNode {
   commentCount: number;
   links: LinkRef[];
   questions: Question[];
+  /** LABEL-001: labels attached to opportunities and solutions; empty for other types. */
+  tags: TagRef[];
   /** products only: newest history entry in the branch */
   lastActivity: LastActivity | null;
 }

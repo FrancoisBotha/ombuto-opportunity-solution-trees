@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        LABEL-001: normalize Tag.name for team-scoped uniqueness.
+
+        A team cannot hold two tags whose names differ only by case or by surrounding whitespace.
+        The application writes the trimmed, lower-cased form into `normalized_name` when a tag is
+        created; the database enforces uniqueness on (team_id, normalized_name).
+    -->
+    <changeSet id="20260923120000-1" author="label-001">
+        <addColumn tableName="tag">
+            <column name="normalized_name" type="varchar(50)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20260923120000-2" author="label-001">
+        <sql>UPDATE tag SET normalized_name = LOWER(TRIM(name)) WHERE normalized_name IS NULL</sql>
+    </changeSet>
+
+    <changeSet id="20260923120000-3" author="label-001">
+        <addNotNullConstraint tableName="tag" columnName="normalized_name" columnDataType="varchar(50)"/>
+    </changeSet>
+
+    <changeSet id="20260923120000-4" author="label-001">
+        <addUniqueConstraint
+            tableName="tag"
+            columnNames="team_id, normalized_name"
+            constraintName="ux_tag_team_normalized_name"/>
+    </changeSet>
+</databaseChangeLog>

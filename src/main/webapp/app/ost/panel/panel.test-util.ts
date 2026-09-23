@@ -32,6 +32,7 @@ export const PANEL_TREE: TreeNodeDTO[] = [
       { id: 2, text: 'When?', done: true },
       { id: 3, text: 'Why?', done: false },
     ],
+    tags: [{ id: 100, name: 'Mobile Value Stream' }],
   }),
   dto('solution-1', 'opportunity-1', { title: 'In-app invite', status: 'CANDIDATE' }),
   dto('assumption-1', 'solution-1', { title: 'Users accept', status: 'SUPPORTED', confidence: 30, ownerLogin: 'user' }),

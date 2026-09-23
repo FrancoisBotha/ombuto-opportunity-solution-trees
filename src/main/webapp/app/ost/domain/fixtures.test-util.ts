@@ -26,6 +26,7 @@ export function node(key: string, parent: string | null, extra: Partial<OstNode>
     commentCount: 0,
     links: [],
     questions: [],
+    tags: [],
     lastActivity: null,
     ...extra,
   };
@@ -52,6 +53,7 @@ export function dto(key: string, parentKey: string | null, extra: Partial<TreeNo
     commentCount: 0,
     links: [],
     questions: [],
+    tags: [],
     lastActivity: null,
     ...extra,
   };
