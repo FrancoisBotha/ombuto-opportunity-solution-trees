@@ -1,16 +1,21 @@
 package com.opportunity.tree.web.rest;
 
+import com.opportunity.tree.service.TeamAccessService;
+import com.opportunity.tree.service.TranscriptUploadParser;
 import com.opportunity.tree.service.TreeMeetingTranscriptService;
 import com.opportunity.tree.service.TreeNodeRules;
 import com.opportunity.tree.service.dto.tree.TreeTranscriptDTO;
 import com.opportunity.tree.service.dto.tree.TreeTranscriptMetaDTO;
+import com.opportunity.tree.service.dto.tree.TreeTranscriptParseResultDTO;
 import com.opportunity.tree.service.dto.tree.TreeTranscriptWriteDTO;
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +24,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.PaginationUtil;
 
@@ -42,9 +49,17 @@ public class TreeMeetingTranscriptResource {
     private static final Logger LOG = LoggerFactory.getLogger(TreeMeetingTranscriptResource.class);
 
     private final TreeMeetingTranscriptService transcriptService;
+    private final TranscriptUploadParser uploadParser;
+    private final TeamAccessService teamAccessService;
 
-    public TreeMeetingTranscriptResource(TreeMeetingTranscriptService transcriptService) {
+    public TreeMeetingTranscriptResource(
+        TreeMeetingTranscriptService transcriptService,
+        TranscriptUploadParser uploadParser,
+        TeamAccessService teamAccessService
+    ) {
         this.transcriptService = transcriptService;
+        this.uploadParser = uploadParser;
+        this.teamAccessService = teamAccessService;
     }
 
     @GetMapping("/nodes/{type}/{id}/transcripts")
@@ -93,5 +108,36 @@ public class TreeMeetingTranscriptResource {
         LOG.debug("REST delete transcript {}", id);
         transcriptService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Team-scoped parse-only upload (MTRANS-003). Accepts {@code .txt}, {@code .vtt} or
+     * {@code .srt}, decodes it as UTF-8 text and returns the parsed transcript for review.
+     * Nothing is stored — the caller must POST the returned body separately to persist it.
+     * Gated by {@link TeamAccessService#requireEditTeam(Long)}: OWNER or EDITOR of the target
+     * team only. The request itself and any parse failure are logged by filename and ext only —
+     * the transcript text never appears in an application log line (NFR-022).
+     */
+    @PostMapping(value = "/teams/{teamId}/transcripts/parse", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TreeTranscriptParseResultDTO> parseUpload(
+        @PathVariable("teamId") Long teamId,
+        @RequestPart("file") MultipartFile file
+    ) {
+        LOG.debug("REST parse transcript upload for team {} ({} bytes)", teamId, file == null ? -1 : file.getSize());
+        teamAccessService.requireEditTeam(teamId);
+        final byte[] bytes;
+        try {
+            bytes = file == null ? new byte[0] : file.getBytes();
+        } catch (IOException e) {
+            LOG.debug("Rejected an unreadable transcript upload for team {}", teamId, e);
+            throw new com.opportunity.tree.service.NodeWriteRuleException(
+                "Uploaded file could not be read",
+                TranscriptUploadParser.ENTITY_NAME,
+                "transcriptuploadmalformed"
+            );
+        }
+        String filename = file == null ? "" : (file.getOriginalFilename() == null ? "" : file.getOriginalFilename());
+        String text = uploadParser.parse(filename, bytes);
+        return ResponseEntity.ok(new TreeTranscriptParseResultDTO(text));
     }
 }
