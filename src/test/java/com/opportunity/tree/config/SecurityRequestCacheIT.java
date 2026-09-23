@@ -2,6 +2,7 @@ package com.opportunity.tree.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.opportunity.tree.IntegrationTest;
@@ -39,9 +40,25 @@ class SecurityRequestCacheIT {
     }
 
     @Test
+    void deepLinkNavigationIsThePostLoginDestination() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+
+        mvc
+            .perform(get("/trees/42/canvas").accept("text/html").header("Sec-Fetch-Mode", "navigate").session(session))
+            .andExpect(status().isOk())
+            .andExpect(forwardedUrl("/index.html"));
+
+        assertThat(successfulLoginRedirect(session)).isEqualTo("http://localhost/trees/42/canvas?continue");
+    }
+
+    @Test
     void reconnectDoesNotReplaceAnExistingTreeDestination() throws Exception {
         MockHttpSession session = new MockHttpSession();
-        saveNavigation(session, "/trees/42/canvas");
+
+        mvc
+            .perform(get("/trees/42/canvas").accept("text/html").header("Sec-Fetch-Mode", "navigate").session(session))
+            .andExpect(status().isOk())
+            .andExpect(forwardedUrl("/index.html"));
 
         mvc.perform(get("/websocket/tracker/info?t=5678").accept("*/*").session(session)).andExpect(status().isUnauthorized());
 
@@ -53,20 +70,10 @@ class SecurityRequestCacheIT {
         assertThat(successfulLoginRedirect(new MockHttpSession())).isEqualTo("/");
     }
 
-    private void saveNavigation(MockHttpSession session, String path) {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
-        request.setScheme("http");
-        request.setServerName("localhost");
-        request.setServerPort(80);
-        request.setSession(session);
-        request.addHeader(HttpHeaders.ACCEPT, "text/html");
-        request.addHeader("Sec-Fetch-Mode", "navigate");
-        requestCache.saveRequest(request, new MockHttpServletResponse());
-    }
-
     private String successfulLoginRedirect(MockHttpSession session) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/login/success");
         request.setSession(session);
+        request.addHeader(HttpHeaders.ACCEPT, "text/html");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         SavedRequestAwareAuthenticationSuccessHandler successHandler = new SavedRequestAwareAuthenticationSuccessHandler();
