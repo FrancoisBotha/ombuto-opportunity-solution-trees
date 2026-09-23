@@ -9,6 +9,41 @@
           <time :datetime="transcript.meetingDate">{{ transcript.meetingDate }}</time>
           <span v-if="transcript.attendees">· {{ transcript.attendees }}</span>
         </div>
+        <div v-if="transcript && tree.canEdit" class="ost-transcript-viewer__actions">
+          <button type="button" class="ost-btn" data-cy="ost-transcript-viewer-edit" :disabled="deleting" @click="emitEdit">Edit</button>
+          <template v-if="!confirmingDelete">
+            <button
+              type="button"
+              class="ost-btn ost-btn--destructive"
+              data-cy="ost-transcript-viewer-delete"
+              :disabled="deleting"
+              @click="confirmingDelete = true"
+            >
+              Delete
+            </button>
+          </template>
+          <template v-else>
+            <span class="ost-transcript-viewer__confirm" data-cy="ost-transcript-viewer-confirm"> Delete this transcript? </span>
+            <button
+              type="button"
+              class="ost-btn"
+              data-cy="ost-transcript-viewer-cancel-delete"
+              :disabled="deleting"
+              @click="confirmingDelete = false"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="ost-btn ost-btn--destructive"
+              data-cy="ost-transcript-viewer-confirm-delete"
+              :disabled="deleting"
+              @click="doDelete"
+            >
+              {{ deleting ? 'Deleting…' : 'Delete' }}
+            </button>
+          </template>
+        </div>
       </div>
     </template>
     <p v-if="loading" class="ost-transcript-viewer__empty">Loading transcript…</p>
@@ -19,13 +54,16 @@
 
 <script setup lang="ts">
 /**
- * MTRANS-005 — Transcript viewer dialog.
+ * MTRANS-005 / MTRANS-006 — Transcript viewer dialog.
  *
- * Fetches the transcript body on open (lazy — the list never carries bodies, NFR-024), and shows
- * it in a scrollable `<pre>` that preserves line breaks. The body is rendered as text through
- * Vue's normal interpolation (`{{ body }}`), NEVER via `v-html`, so an attacker's HTML inside a
- * pasted transcript can never execute (NFR-023). Team viewers open the same viewer editors do,
- * without any mutation controls.
+ * Fetches the transcript body on open (lazy — the list never carries bodies, NFR-024). Renders it
+ * in a scrollable {@code <pre>} that preserves line breaks. The body is text-interpolated
+ * ({@code \{\{ body \}\}}), NEVER via {@code v-html}, so HTML inside a pasted transcript cannot
+ * execute (NFR-023).
+ *
+ * MTRANS-006 adds Edit and Delete affordances for editors / owners: {@code canEdit} gates them,
+ * so viewers see the same read-only viewer they saw before. Delete requires an inline confirm
+ * (criterion 4).
  */
 import { onMounted, ref, watch } from 'vue';
 
@@ -34,23 +72,44 @@ import { useOstTreeStore } from '../../stores/ost-tree.store';
 import OstDialog from '../../overlays/OstDialog.vue';
 
 const props = defineProps<{ transcriptId: number }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; edit: [TranscriptDTO]; deleted: [number] }>();
 
 const tree = useOstTreeStore();
 const transcript = ref<TranscriptDTO | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+const confirmingDelete = ref(false);
+const deleting = ref(false);
 
 async function load() {
   loading.value = true;
   error.value = null;
   transcript.value = null;
+  confirmingDelete.value = false;
   try {
     const dto = await tree.loadTranscript(props.transcriptId);
     if (!dto) error.value = 'The transcript could not be loaded.';
     else transcript.value = dto;
   } finally {
     loading.value = false;
+  }
+}
+
+function emitEdit() {
+  if (transcript.value) emit('edit', transcript.value);
+}
+
+async function doDelete() {
+  if (!transcript.value || deleting.value) return;
+  deleting.value = true;
+  try {
+    const ok = await tree.deleteTranscript(transcript.value.id);
+    if (ok) {
+      emit('deleted', transcript.value.id);
+      emit('close');
+    }
+  } finally {
+    deleting.value = false;
   }
 }
 
@@ -83,6 +142,19 @@ watch(
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.ost-transcript-viewer__actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.ost-transcript-viewer__confirm {
+  font-size: 12px;
+  color: var(--color-neutral-300);
 }
 
 .ost-transcript-viewer__empty {

@@ -28,6 +28,7 @@ import type {
   TeamTreeDTO,
   TranscriptDTO,
   TranscriptMetaDTO,
+  TranscriptWriteRequest,
   TreeNodeDTO,
 } from '../ost.model';
 import OstService from '../ost.service';
@@ -1169,6 +1170,130 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     }
   }
 
+  // ---- actions: transcript mutations (MTRANS-006) --------------------------------------------
+
+  /**
+   * Builds the exactly-one-node id payload for a create request from a node key. The server
+   * rejects a request that sets zero or more than one node id — the shape here mirrors that rule.
+   */
+  function nodeIdField(key: string): Partial<TranscriptWriteRequest> | null {
+    const node = byId(key);
+    const parsed = parseKey(key);
+    if (!node || !parsed) return null;
+    switch (parsed.type) {
+      case 'product':
+        return { productId: node.dbId };
+      case 'outcome':
+        return { outcomeId: node.dbId };
+      case 'opportunity':
+        return { opportunityId: node.dbId };
+      case 'solution':
+        return { solutionId: node.dbId };
+      case 'assumption':
+        return { assumptionId: node.dbId };
+      case 'evidence':
+        return { evidenceId: node.dbId };
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Creates a transcript on `nodeKey`. Refreshes the node's transcript list and count on success
+   * so the panel and the canvas badge follow at once (no WebSocket publication — NFR-022).
+   * Returns the created DTO, or null on failure (the error is surfaced through the store).
+   */
+  async function createTranscript(
+    nodeKey: string,
+    request: Omit<TranscriptWriteRequest, 'productId' | 'outcomeId' | 'opportunityId' | 'solutionId' | 'assumptionId' | 'evidenceId'>,
+  ): Promise<TranscriptDTO | null> {
+    const nodeIds = nodeIdField(nodeKey);
+    if (!nodeIds) return null;
+    try {
+      const dto = await api().createTranscript({ ...request, ...nodeIds });
+      transcriptBodies.value = { ...transcriptBodies.value, [dto.id]: dto };
+      await loadTranscripts(nodeKey);
+      recordWrite(nodeKey, dto.createdDate);
+      return dto;
+    } catch (err) {
+      await failOnNodes(err, [nodeKey], 'The transcript could not be saved.');
+      return null;
+    }
+  }
+
+  /**
+   * Edits a transcript. The node relationship is immutable — omitted from the request body. On
+   * success refreshes the cached body and the node's list. Returns the updated DTO or null.
+   */
+  async function updateTranscript(
+    transcriptId: number,
+    request: Omit<TranscriptWriteRequest, 'productId' | 'outcomeId' | 'opportunityId' | 'solutionId' | 'assumptionId' | 'evidenceId'>,
+  ): Promise<TranscriptDTO | null> {
+    try {
+      const dto = await api().updateTranscript(transcriptId, request);
+      transcriptBodies.value = { ...transcriptBodies.value, [dto.id]: dto };
+      const key = dto.nodeKey;
+      if (key) {
+        await loadTranscripts(key);
+        recordWrite(key, dto.editedDate ?? dto.createdDate);
+      }
+      return dto;
+    } catch (err) {
+      fail(err, 'The transcript could not be saved.');
+      return null;
+    }
+  }
+
+  /**
+   * Deletes a transcript, then refreshes the owning node's list and count. The node itself is
+   * left intact (FR-064). Returns true on success.
+   */
+  async function deleteTranscript(transcriptId: number): Promise<boolean> {
+    const cached = transcriptBodies.value[transcriptId];
+    let nodeKey = cached?.nodeKey ?? null;
+    if (!nodeKey) {
+      for (const [k, list] of Object.entries(transcripts.value)) {
+        if (list.some(t => t.id === transcriptId)) {
+          nodeKey = k;
+          break;
+        }
+      }
+    }
+    try {
+      await api().deleteTranscript(transcriptId);
+    } catch (err) {
+      await failOnNodes(err, nodeKey ? [nodeKey] : [], 'The transcript could not be deleted.');
+      return false;
+    }
+    if (transcriptBodies.value[transcriptId]) {
+      const next = { ...transcriptBodies.value };
+      delete next[transcriptId];
+      transcriptBodies.value = next;
+    }
+    if (nodeKey) {
+      await loadTranscripts(nodeKey);
+      recordWrite(nodeKey);
+    }
+    return true;
+  }
+
+  /**
+   * Parses an uploaded {@code .txt} / {@code .vtt} / {@code .srt} file server-side and returns the
+   * cleaned body text. Nothing is stored — the caller reviews and then explicitly saves through
+   * {@link createTranscript} with {@code source: 'UPLOADED'}. The error is surfaced on failure.
+   */
+  async function parseTranscriptUpload(file: File): Promise<string | null> {
+    const id = teamId.value;
+    if (id === null) return null;
+    try {
+      const result = await api().parseTranscriptUpload(id, file);
+      return result.body;
+    } catch (err) {
+      fail(err, 'The uploaded file could not be parsed.');
+      return null;
+    }
+  }
+
   // ---- actions: realtime -------------------------------------------------------------------
 
   /**
@@ -1461,6 +1586,10 @@ export const useOstTreeStore = defineStore('ostTree', () => {
     loadHistory,
     loadTranscripts,
     loadTranscript,
+    createTranscript,
+    updateTranscript,
+    deleteTranscript,
+    parseTranscriptUpload,
     applyEvents,
     endPulse,
     clearPulses,

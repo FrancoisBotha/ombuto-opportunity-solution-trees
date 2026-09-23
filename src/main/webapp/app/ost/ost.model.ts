@@ -152,6 +152,30 @@ export interface TranscriptDTO extends TranscriptMetaDTO {
   body: string;
 }
 
+/**
+ * MTRANS-006: request body for creating or editing a transcript. On create, exactly one node id
+ * must be set (server-enforced); on edit, the node ids are ignored — a transcript is bound to its
+ * node for life. {@code source} defaults to PASTED on create; it is ignored on update.
+ */
+export interface TranscriptWriteRequest {
+  title: string;
+  meetingDate: string;
+  attendees: string | null;
+  body: string;
+  source?: 'PASTED' | 'UPLOADED';
+  productId?: number | null;
+  outcomeId?: number | null;
+  opportunityId?: number | null;
+  solutionId?: number | null;
+  assumptionId?: number | null;
+  evidenceId?: number | null;
+}
+
+/** MTRANS-006: response of the parse-only upload endpoint — parsed body text, ready for review. */
+export interface TranscriptParseResultDTO {
+  body: string;
+}
+
 export interface HistoryEntryDTO {
   id: number;
   eventType: string;

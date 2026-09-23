@@ -5,12 +5,13 @@ import sinon from 'sinon';
 
 import OstService from './ost.service';
 
-type Verb = 'get' | 'post' | 'patch' | 'delete';
+type Verb = 'get' | 'post' | 'patch' | 'put' | 'delete';
 
 const stubs = {
   get: sinon.stub(axios, 'get'),
   post: sinon.stub(axios, 'post'),
   patch: sinon.stub(axios, 'patch'),
+  put: sinon.stub(axios, 'put'),
   delete: sinon.stub(axios, 'delete'),
 };
 
@@ -126,6 +127,73 @@ describe('OstService', () => {
       call: () => service.listHistory('solution', 5),
       verb: 'get',
       url: 'api/tree/nodes/solution/5/history',
+      returnsData: true,
+    },
+    {
+      name: 'listTranscriptsByNode',
+      call: () => service.listTranscriptsByNode('opportunity', 1),
+      verb: 'get',
+      url: 'api/tree/nodes/opportunity/1/transcripts',
+      returnsData: true,
+    },
+    {
+      name: 'getTranscript',
+      call: () => service.getTranscript(9),
+      verb: 'get',
+      url: 'api/tree/transcripts/9',
+      returnsData: true,
+    },
+    {
+      name: 'createTranscript',
+      call: () => service.createTranscript({ title: 't', meetingDate: '2026-09-10', attendees: null, body: 'b', opportunityId: 1 }),
+      verb: 'post',
+      url: 'api/tree/transcripts',
+      body: { title: 't', meetingDate: '2026-09-10', attendees: null, body: 'b', opportunityId: 1 },
+      returnsData: true,
+    },
+    {
+      name: 'updateTranscript',
+      call: () => service.updateTranscript(9, { title: 't', meetingDate: '2026-09-10', attendees: null, body: 'b' }),
+      verb: 'patch',
+      url: 'api/tree/transcripts/9',
+      body: { title: 't', meetingDate: '2026-09-10', attendees: null, body: 'b' },
+      returnsData: true,
+    },
+    {
+      name: 'deleteTranscript',
+      call: () => service.deleteTranscript(9),
+      verb: 'delete',
+      url: 'api/tree/transcripts/9',
+      returnsData: false,
+    },
+    {
+      name: 'parseTranscriptUpload',
+      call: () => service.parseTranscriptUpload(7, new File(['hello'], 'a.txt', { type: 'text/plain' })),
+      verb: 'post',
+      url: 'api/tree/teams/7/transcripts/parse',
+      returnsData: true,
+    },
+    {
+      name: 'listLabelSuggestions',
+      call: () => service.listLabelSuggestions(7),
+      verb: 'get',
+      url: 'api/tree/labels/suggestions/7',
+      returnsData: true,
+    },
+    {
+      name: 'createLabel',
+      call: () => service.createLabel(7, 'Mobile'),
+      verb: 'post',
+      url: 'api/tree/labels/team/7',
+      body: { name: 'Mobile' },
+      returnsData: true,
+    },
+    {
+      name: 'applyLabels',
+      call: () => service.applyLabels('opportunity', 1, [10, 11]),
+      verb: 'put',
+      url: 'api/tree/labels/node/opportunity/1',
+      body: { tagIds: [10, 11] },
       returnsData: true,
     },
   ];

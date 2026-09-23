@@ -13,6 +13,8 @@ import type {
   TeamTreeDTO,
   TranscriptDTO,
   TranscriptMetaDTO,
+  TranscriptParseResultDTO,
+  TranscriptWriteRequest,
   TreeNodeDTO,
   TreeNodeTagDTO,
 } from './ost.model';
@@ -123,6 +125,30 @@ export default class OstService {
 
   getTranscript(id: number): Promise<TranscriptDTO> {
     return axios.get<TranscriptDTO>(`${treeApi}/transcripts/${id}`).then(res => res.data);
+  }
+
+  // ---- MTRANS-006: transcript create / edit / delete + parse upload -------------------------
+
+  createTranscript(request: TranscriptWriteRequest): Promise<TranscriptDTO> {
+    return axios.post<TranscriptDTO>(`${treeApi}/transcripts`, request).then(res => res.data);
+  }
+
+  updateTranscript(id: number, request: TranscriptWriteRequest): Promise<TranscriptDTO> {
+    return axios.patch<TranscriptDTO>(`${treeApi}/transcripts/${id}`, request).then(res => res.data);
+  }
+
+  deleteTranscript(id: number): Promise<void> {
+    return axios.delete(`${treeApi}/transcripts/${id}`).then(() => undefined);
+  }
+
+  parseTranscriptUpload(teamId: number, file: File): Promise<TranscriptParseResultDTO> {
+    const form = new FormData();
+    form.append('file', file);
+    return axios
+      .post<TranscriptParseResultDTO>(`${treeApi}/teams/${teamId}/transcripts/parse`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then(res => res.data);
   }
 
   // ---- LABEL-001: team-scoped labels --------------------------------------------------------

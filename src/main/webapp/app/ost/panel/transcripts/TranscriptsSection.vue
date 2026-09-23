@@ -1,8 +1,13 @@
 <template>
   <section v-if="node" class="ost-transcripts" data-cy="ost-transcripts" :data-node-key="nodeKey">
-    <h3 class="ost-transcripts__title">
-      Transcripts<span v-if="items.length" class="ost-transcripts__count">({{ items.length }})</span>
-    </h3>
+    <header class="ost-transcripts__header">
+      <h3 class="ost-transcripts__title">
+        Transcripts<span v-if="items.length" class="ost-transcripts__count">({{ items.length }})</span>
+      </h3>
+      <button v-if="tree.canEdit" type="button" class="ost-btn ost-btn--quick" data-cy="ost-transcript-add" @click="openAdd">
+        Add transcript
+      </button>
+    </header>
     <p v-if="loading && !items.length" class="ost-transcripts__empty">Loading transcripts…</p>
     <p v-else-if="!items.length" class="ost-transcripts__empty" data-cy="ost-transcripts-empty">No transcripts on this node yet.</p>
     <ol v-else class="ost-transcripts__list" aria-label="Transcripts, newest first">
@@ -22,25 +27,27 @@
         </button>
       </li>
     </ol>
-    <TranscriptViewer v-if="openId !== null" :transcript-id="openId" @close="openId = null" />
+    <TranscriptViewer v-if="openId !== null" :transcript-id="openId" @close="openId = null" @edit="startEdit" @deleted="onDeleted" />
+    <TranscriptFormDialog v-if="formOpen" :node-key="nodeKey" :transcript="editing" @close="closeForm" @saved="onSaved" />
   </section>
 </template>
 
 <script setup lang="ts">
 /**
- * MTRANS-005 — Transcripts section in the node detail panel, beneath the chat.
+ * MTRANS-005 / MTRANS-006 — Transcripts section in the node detail panel.
  *
- * Lists a node's transcripts newest first, showing title, meeting date and attendees only —
- * bodies are NEVER fetched for the list (NFR-024). Clicking a row opens the viewer, which pulls
- * that transcript's body on demand. This ticket ships the read side only: viewers and editors
- * see the same list and viewer, and no mutation controls are rendered here (add / edit / delete
- * belong to a later frontend ticket in the epic breakdown).
+ * Lists a node's transcripts newest first (title / date / attendees only — bodies are NEVER
+ * fetched for the list, NFR-024). Clicking a row opens the viewer, which pulls the body on
+ * demand. Editors get an "Add transcript" button; the viewer offers Edit and Delete affordances
+ * to the same audience. Viewers see the list and can open the viewer but never see the mutation
+ * controls (criterion 1).
  */
 import { computed, onMounted, ref, watch } from 'vue';
 
-import type { TranscriptMetaDTO } from '../../ost.model';
+import type { TranscriptDTO, TranscriptMetaDTO } from '../../ost.model';
 import { useOstTreeStore } from '../../stores/ost-tree.store';
 
+import TranscriptFormDialog from './TranscriptFormDialog.vue';
 import TranscriptViewer from './TranscriptViewer.vue';
 
 const props = defineProps<{ nodeKey: string }>();
@@ -50,6 +57,8 @@ const node = computed(() => tree.byId(props.nodeKey));
 const items = computed<TranscriptMetaDTO[]>(() => tree.transcripts[props.nodeKey] ?? []);
 const loading = ref(false);
 const openId = ref<number | null>(null);
+const formOpen = ref(false);
+const editing = ref<TranscriptDTO | null>(null);
 let loadingKey: string | null = null;
 
 async function load() {
@@ -71,11 +80,40 @@ function open(id: number) {
   openId.value = id;
 }
 
+function openAdd() {
+  if (!tree.canEdit) return;
+  editing.value = null;
+  formOpen.value = true;
+}
+
+function startEdit(transcript: TranscriptDTO) {
+  if (!tree.canEdit) return;
+  editing.value = transcript;
+  openId.value = null;
+  formOpen.value = true;
+}
+
+function closeForm() {
+  formOpen.value = false;
+  editing.value = null;
+}
+
+function onSaved() {
+  formOpen.value = false;
+  editing.value = null;
+}
+
+function onDeleted() {
+  openId.value = null;
+}
+
 onMounted(load);
 watch(
   () => props.nodeKey,
   () => {
     openId.value = null;
+    formOpen.value = false;
+    editing.value = null;
     void load();
   },
 );
@@ -89,6 +127,13 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.ost-transcripts__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .ost-transcripts__title {
